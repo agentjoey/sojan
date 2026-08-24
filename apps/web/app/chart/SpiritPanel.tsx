@@ -17,11 +17,9 @@ import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 
 export function SpiritPanel({
   profile,
-  autoSend,
   seedTurns,
 }: {
   profile: Profile;
-  autoSend?: string;
   /**
    * 对话开场（EP-jiao）：掷筊问事的「问题 + 灵解」由 /spirit 页注入，作为这次
    * 对话的头两条消息渲染。**不落 spirit_messages**——它们已经由 jiao_history
@@ -52,7 +50,6 @@ export function SpiritPanel({
   const [initialized, setInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoSentRef = useRef(false);
 
   useTgMainButton({
     text: streaming ? t("spirit.writing") : t("spirit.send"),
@@ -271,15 +268,6 @@ export function SpiritPanel({
     e?.preventDefault();
     await submitText(input);
   }
-
-  // 从画像页携带 topic=portrait 进入时，自动发送预设消息开启对话
-  useEffect(() => {
-    if (!autoSend || autoSentRef.current || streaming || !initialized) return;
-    if (messages.some((m) => m.role === "user")) return;
-    autoSentRef.current = true;
-    const id = setTimeout(() => void submitText(autoSend), 0);
-    return () => clearTimeout(id);
-  }, [autoSend, initialized, messages, streaming, submitText]);
 
   const accentVar = `var(--color-${spirit.dominantElement})`;
   const elementLabel = t(`chart.element${spirit.dominantElement.charAt(0).toUpperCase() + spirit.dominantElement.slice(1)}`);

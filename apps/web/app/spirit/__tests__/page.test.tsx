@@ -27,11 +27,14 @@ import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
  * 提供的那个；supabase 会话用 `vi.hoisted` 共享可变量，不能直接摆弄 mock 实例
  * （resetModules 后会打到旧实例）。
  */
+// SpiritPanel 的 autoSend prop 已随 EP-jiao Task 8 删除（产生它的旧 topic=portrait /
+// topic=fengshui&q= bypass 机制已整体撤回，见下方 describe 块的说明）——桩组件只再
+// 截获 seedTurns。
 const spiritPanelPropsSpy = vi.fn();
 vi.mock("@/app/chart/SpiritPanel", () => ({
-  SpiritPanel: (props: { autoSend?: string; seedTurns?: { role: string; content: string }[] }) => {
+  SpiritPanel: (props: { seedTurns?: { role: string; content: string }[] }) => {
     spiritPanelPropsSpy(props);
-    return <div data-testid="spirit-panel-stub">{props.autoSend ?? "(no autoSend)"}</div>;
+    return <div data-testid="spirit-panel-stub" />;
   },
 }));
 

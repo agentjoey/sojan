@@ -7,7 +7,10 @@ import { consumeQuota } from "./quota";
 import { supabaseAdmin } from "./admin";
 
 let _bot: Bot | null = null;
-const MINIAPP_URL = process.env.NEXT_PUBLIC_MINIAPP_URL || "https://zhaojian-mvp.vercel.app";
+// 兜底值指向 production 域名（2026-08-25 更名后为 sojan.app）。正常路径是由
+// NEXT_PUBLIC_MINIAPP_URL 显式指定——staging 环境必须设成 zhaojian.agentjoey.ai，
+// 否则 staging 的 bot 会把用户送进 production Mini App。
+const MINIAPP_URL = process.env.NEXT_PUBLIC_MINIAPP_URL || "https://sojan.app";
 
 function todayYmd(): string {
   const d = new Date();

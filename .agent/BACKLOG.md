@@ -88,7 +88,7 @@
 
 ## 🔴 上线前必做（owner 指定，2026-08-25）
 - [ ] **[EP-tg-bot-close] TG bot 私聊自由对话，正式上线前关闭**（owner 指示）：`lib/tg/bot.ts:87` 的 `message:text` handler 让用户在 Telegram 私聊直接发消息就进入灵的**无边界闲聊**。这是内测阶段的临时形态，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突（私聊里能随便聊、产品内却要先掷筊）。正式上线前改成引导去掷筊，或直接关掉该 handler。
-- [ ] **[EP-domain] `sojan.app` 生产域名接入**：production 用 `sojan.app`、staging 保留 `zhaojian.agentjoey.ai`（owner 决策）。需在 Vercel 绑域名 + DNS，并核对所有硬编码域名的地方：`NEXT_PUBLIC_MINIAPP_URL`、Telegram webhook（`setWebhook`）、BotFather `/setdomain`（Login Widget 必需）、Stripe webhook 回调（EP-billing-pay 落地时）。
+- [x] ~~**[EP-domain] `sojan.app` 生产域名接入**~~ —— **2026-08-25 完成**。owner 已做完 Vercel 绑域名+DNS / GitHub repo 改名 / Supabase 项目改名；claude 侧改完代码：`git remote` 指向新 repo、`apps/web/lib/tg/bot.ts` 的 `MINIAPP_URL` 兜底值 → `https://sojan.app`（**staging 必须显式设 `NEXT_PUBLIC_MINIAPP_URL=https://zhaojian.agentjoey.ai`，否则 staging 的 bot 会把用户送进 production Mini App**）。核查结论：代码里硬编码域名**只有这一处**——此前记的"四处"里，`setWebhook` 是一次性 curl 不在代码中、BotFather `/setdomain` 是 Telegram 侧外部动作、Stripe webhook 尚未实现（留待 EP-billing-pay）。
 
 ## 🟢 LOW
 - [ ] [EP-009] 分享卡片 / 海报生成。

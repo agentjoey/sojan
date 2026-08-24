@@ -111,15 +111,14 @@ beforeEach(() => {
 });
 
 describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文本>", () => {
-  it("topic=fengshui&q=<动作文本> 时，autoSend 收到了根据该动作文本拼出的提问，而不是 undefined", async () => {
-    await renderSpiritPage("/spirit?topic=fengshui&q=" + encodeURIComponent("床头靠东南一侧的实墙"));
-    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
-    const lastCall = spiritPanelPropsSpy.mock.calls.at(-1)![0] as { autoSend?: string };
-    expect(lastCall.autoSend).toBeDefined();
-    // autoSend 必须真的带着这条化解的动作文本本身，不能只是一句不知所云的通用寒暄
-    expect(lastCall.autoSend).toContain("床头靠东南一侧的实墙");
-  });
-
+  // 修复轮（评审 Critical）：撤回 topic=portrait / topic=fengshui&q= 两条深链
+  // autoSend bypass——它们曾经绕过掷筊闸门直接进对话，与 EP-jiao「/spirit 收缩为
+  // 先对一件具体的事掷筊」的核心决策冲突。这两条 bypass 的最终归宿是计划
+  // docs/superpowers/plans/2026-08-25-jiao-divination.md 的 Task 8：
+  // topic=portrait 的产生方（画像页「聊聊这个」按钮）整个删除；
+  // topic=fengshui&q= 改成 ?ask=<动作文本>，语义是预填输入框、仍需用户自己掷筊。
+  // 原本钉住 bypass 行为的两条测试（topic=fengshui&q=、topic=portrait）随之删除；
+  // 下面这条「畸形链接落回掷筊闸门」的测试反映的正是正确行为，予以保留。
   it("topic=fengshui 但没有 q（畸形链接）时，autoSend 仍是 undefined，不拼出一句空话——落回掷筊闸门而不是空白通用聊天", async () => {
     // EP-jiao 之前：autoSend undefined 时 SpiritPanel 仍会直接渲染（空白通用聊天）。
     // EP-jiao 之后：/spirit 默认（无有效 topic）入口统一收窄成掷筊闸门，畸形链接
@@ -127,13 +126,6 @@ describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文�
     await renderSpiritPage("/spirit?topic=fengshui");
     await waitFor(() => expect(screen.getByPlaceholderText(/该不该/)).toBeInTheDocument());
     expect(spiritPanelPropsSpy).not.toHaveBeenCalled();
-  });
-
-  it("回归：topic=portrait 时 autoSend 仍是既有的画像开场白（不受本次改动影响）", async () => {
-    await renderSpiritPage("/spirit?topic=portrait");
-    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
-    const lastCall = spiritPanelPropsSpy.mock.calls.at(-1)![0] as { autoSend?: string };
-    expect(lastCall.autoSend).toBe("我想聊聊我的自我画像");
   });
 
   it("回归：不带 topic 时 autoSend 为 undefined（走掷筊闸门，而不是空白通用聊天）", async () => {
@@ -239,5 +231,63 @@ describe("EP-jiao 掷筊闸门", () => {
     // 等对话态落定，让 askSpirit 里的异步链在测试结束前跑完，不留悬挂的
     // act-外 setState 污染下一个测试的输出。
     await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
+  });
+
+  // 修复轮（评审 Important 2）：402（免费额度用尽）此前落进 `throw new Error(await
+  // res.text())`，把服务端裸 JSON 错误体 `{"error":"paywall"}` 当文案展示给用户。
+  it("402 → 渲染付费墙，而不是把裸 JSON 错误体当文案展示", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ error: "paywall" }), { status: 402 }));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+
+    await waitFor(() => expect(screen.getByText("升级会员，解锁无限")).toBeInTheDocument());
+    // 裸 JSON 错误体不应该出现在页面上
+    expect(screen.queryByText(/"error":"paywall"/)).toBeNull();
+    // 回到 asking 阶段，问题还在、可以重新掷（而不是卡死在报错态）
+    expect(screen.getByRole("button", { name: "掷筊" })).toBeInTheDocument();
+  });
+
+  // 修复轮（评审 Minor 3）：needLogin 横幅此前一旦置为 true，此后每次渲染都会
+  // 继续挂着，即使后来掷筊成功也不消失，要刷新整页才会消失。
+  it("needLogin 横幅不需要刷新整页——下一次掷筊即清除", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValueOnce(new Response("unauthorized", { status: 401 }));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/先确认身份/)).toBeInTheDocument());
+
+    // 发起下一次掷筊尝试：不必等网络返回，横幅应立刻消失
+    fetchSpy.mockResolvedValueOnce(new Response("这一掷是圣筊。"));
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    expect(screen.queryByText(/先确认身份/)).toBeNull();
+
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
+  });
+
+  // 修复轮（评审 Minor 4）：askSpirit 的 catch 块此前只把 stage 重置回 asking，
+  // 没有把 onSettled 刚追加进 throws 的那一次筊象撤掉——失败的那一卦被永久算进
+  // 三掷计数，挤占用户本该有的免费重掷额度。
+  it("askSpirit 失败（网络错误）时把这次筊象从 throws 撤回，不占用三掷额度", async () => {
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockRejectedValueOnce(new Error("network down"));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
+
+    // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
+    // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+    expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
   });
 });

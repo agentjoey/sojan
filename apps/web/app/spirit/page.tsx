@@ -12,6 +12,7 @@ import { JiaoThrow } from "@/components/JiaoThrow";
 import { SpiritPanel } from "@/app/chart/SpiritPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui";
+import { Paywall } from "@/components/Paywall";
 import { jiaoSummaryAction } from "@/app/actions";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 
@@ -36,18 +37,6 @@ export default function SpiritPage() {
   const [memory, setMemory] = useState<string | null>(null);
   const [questionnaire, setQuestionnaire] = useState<string | undefined>(undefined);
   const [history, setHistory] = useState<JiaoHistoryEntry[]>([]);
-
-  // 深链入口（画像页「聊聊这个」/「境」页每条化解的「聊聊这条建议」）——见下方
-  // topic/query 解析。这两个入口本身就带着一件具体的事，跳过掷筊闸门直接进对话，
-  // 语义上等价于「已经想清楚要问什么了」，不需要再补一次仪式。
-  const [topic, setTopic] = useState<string | null>(null);
-  const [query, setQuery] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setTopic(params.get("topic"));
-    setQuery(params.get("q"));
-  }, []);
 
   useEffect(() => {
     if (!ENABLED) return;
@@ -88,6 +77,7 @@ export default function SpiritPage() {
   function doThrow() {
     if (!canThrow) return;
     setError(null);
+    setNeedLogin(false); // 新一次掷筊即视为用户已处理过登录态，不让旧横幅挂到刷新页面才消失
     const r = throwJiao();
     setStage({ kind: "throwing", blocks: r.blocks, omen: r.omen });
   }
@@ -122,6 +112,13 @@ export default function SpiritPage() {
           setStage({ kind: "asking" });
           return;
         }
+        // 匿名级免费额度烧完 → 402：走付费墙 UI，别把服务端裸 JSON 错误体
+        // （`{"error":"paywall"}`）当文案展示给用户（同 SpiritPanel.submitText 的处理）
+        if (res.status === 402) {
+          setError("__paywall__");
+          setStage({ kind: "asking" });
+          return;
+        }
         throw new Error(await res.text());
       }
       const reply = await res.text();
@@ -132,6 +129,10 @@ export default function SpiritPage() {
         void appendJiaoHistory(profile.id, omen, summary, reply).then(() => listJiaoHistory(profile.id).then(setHistory));
       });
     } catch (e) {
+      // 撤回刚才 onSettled 追加进 throws 的这一次筊象：否则第三次笑筊那一轮遇到
+      // 网络错误/500，throws.length 会永久停在 >= MAX_THROWS，之后这一轮里每次
+      // 掷筊都被当成 exhausted（跳过笑筊重掷逻辑），直到用户显式换个问题。
+      setThrows((prev) => prev.slice(0, -1));
       setError(e instanceof Error ? e.message : String(e));
       setStage({ kind: "asking" });
     }
@@ -141,6 +142,7 @@ export default function SpiritPage() {
     setQuestion("");
     setThrows([]);
     setError(null);
+    setNeedLogin(false); // 换一件事问：旧的登录横幅不该跟着新问题继续挂
     setStage({ kind: "asking" });
   }
 
@@ -155,38 +157,6 @@ export default function SpiritPage() {
         </Link>
       </Centered>
     );
-
-  // topic=portrait：既有的画像开场白（固定文案，不带 URL 参数）。
-  // topic=fengshui：q 是「境」页某条化解自己的动作文本（不是 remedyId），
-  // 用 talkFengshuiMessage 模板拼成一句关于这条化解的提问；没有 q（畸形链接）时
-  // 不拼——总不能对着空动作文本造出一句不知所云的话。
-  // 其余情况（含未带 topic）不自动发送，走下面的掷筊闸门。
-  const autoSend =
-    topic === "portrait"
-      ? t("spirit.talkPortraitMessage")
-      : topic === "fengshui" && query
-        ? t("spirit.talkFengshuiMessage", { action: query })
-        : undefined;
-
-  // 深链入口（画像 / 境）已经带着一件具体的事进来，直接对话——保留 EP-jiao 之前的
-  // 行为，不套掷筊闸门（闸门收窄的是「/spirit 冷启动」这个起手姿势，不是每一次进入）。
-  if (autoSend !== undefined) {
-    return (
-      <main className="flex h-[100dvh] flex-col">
-        <header className="flex h-[56px] shrink-0 items-center justify-between border-b border-[var(--color-line)] bg-surface px-4">
-          <Link href="/chart" className="flex items-center gap-1 text-[14px] text-ink-2">
-            <span>←</span>
-            <span>{t("common.back")}</span>
-          </Link>
-          <Link href="/spirit/portrait" className="text-[13px] text-cinnabar">
-            {t("spirit.viewPortrait")}
-          </Link>
-        </header>
-        <SpiritPanel profile={profile} autoSend={autoSend} />
-        <p className="px-5 pb-2 pt-1 text-[11px] leading-relaxed text-muted">{t("spirit.disclaimer")}</p>
-      </main>
-    );
-  }
 
   if (stage.kind === "conversing") {
     return (
@@ -267,11 +237,15 @@ export default function SpiritPage() {
           </Link>
         </div>
       )}
-      {error && (
+      {error === "__paywall__" ? (
+        <div className="mt-4">
+          <Paywall reason="quota" onClose={() => setError(null)} />
+        </div>
+      ) : error ? (
         <div className="mt-4 px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>
           {error}
         </div>
-      )}
+      ) : null}
 
       {stage.kind === "asking" && history.length > 0 && (
         <div className="mt-10 pt-6" style={{ borderTop: "1px solid var(--color-line)" }}>

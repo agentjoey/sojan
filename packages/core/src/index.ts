@@ -23,6 +23,8 @@ export type { QuestionnaireItem, QuestionnaireAnswers } from "./spirit/questionn
 export { deriveSelfPortrait } from "./spirit/portrait";
 export type { SelfPortrait, SelfPortraitDimension } from "./spirit/portrait";
 
+export { omenOf, phaseAfter, MAX_THROWS, type Omen, type BlockFace, type JiaoPhase } from "./jiao";
+
 export {
   computeFengshui, FENGSHUI_ENGINE_VERSION,
   deriveMingGua, ganzhiOfYear, directionsFor, elementDirections, adviseObject,

@@ -108,13 +108,19 @@ export default function SpiritPage() {
       });
       if (!res.ok) {
         if (res.status === 401) {
+          // 撤回刚才 onSettled 追加进 throws 的这一次筊象：未登录/会话过期，
+          // 连 LLM 都没调用，不应消耗用户三掷机会中的一次。
+          setThrows((prev) => prev.slice(0, -1));
           setNeedLogin(true);
           setStage({ kind: "asking" });
           return;
         }
         // 匿名级免费额度烧完 → 402：走付费墙 UI，别把服务端裸 JSON 错误体
-        // （`{"error":"paywall"}`）当文案展示给用户（同 SpiritPanel.submitText 的处理）
+        // （`{"error":"paywall"}`）当文案展示给用户（同 SpiritPanel.submitText 的处理）。
+        // 撤回刚才 onSettled 追加进 throws 的这一次筊象：额度用尽也没有产出解读，
+        // 不应消耗用户三掷机会中的一次。
         if (res.status === 402) {
+          setThrows((prev) => prev.slice(0, -1));
           setError("__paywall__");
           setStage({ kind: "asking" });
           return;

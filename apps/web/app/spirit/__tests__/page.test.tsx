@@ -110,7 +110,7 @@ beforeEach(() => {
   supabaseSession.current = { access_token: "test-access-token" };
 });
 
-describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文本>", () => {
+describe("回归：/spirit 不消费 ?topic=fengshui&q=<动作文本>（该参数落入掷筊闸门，不再 bypass）", () => {
   // 修复轮（评审 Critical）：撤回 topic=portrait / topic=fengshui&q= 两条深链
   // autoSend bypass——它们曾经绕过掷筊闸门直接进对话，与 EP-jiao「/spirit 收缩为
   // 先对一件具体的事掷筊」的核心决策冲突。这两条 bypass 的最终归宿是计划
@@ -281,6 +281,48 @@ describe("EP-jiao 掷筊闸门", () => {
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
     fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
     await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
+
+    // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
+    // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+    expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
+  });
+
+  // 修复轮 2（评审 Blocking 3）：401（未登录/会话过期）此前落进 `return` 而未撤回
+  // throws，用户反复撞 401 可以在零解读的情况下烧光三次机会。同网络错误分支，
+  // askSpirit 失败没产出解读的那一掷应被撤回。
+  it("askSpirit 失败（401 未登录）时把这次筊象从 throws 撤回，不占用三掷额度", async () => {
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValueOnce(new Response("unauthorized", { status: 401 }));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/先确认身份/)).toBeInTheDocument());
+
+    // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
+    // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+    expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
+  });
+
+  // 修复轮 2（评审 Blocking 3）：402（免费额度用尽）此前落进 `return` 而未撤回
+  // throws，用户重试掷筊会尽快撞上 MAX_THROWS 限制，即使后来充值了也得换个问题
+  // 才能继续掷。askSpirit 失败没产出解读的那一掷应被撤回。
+  it("askSpirit 失败（402 额度用尽）时把这次筊象从 throws 撤回，不占用三掷额度", async () => {
+    throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ error: "paywall" }), { status: 402 }));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText("升级会员，解锁无限")).toBeInTheDocument());
 
     // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
     // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。

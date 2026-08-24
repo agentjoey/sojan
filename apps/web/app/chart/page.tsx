@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getActiveProfile, saveReading, type Profile } from "@/lib/profiles";
+import { getActiveProfile, getQuestionnaire, saveReading, type Profile } from "@/lib/profiles";
 import { hasTgSession, isTelegram, tgGetProfile } from "@/lib/tg/client";
 import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { timelineAction } from "@/app/actions";
@@ -15,6 +15,7 @@ import { BaziPillars } from "@/components/charts/BaziPillars";
 import { ZiweiBoard } from "@/components/charts/ZiweiBoard";
 import { WuxingRadar } from "@/components/charts/WuxingRadar";
 import { NatalWheel } from "@/components/charts/NatalWheel";
+import { SelfPortrait } from "./SelfPortrait";
 
 type Section = { key: string; title: string; body: string; accent?: "fire" | "water" | "metal" };
 
@@ -40,6 +41,7 @@ export default function ChartPage() {
   const [streaming, setStreaming] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<string | null>(null);
+  const [qAnswers, setQAnswers] = useState<Awaited<ReturnType<typeof getQuestionnaire>>>(null);
 
   const inTg = useIsTelegram();
 
@@ -64,6 +66,14 @@ export default function ChartPage() {
       }
     })();
   }, []);
+
+  // 自我画像（EP-jiao Task 8：从已删除的 /spirit/portrait 独立页挪入命盘页）——
+  // questionnaire 是问卷自陈，读不到（含 TG 会话下 RLS 无会话的已知情形）时
+  // 静默回落 null，SelfPortrait 仅凭命盘也能渲染，不阻塞主流程。
+  useEffect(() => {
+    if (!profile) return;
+    getQuestionnaire(profile.id).then(setQAnswers).catch(() => setQAnswers(null));
+  }, [profile]);
 
   // 当下时序：按 (档案,年份) 缓存，避免重复调 LLM
   async function loadTimeline(p: Profile) {
@@ -210,6 +220,12 @@ export default function ChartPage() {
         ) : (
           <p className="text-[14px] text-muted">{t("chart.westernMissing")}</p>
         )}
+      </ChartBlock>
+
+      {/* 自我画像（EP-jiao Task 8：从 /spirit/portrait 独立页挪入，不再挂「和本命之灵聊聊」
+          的自由聊入口——命盘页是骨架陈列，跳出去开自由聊与这里的语义不符） */}
+      <ChartBlock label={t("chart.selfPortraitTitle")}>
+        <SelfPortrait chart={chart} questionnaire={qAnswers ?? undefined} />
       </ChartBlock>
 
       {/* 三段式解读 */}

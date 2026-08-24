@@ -675,15 +675,17 @@ describe("EP-fs-15 命宅相配/相冲判语（复审必修3）", () => {
   });
 });
 
-describe("最终评审 Blocking 2：「和 Sojan 聊聊这条」链接要带得动实际内容，且受「灵」flag 门控", () => {
+describe("最终评审 Blocking 2：「就这条问一卦」链接要带得动实际内容，且受「灵」flag 门控", () => {
   // 复审指出：此前 href 只带 remedyId（如 `?topic=fengshui:fs-desk-sheng`），
   // /spirit 只认 topic==="portrait"，id 被解析出来即丢弃，用户落进空白通用聊天——
-  // 是「复用了 URL 形状，没复用机制」。下面的测试断言行为（q 参数真的带着这条化解
+  // 是「复用了 URL 形状，没复用机制」。下面的测试断言行为（ask 参数真的带着这条化解
   // 的动作文本、灵关闭时链接压根不存在），不再只断言 href 正则（那样的断言即使
-  // /spirit 端完全不解析这个 id 也照样通过，抓不住这个 bug）。
+  // /spirit 端完全不解析这个参数也照样通过，抓不住这个 bug）。
   // Task 9：化解卡片移到「化解」tab，查询前需先切换过去。
+  // EP-jiao Task 8：链接语义从「聊聊」改成「问一卦」，参数从 topic=fengshui&q= 改成
+  // ask=——/spirit 端只用它预填输入框，不自动掷筊（掷筊闸门收缩后的行为，见 page.tsx）。
 
-  it("灵开启时，每条化解链接指向 /spirit?topic=fengshui&q=<那一条自己的动作文本>（不是无意义的 id）", async () => {
+  it("灵开启时，每条化解链接指向 /spirit?ask=<那一条自己的动作文本>（不是无意义的 id）", async () => {
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
     const { truncateForSpiritQuery } = await import("../page");
     await renderPage();
@@ -692,7 +694,7 @@ describe("最终评审 Blocking 2：「和 Sojan 聊聊这条」链接要带得�
     // 比 getByText("甲") 更准：这条测试不关心叙述内容本身，不需要真的点开它。
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "化解" }));
-    const links = screen.getAllByText("和 Sojan 聊聊这条");
+    const links = screen.getAllByText("就这条问一卦");
     // page.tsx 按 fs.remedies 数组原序 .map 渲染卡片，不重新排序——逐条按位置对拍，
     // 不假设某条化解「恒为第一条」（sortRemedies 的实际输出顺序不是这么回事）。
     expect(links.length).toBe(fs.remedies.length);
@@ -700,23 +702,22 @@ describe("最终评审 Blocking 2：「和 Sojan 聊聊这条」链接要带得�
       const href = link.closest("a")!.getAttribute("href")!;
       const url = new URL(href, "http://localhost");
       expect(url.pathname).toBe("/spirit");
-      expect(url.searchParams.get("topic")).toBe("fengshui");
-      // q 必须是这条化解自己的动作文本（截断规则与 page.tsx 用同一个函数），
+      // ask 必须是这条化解自己的动作文本（截断规则与 page.tsx 用同一个函数），
       // 而不是像此前那样只带一个 /spirit 端根本不认得的 remedyId。
-      expect(url.searchParams.get("q")).toBe(truncateForSpiritQuery(fs.remedies[i]!.action));
+      expect(url.searchParams.get("ask")).toBe(truncateForSpiritQuery(fs.remedies[i]!.action));
     });
   });
 
-  it("灵未开启时不渲染「和 Sojan 聊聊这条」链接，避免把用户送进 /spirit 的「尚未开启」死胡同", async () => {
+  it("灵未开启时不渲染「就这条问一卦」链接，避免把用户送进 /spirit 的「尚未开启」死胡同", async () => {
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", ""); // 显式关闭；与「未设置」等价，但意图更明确
     await renderPage();
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "化解" }));
     expect(screen.getByText("可做的事")).toBeInTheDocument(); // 确认真的切到了会渲染卡片的 tab
-    expect(screen.queryByText("和 Sojan 聊聊这条")).toBeNull();
+    expect(screen.queryByText("就这条问一卦")).toBeNull();
   });
 
-  it("动作文本较长时对 q 参数做合理截断，不放任 URL 无限增长", async () => {
+  it("动作文本较长时对 ask 参数做合理截断，不放任 URL 无限增长", async () => {
     const { truncateForSpiritQuery } = await import("../page");
     const long = "久".repeat(200);
     const truncated = truncateForSpiritQuery(long);

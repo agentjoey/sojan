@@ -167,6 +167,23 @@ describe("EP-jiao 掷筊闸门", () => {
     expect(screen.queryByTestId("spirit-panel-stub")).toBeNull();
   });
 
+  // EP-jiao Task 8：风水页「就这条问一卦」的新落点是 ?ask=<动作文本>。与已删除的
+  // topic=fengshui&q= bypass 语义完全不同——那条会绕过掷筊闸门直接进对话；这条
+  // 只把文本填进输入框，用户仍要自己点「掷筊」（掷筊是用户自己的动作，不能替他掷，
+  // 见 page.tsx 里 ?ask= effect 的注释）。
+  it("消费 ?ask= 只预填问题文本，不自动掷筊——不调用 throwJiao / 不发起请求，仍停在 asking 阶段", async () => {
+    await renderSpiritPage("/spirit?ask=" + encodeURIComponent("久坐处朝向调到东南"));
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/该不该/)).toHaveValue("久坐处朝向调到东南"),
+    );
+    // 没有自动掷筊：throwJiao 未被调用，也没有对话面板/请求发生。
+    expect(throwJiaoMock).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("spirit-panel-stub")).toBeNull();
+    // 掷筊按钮就在那——预填后问题已经 >= 4 字，用户一点就能自己掷。
+    expect(screen.getByRole("button", { name: "掷筊" })).toBeEnabled();
+  });
+
   it("问题少于 4 字时掷筊按钮禁用", async () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "嗯" } });

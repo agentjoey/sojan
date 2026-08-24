@@ -59,6 +59,13 @@ export default function SpiritPage() {
     })();
   }, []);
 
+  // 风水页「就这条问一卦」带过来的预填问题（化解动作文本）。只预填，不自动掷——
+  // 掷筊是用户自己的动作，不能替他掷。
+  useEffect(() => {
+    const ask = new URLSearchParams(window.location.search).get("ask");
+    if (ask) setQuestion(ask);
+  }, []);
+
   // 历史列表独立 effect + 独立 try/catch：加载失败只留空列表，不挡主流程（同 /dream）
   useEffect(() => {
     if (!profile) return;

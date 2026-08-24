@@ -319,16 +319,8 @@ export const zh = {
     quickPrompts: ["该不该换工作", "这段关系要不要继续", "现在适合搬家吗", "要不要开始这件事"],
     quickPromptsLabel: "想继续问：",
     online: "在线",
-    portraitPageTitle: "自我画像",
-    share: "分享",
     talkAboutPortrait: "和本命之灵聊聊这个",
-    talkPortraitMessage: "我想聊聊我的自我画像",
-    // 最终评审 Blocking 2：/spirit?topic=fengshui&q=<动作文本> 落地时，用这句模板把
-    // 「境」页某条化解的动作文本拼成一句自然的开场提问，复用 talkPortraitMessage
-    // 同一套 autoSend 机制（见 apps/web/app/spirit/page.tsx）。
-    talkFengshuiMessage: "我想聊聊这条建议：{action}",
     portraitNoteTitle: "本命之灵的观察",
-    viewPortrait: "查看自我画像 →",
 
     archetypeAlt: "本命之灵 · {archetype}",
     natalSpirit: "本命之灵 · Natal Spirit",
@@ -444,7 +436,7 @@ export const zh = {
     evidenceBoth: "传统 + 现代",
     modernLabel: "现代机制",
     traditionalLabel: "传统依据",
-    askSojan: "和 Sojan 聊聊这条",
+    askSojan: "就这条问一卦",
     narrativeFailed: "叙述暂时生成不出来，下面的盘与建议不受影响。",
     narrativeDegraded: "本次叙述中有方位判断被系统纠正，可信度不足，已不展示；下面的盘与建议不受影响。",
     regenerate: "重新生成叙述",

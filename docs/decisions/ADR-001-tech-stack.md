@@ -34,7 +34,7 @@ MVP 需把出生信息 → 八字+紫微+西方本命盘 → LLM 命理/心理/�
 
 ## 影响（已落地）
 - `apps/web` 已用 `create-next-app`（Next 16 / React 19 / Tailwind 4）初始化并加入 `pnpm-workspace.yaml` 的 `apps/*`。
-- `@eamvp/core` 经 `transpilePackages` 接入；server action `app/reading/actions.ts` 已打通校验→排盘集成边界。
-- 验证：`pnpm --filter @eamvp/web build` ✓ 编译+TS 通过（路由 `/`、`/reading`）；`@eamvp/core` 测试 4/4。
+- `@sojan/core` 经 `transpilePackages` 接入；server action `app/reading/actions.ts` 已打通校验→排盘集成边界。
+- 验证：`pnpm --filter @sojan/web build` ✓ 编译+TS 通过（路由 `/`、`/reading`）；`@sojan/core` 测试 4/4。
 - `packages/core` 内部相对导入改为 extensionless（Turbopack 不重映射 `.js`→`.ts`）。
 - `docs/deployment.md` 待随首个 Vercel 部署补全。

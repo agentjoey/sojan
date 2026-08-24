@@ -1,5 +1,5 @@
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
-import { streamReading, resolveLlmConfig, isLlmConfigured } from "@eamvp/llm";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
+import { streamReading, resolveLlmConfig, isLlmConfigured } from "@sojan/llm";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";

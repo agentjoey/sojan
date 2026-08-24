@@ -39,7 +39,7 @@ jobs:
       # page-data 收集阶段直接失败（getBot() 抛错）。构建期不需要真 token，
       # 给个占位即可——这不是密钥，只是让模块能完成初始化。
       - name: build（apps/web）
-        run: pnpm --filter @eamvp/web build
+        run: pnpm --filter @sojan/web build
         env:
           TELEGRAM_BOT_TOKEN: ci-placeholder-not-a-secret
 
@@ -50,4 +50,4 @@ jobs:
       # 想连 warning 一起卡，加 `--max-warnings 0`——但先把那 18 条处理掉，
       # 否则等于把闸门锁死在红灯上。
       - name: lint（error 阻塞）
-        run: pnpm --filter @eamvp/web lint
+        run: pnpm --filter @sojan/web lint

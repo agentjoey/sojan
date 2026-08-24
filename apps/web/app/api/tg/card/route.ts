@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { cookies } from "next/headers";
 import * as React from "react";
-import { deriveSpirit, computeDailyFortune } from "@eamvp/core";
+import { deriveSpirit, computeDailyFortune } from "@sojan/core";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { getProfileForUser } from "@/lib/tg/identity";
 

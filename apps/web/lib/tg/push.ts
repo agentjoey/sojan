@@ -1,5 +1,5 @@
-import { computeDailyFortune } from "@eamvp/core";
-import { generateDailySpiritGreeting } from "@eamvp/llm";
+import { computeDailyFortune } from "@sojan/core";
+import { generateDailySpiritGreeting } from "@sojan/llm";
 import { supabaseAdmin } from "./admin";
 import { getBot } from "./bot";
 import { getMemory } from "./data";

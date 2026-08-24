@@ -15,7 +15,7 @@ const generateSpiritIntroSpy = vi.fn(async (..._a: unknown[]) => ({ text: "你�
 const streamSpiritChatSpy = vi.fn(async function* () {
   yield "回复";
 });
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "minimax", model: "m" })),
   isLlmConfigured: () => isLlmConfiguredMock(),
   generateSpiritIntro: (...a: unknown[]) => generateSpiritIntroSpy(...a),

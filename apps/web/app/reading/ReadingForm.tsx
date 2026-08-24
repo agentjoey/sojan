@@ -7,7 +7,7 @@ import { createProfile } from "@/lib/profiles";
 import { hasTgSession, isTelegram, ensureTgSession, tgReadyExpand } from "@/lib/tg/client";
 import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
-import type { BirthInput } from "@eamvp/core";
+import type { BirthInput } from "@sojan/core";
 import { shichenOf } from "@/lib/shichen";
 
 // 当代东方 v3：字段值是「细线下划的纯文字」，不是方框输入——跟全站去卡片化的

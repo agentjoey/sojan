@@ -1,6 +1,6 @@
 "use client";
 
-import type { BaziChart, Pillar } from "@eamvp/core";
+import type { BaziChart, Pillar } from "@sojan/core";
 import { useT } from "@/lib/i18n/I18nProvider";
 
 // 五行计数小芯片的固定顺序：木火土金水

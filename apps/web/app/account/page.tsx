@@ -446,7 +446,7 @@ export default function AccountPage() {
         : t("account.title")
       : view.kind === "email"
         ? view.email
-        : t("account.saveYourZhaojian");
+        : t("account.saveYourSojan");
   const annotation = view.kind === "telegram" ? t("account.loggedInViaTelegram") : undefined;
 
   const primaryBtn = "w-full px-4 py-3 text-[14px] font-medium transition-colors disabled:opacity-60";

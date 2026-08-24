@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { computeUnifiedChart, computeFengshui, BirthInputSchema } from "@eamvp/core";
-import { generateFengshuiReading } from "@eamvp/llm";
+import { computeUnifiedChart, computeFengshui, BirthInputSchema } from "@sojan/core";
+import { generateFengshuiReading } from "@sojan/llm";
 import { getEntitlement, isMember } from "@/lib/entitlements";
 // 同住人上限的**单一事实源**（最终评审 I1），与 DwellingForm 的选择器同源。
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";

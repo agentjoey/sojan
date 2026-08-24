@@ -9,8 +9,8 @@ import {
   type UnifiedChart,
   type DailyFortune,
   type ZiweiHoroscope,
-} from "@eamvp/core";
-import { polishDailyFortune, dailyBehaviorAdvice, generateTimeline, summarizeSpiritMemory, summarizeDreamEntry, generateDailySpiritGreeting, resolveLlmConfig, isLlmConfigured, type ReadingLanguage } from "@eamvp/llm";
+} from "@sojan/core";
+import { polishDailyFortune, dailyBehaviorAdvice, generateTimeline, summarizeSpiritMemory, summarizeDreamEntry, generateDailySpiritGreeting, resolveLlmConfig, isLlmConfigured, type ReadingLanguage } from "@sojan/llm";
 
 /** 建档排盘：一次性算出完整命盘（EP-007 冻结存档用）。 */
 export async function computeChartAction(
@@ -110,7 +110,7 @@ export async function geocodeAction(
   try {
     const tzlookup = (await import("tz-lookup")).default;
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=zh`;
-    const res = await fetch(url, { headers: { "User-Agent": "zhaojian-mvp/0.1 (eastern astrology self-reflection)" } });
+    const res = await fetch(url, { headers: { "User-Agent": "sojan/0.1 (eastern astrology self-reflection)" } });
     if (!res.ok) return { ok: false, error: `地理编码失败（${res.status}）` };
     const data = (await res.json()) as { lat: string; lon: string; display_name: string }[];
     const results: GeoResult[] = data.map((d) => {

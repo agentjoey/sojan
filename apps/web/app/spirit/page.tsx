@@ -12,7 +12,7 @@ const ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1";
 export default function SpiritPage() {
   const t = useT();
   const [topic, setTopic] = useState<string | null>(null);
-  // 最终评审 Blocking 2：/fengshui 每条化解卡片的「和 Mira 聊聊这条」链接携带
+  // 最终评审 Blocking 2：/fengshui 每条化解卡片的「和 Sojan 聊聊这条」链接携带
   // ?topic=fengshui&q=<该条化解的动作文本>（见 apps/web/app/fengshui/page.tsx）。
   // `query` 就是那段动作文本本身——原始素材，不是 remedyId；下面据此拼出 autoSend。
   const [query, setQuery] = useState<string | null>(null);

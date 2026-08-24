@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeUnifiedChart, BirthInputSchema, deriveSpirit, computeDailyFortune } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema, deriveSpirit, computeDailyFortune } from "@sojan/core";
 import { buildSpiritSystemPrompt, summarizeSpiritMemory } from "./spirit";
 
 const chart = computeUnifiedChart(

@@ -5,7 +5,7 @@ import {
   adviseObject, OBJECT_CATEGORIES, CATEGORY_LABEL, DIRECTIONS, DIRECTION_LABEL,
   type FengshuiChart, type ObjectAdvice, type ObjectCategory, type Direction,
   type DirectionVerdict,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { Group } from "@/components/tg/native";

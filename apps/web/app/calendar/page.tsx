@@ -13,9 +13,12 @@ import { FortuneFrame } from "@/components/FortuneFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { AskToday } from "./AskToday";
 import { useT } from "@/lib/i18n/I18nProvider";
-import type { DailyFortune, ZiweiHoroscope } from "@eamvp/core";
+import type { DailyFortune, ZiweiHoroscope } from "@sojan/core";
 
-// 按 (档案,日期,kind) 缓存 LLM 结果到 localStorage，避免重复调用
+// 按 (档案,日期,kind) 缓存 LLM 结果到 localStorage，避免重复调用。
+// ⚠️ 键前缀 `zhaojian.` 刻意保留旧品牌名、不随 2026-08-25 更名 Sojan 而改（owner 决策）：
+// 这是用户浏览器里已存在的键，改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度，
+// 而用户根本看不到这个字符串。同理见 lib/access.ts 的 SYNTHETIC_EMAIL_DOMAIN。
 function cacheGet(kind: string, pid: string, date: string): string | null {
   try { return localStorage.getItem(`zhaojian.${kind}.${pid}.${date}`); } catch { return null; }
 }

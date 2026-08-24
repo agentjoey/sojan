@@ -7,16 +7,16 @@
 // Next 的开发/构建服务器，是最贴近路由处理函数真实运行时形态的单测方式。
 //
 // Task 14 复审必修2：本路由此前零测试。覆盖四条路径：LLM 未配置 503、入参非法 400、
-// 正常路径返回 JSON（含 sections/degraded）、生成抛错 500。`@eamvp/llm` 整体 mock 掉，
-// 避免真实网络调用；`@eamvp/core` 不 mock，让 computeUnifiedChart/computeFengshui
+// 正常路径返回 JSON（含 sections/degraded）、生成抛错 500。`@sojan/llm` 整体 mock 掉，
+// 避免真实网络调用；`@sojan/core` 不 mock，让 computeUnifiedChart/computeFengshui
 // 走真实计算（快、确定性，且能顺带验证 route 与 core 的接线没有断）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { BirthInputSchema, type FengshuiChart } from "@eamvp/core";
+import { BirthInputSchema, type FengshuiChart } from "@sojan/core";
 
 const isLlmConfiguredMock = vi.fn<(...args: unknown[]) => boolean>(() => true);
 const generateFengshuiReadingMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "anthropic", wire: "anthropic", model: "m", baseUrl: "http://x", apiKey: "k" })),
   isLlmConfigured: (...a: unknown[]) => isLlmConfiguredMock(...a),
   generateFengshuiReading: (...a: unknown[]) => generateFengshuiReadingMock(...a),

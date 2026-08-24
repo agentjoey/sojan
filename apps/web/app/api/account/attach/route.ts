@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyTelegramLogin, type TgLoginParams } from "@eamvp/core";
+import { verifyTelegramLogin, type TgLoginParams } from "@sojan/core";
 import { resolveUid } from "@/lib/account/uid";
 import { supabaseAdmin } from "@/lib/tg/admin";
 import { attachIdentity, completeEmailAttach, peekEmailBind, type AttachError } from "@/lib/tg/identity-link";

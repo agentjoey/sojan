@@ -7,7 +7,7 @@ import { deriveWesternProfile } from "../western/profile";
  *
  * 从「已冻结的命盘」确定性派生一个陪伴人格的「种子」——**不调用 LLM、不进冻结命盘**，
  * 与 deriveStrength/deriveTriad/deriveWesternProfile 同属「facts 层派生」。
- * LLM 只负责把这枚种子「渲染成口吻」（见 @eamvp/llm spirit.ts），杜绝灵的身份被模型臆造。
+ * LLM 只负责把这枚种子「渲染成口吻」（见 @sojan/llm spirit.ts），杜绝灵的身份被模型臆造。
  *
  * 锚点全部取自命盘既有字段：
  * - 主导五行 = 八字五行计数峰（决定水墨印记与基调）

@@ -37,7 +37,7 @@ description: 为「照见」运势日历生成、筛选、打标签并入库水�
 3. **入库**：通过的图
    - 命名 `<mood>-<n>.jpeg`，移到 `apps/web/public/fortune/`；
    - 在 `apps/web/lib/fortune-images.ts` 的 `FORTUNE_IMAGES` 追加一条：`{ file:"/fortune/<mood>-<n>.jpeg", moods:[...], caption:"...", alt:"..." }`（caption 须含「今日宜…」式心理暗示）。
-4. **验证**：`pnpm --filter @eamvp/web build`；可本地起服务看 `/calendar` 配图与意境是否相符。
+4. **验证**：`pnpm --filter @sojan/web build`；可本地起服务看 `/calendar` 配图与意境是否相符。
 5. 清理 `/tmp/fc`。
 
 ## 注意

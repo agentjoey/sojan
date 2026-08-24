@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import type { ZiweiChart, Palace } from "@eamvp/core";
+import type { ZiweiChart, Palace } from "@sojan/core";
 import { ZiweiBoard } from "../ZiweiBoard";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 

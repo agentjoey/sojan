@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import {
   resolveLlmConfig,
   isLlmConfigured,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { DailyFortune } from "@eamvp/core";
+import type { DailyFortune } from "@sojan/core";
 import type { Profile } from "@/lib/tg/identity";
 import { supabase } from "@/lib/supabase";
 import { type Locale, LOCALE_COOKIE } from "@/lib/i18n/locale";

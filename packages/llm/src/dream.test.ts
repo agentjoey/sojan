@@ -107,7 +107,7 @@ describe("sanitizeDream：预言措辞机械扫描", () => {
 // mock 提到文件顶部会影响全文件 import，纯函数测试（上方）不依赖 ./client，不受影响。
 
 const { interpretDream, continueDreamReply, summarizeDreamEntry } = await import("./dream");
-const { computeUnifiedChart, BirthInputSchema } = await import("@eamvp/core");
+const { computeUnifiedChart, BirthInputSchema } = await import("@sojan/core");
 const dreamChart = computeUnifiedChart(BirthInputSchema.parse({ date: "1991-03-15", time: "14:30", gender: "male", latitude: 31.23, longitude: 121.47 }));
 const dreamConfig = { provider: "minimax", wire: "anthropic", baseUrl: "https://x/anthropic", model: "MiniMax-M3", apiKey: "sk-test", supportsJsonSchema: false } as LlmConfig;
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { deriveSelfPortrait, deriveSpirit } from "@eamvp/core";
-import type { QuestionnaireAnswers } from "@eamvp/core";
+import { deriveSelfPortrait, deriveSpirit } from "@sojan/core";
+import type { QuestionnaireAnswers } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
 import { Card } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";

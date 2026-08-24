@@ -1,4 +1,4 @@
-import type { UnifiedChart } from "@eamvp/core";
+import type { UnifiedChart } from "@sojan/core";
 import { resolveLlmConfig, isLlmConfigured, type LlmConfig } from "./provider";
 import { extractFacts } from "./facts";
 import { buildSystemPrompt, buildUserPrompt, parseSections, sanitizeReading, type ReadingLanguage, type SectionKey } from "./prompt";

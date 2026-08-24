@@ -1,4 +1,4 @@
-import { isLlmConfigured, resolveLlmConfig } from "@eamvp/llm";
+import { isLlmConfigured, resolveLlmConfig } from "@sojan/llm";
 import { localeFromRequest } from "@/lib/i18n/server";
 // 校验 schema / 会员闸门 / 生成逻辑与 TG 中介端点（api/tg/fengshui 的 reading action）
 // 共用同一份实现（EP-fs-tg），见 lib/fengshui-reading.ts 顶部注释——闸门规则只写一份。
@@ -54,7 +54,7 @@ export async function GET(req: Request): Promise<Response> {
  * `sections` 就是 generateFengshuiReading 已经按三个 H2 切好的分节正文（不含标题行本身，
  * 标题由客户端按 i18n 渲染）；`degraded` 是 generateFengshuiReading 的降级信号（模型对
  * 确定性事实说错话、已被机械纠正——纠正救得回星名，救不回建立在错方位上的整段叙述，
- * 见 @eamvp/llm 的 FengshuiReading.degraded 文档）。改用 JSON body 而不是自定义响应头，
+ * 见 @sojan/llm 的 FengshuiReading.degraded 文档）。改用 JSON body 而不是自定义响应头，
  * 是因为降级信号只应该有一处字面量：塞进响应头意味着「设置」「转发」「客户端读取」三处
  * 各写一遍 `"X-Fengshui-Degraded"`/`"1"`/`"0"` 字符串，改一处很容易漏改另一处、悄悄断链；
  * 并入 JSON body 后就是普通的类型化字段，没有这个问题。

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import type { BaziChart } from "@eamvp/core";
+import type { BaziChart } from "@sojan/core";
 import { BaziPillars } from "../BaziPillars";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 

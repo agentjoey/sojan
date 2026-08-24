@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { BirthInputSchema, computeUnifiedChart } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
  * 最终评审 Blocking 2：/spirit 此前只认 `topic === "portrait"`，`?topic=fengshui:<id>`

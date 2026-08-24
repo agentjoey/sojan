@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { deriveSpirit, formatQuestionnaire, type DailyFortune } from "@eamvp/core";
+import { deriveSpirit, formatQuestionnaire, type DailyFortune } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
 import { getSpiritMemory, getQuestionnaire } from "@/lib/profiles";
 import { hasTgSession, tgDaily } from "@/lib/tg/client";

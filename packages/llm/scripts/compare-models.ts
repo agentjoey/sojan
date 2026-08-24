@@ -1,10 +1,10 @@
 /**
  * 三模型对比：minimax-m3 / minimax-m2.7-highspeed / deepseek-v4-flash。
  * 指标：响应速度(首字 ms)、完成速度(总 ms)、稳定性(成功率)、命理语言(存样本供人判)、幻觉度(接地/四化错配)。
- * 用法：MINIMAX_KEY=sk-cp.. DEEPSEEK_KEY=sk.. pnpm --filter @eamvp/llm exec tsx scripts/compare-models.ts
+ * 用法：MINIMAX_KEY=sk-cp.. DEEPSEEK_KEY=sk.. pnpm --filter @sojan/llm exec tsx scripts/compare-models.ts
  */
 import { writeFileSync } from "node:fs";
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import { buildMessages, chatStream, extractFacts, scoreReading, sanitizeReading, EVAL_CASES } from "../src/index";
 import type { LlmConfig } from "../src/index";
 

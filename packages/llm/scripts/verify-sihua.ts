@@ -2,7 +2,7 @@
  * 四化根因分析：核对引擎算出的 birthMutagens 是否与「天干四化」标准表一致。
  * 一致 → 规则引擎正确，prose 里的「紫微化忌」等是模型幻觉，非引擎问题。
  */
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import { EVAL_CASES } from "../src/index";
 
 // 标准天干四化表（年干 → 禄/权/科/忌），见 research/ziwei-doushu-knowledge.md §4

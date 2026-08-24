@@ -1,5 +1,5 @@
 import { supabase, ensureSession } from "@/lib/supabase";
-import type { Direction } from "@eamvp/core";
+import type { Direction } from "@sojan/core";
 import { hasTgSession } from "@/lib/tg/client";
 import {
   tgListDwellings, tgCreateDwelling, tgUpdateDwelling, tgDeleteDwelling,

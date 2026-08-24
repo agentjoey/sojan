@@ -1,4 +1,4 @@
-import { signSession, verifySession } from "@eamvp/core";
+import { signSession, verifySession } from "@sojan/core";
 
 export const TG_COOKIE = "zj_tg";
 

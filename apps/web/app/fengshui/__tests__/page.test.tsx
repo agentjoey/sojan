@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent, within, act } from "@testing-librar
 import {
   BirthInputSchema, computeUnifiedChart, computeFengshui, directionsFor, FENGSHUI_ENGINE_VERSION,
   DIRECTION_LABEL,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { fengshuiFingerprint, type FengshuiSections } from "@/lib/fengshui-report";
 import type { Dwelling } from "@/lib/dwellings";
 // 最终评审 I1：同住人上限的**单一事实源**，与 api/fengshui/reading/route.ts 的
@@ -130,8 +130,8 @@ const { dwellingsFixture, profilesById } = vi.hoisted(() => ({
 const { computeFengshuiCalls } = vi.hoisted(() => ({
   computeFengshuiCalls: { args: [] as { dwelling?: unknown; cohabitants?: unknown }[] },
 }));
-vi.mock("@eamvp/core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@eamvp/core")>();
+vi.mock("@sojan/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sojan/core")>();
   return {
     ...actual,
     computeFengshui: (input: Parameters<typeof actual.computeFengshui>[0]) => {
@@ -675,7 +675,7 @@ describe("EP-fs-15 命宅相配/相冲判语（复审必修3）", () => {
   });
 });
 
-describe("最终评审 Blocking 2：「和 Mira 聊聊这条」链接要带得动实际内容，且受「灵」flag 门控", () => {
+describe("最终评审 Blocking 2：「和 Sojan 聊聊这条」链接要带得动实际内容，且受「灵」flag 门控", () => {
   // 复审指出：此前 href 只带 remedyId（如 `?topic=fengshui:fs-desk-sheng`），
   // /spirit 只认 topic==="portrait"，id 被解析出来即丢弃，用户落进空白通用聊天——
   // 是「复用了 URL 形状，没复用机制」。下面的测试断言行为（q 参数真的带着这条化解
@@ -692,7 +692,7 @@ describe("最终评审 Blocking 2：「和 Mira 聊聊这条」链接要带得�
     // 比 getByText("甲") 更准：这条测试不关心叙述内容本身，不需要真的点开它。
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "化解" }));
-    const links = screen.getAllByText("和 Mira 聊聊这条");
+    const links = screen.getAllByText("和 Sojan 聊聊这条");
     // page.tsx 按 fs.remedies 数组原序 .map 渲染卡片，不重新排序——逐条按位置对拍，
     // 不假设某条化解「恒为第一条」（sortRemedies 的实际输出顺序不是这么回事）。
     expect(links.length).toBe(fs.remedies.length);
@@ -707,13 +707,13 @@ describe("最终评审 Blocking 2：「和 Mira 聊聊这条」链接要带得�
     });
   });
 
-  it("灵未开启时不渲染「和 Mira 聊聊这条」链接，避免把用户送进 /spirit 的「尚未开启」死胡同", async () => {
+  it("灵未开启时不渲染「和 Sojan 聊聊这条」链接，避免把用户送进 /spirit 的「尚未开启」死胡同", async () => {
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", ""); // 显式关闭；与「未设置」等价，但意图更明确
     await renderPage();
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "化解" }));
     expect(screen.getByText("可做的事")).toBeInTheDocument(); // 确认真的切到了会渲染卡片的 tab
-    expect(screen.queryByText("和 Mira 聊聊这条")).toBeNull();
+    expect(screen.queryByText("和 Sojan 聊聊这条")).toBeNull();
   });
 
   it("动作文本较长时对 q 参数做合理截断，不放任 URL 无限增长", async () => {
@@ -756,7 +756,7 @@ describe("EP-fs-07 /fengshui Layer 0 — 报告缓存", () => {
   });
 
   it("最终评审 Blocking 1：叙述解析失败（模型输出未含合法 H2 标题）时不写缓存、显示重试入口，而不是缓存一份三节皆空的报告", async () => {
-    // @eamvp/llm 的 generateFengshuiReading 已改为：三节全部解析为空时抛错，不再返回
+    // @sojan/llm 的 generateFengshuiReading 已改为：三节全部解析为空时抛错，不再返回
     // 200 + 空 sections（见 packages/llm/src/fengshui/index.test.ts 的对应用例）。
     // route.ts 的 catch-all 把这类抛错转成 500——从本页面 fetch 调用方视角，与其他失败
     // 原因（网络故障、LLM 未配置）不可区分，统一走 failed 路径：不落盘缓存、给重试入口。

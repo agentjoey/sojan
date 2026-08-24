@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import { formatQuestionnaire } from "@eamvp/core";
+import { formatQuestionnaire } from "@sojan/core";
 import {
   streamSpiritChat,
   summarizeSpiritMemory,
-} from "@eamvp/llm";
-import type { SpiritTurn } from "@eamvp/llm";
+} from "@sojan/llm";
+import type { SpiritTurn } from "@sojan/llm";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { getProfileForUser } from "@/lib/tg/identity";
 import {

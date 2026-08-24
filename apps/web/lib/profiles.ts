@@ -1,6 +1,6 @@
 "use client";
 
-import type { UnifiedChart, BirthInput, QuestionnaireAnswers } from "@eamvp/core";
+import type { UnifiedChart, BirthInput, QuestionnaireAnswers } from "@sojan/core";
 import { supabase, ensureSession } from "./supabase";
 
 /**

@@ -1,4 +1,4 @@
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import { extractFacts } from "../facts";
 import { generateReading } from "../reading";
 import { resolveLlmConfig, isLlmConfigured } from "../provider";

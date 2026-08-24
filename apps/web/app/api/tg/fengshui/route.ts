@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isLlmConfigured, resolveLlmConfig } from "@eamvp/llm";
+import { isLlmConfigured, resolveLlmConfig } from "@sojan/llm";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { supabaseAdmin } from "@/lib/tg/admin";
 import { localeFromRequest } from "@/lib/i18n/server";

@@ -1,4 +1,4 @@
-import { RESONANCE_ANCHORS, SYNTHESIS_GUARDRAILS } from "@eamvp/core";
+import { RESONANCE_ANCHORS, SYNTHESIS_GUARDRAILS } from "@sojan/core";
 import type { ChartFacts } from "./facts";
 
 export type ReadingLanguage = "en" | "zh";
@@ -24,7 +24,7 @@ const SECTION_HEADERS: Record<ReadingLanguage, Record<SectionKey, string>> = {
 
 /**
  * 冻结系统提示（适合 prompt-cache）：定义两个声部 + 整合声部 + 守护栏 + 输出契约。
- * 守护栏与共振锚点从 @eamvp/core 取，单一事实源。
+ * 守护栏与共振锚点从 @sojan/core 取，单一事实源。
  */
 export function buildSystemPrompt(language: ReadingLanguage = "en", hasWestern = true): string {
   const H = SECTION_HEADERS[language];

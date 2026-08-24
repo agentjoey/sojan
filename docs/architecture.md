@@ -1,7 +1,7 @@
-# Architecture — 照见 Zhaojian
+# Architecture — 照见 Sojan
 
-> 东方命理（八字 + 紫微）× 西方心理占星（利兹·格林）双引擎。系统架构总览；PRD 见 Obsidian `P028-EasternAstrology`，调研依据见 `research/`，决策见 `docs/decisions/`。
-> 现状：MVP 全链路已上线（https://zhaojian-mvp.vercel.app）。本文随引擎演进同步更新。
+> 东方命理（八字 + 紫微）× 西方心理占星（利兹·格林）双引擎。系统架构总览；PRD 见 Obsidian `P028-Miro-Zhaojian`，调研依据见 `research/`，决策见 `docs/decisions/`。
+> 现状：MVP 全链路已上线（production `sojan.app` · staging `zhaojian.agentjoey.ai`）。本文随引擎演进同步更新。
 
 ## 1. 设计总原则
 
@@ -12,7 +12,7 @@
 
 ## 2. 架构图
 
-![照见系统架构](assets/architecture.png)
+![照见 Sojan 系统架构](assets/architecture.png)
 
 <details><summary>Mermaid 源（可维护版）</summary>
 
@@ -26,13 +26,13 @@ flowchart TB
     ACT["Server Actions<br/>computeChart·dailyFortune·dailyPolish·dailyBehavior·geocode"]
     API["Route /api/reading<br/>流式三段式解读"]; LIB["lib/ profiles·supabase·fortune-images"]
   end
-  subgraph CORE["③ 排盘核心 @eamvp/core — 纯函数·确定性·Zod"]
+  subgraph CORE["③ 排盘核心 @sojan/core — 纯函数·确定性·Zod"]
     NB["normalizeBirth<br/>真太阳时(经度+EoT)·农历·时辰索引"]
     BZ["八字 lunar-typescript"]; ZW["紫微 iztro(中州派)"]; WE["西方 circular-natal-horoscope-js"]
     UC["UnifiedChart (Zod)"]; DF["computeDailyFortune (确定性)"]
     NB-->BZ & ZW & WE-->UC; UC-.->DF
   end
-  subgraph LLM["④ 解读层 @eamvp/llm — provider无关·双线协议"]
+  subgraph LLM["④ 解读层 @sojan/llm — provider无关·双线协议"]
     EF["extractFacts 承重事实"]-->PR["buildPrompt 三声部+守护栏"]-->CH["chat/stream<br/>MiniMax(anthropic)/DeepSeek(openai)"]
     GUARD["反幻觉链: facts→prompt硬规则→sanitize→correctMutagens→eval"]
   end
@@ -64,8 +64,8 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 
 | 模块 | 职责 | 关键库 | 状态 |
 |------|------|--------|------|
-| `@eamvp/core` | 排盘 + 统一 Schema + 每日运势 + 共振映射 | lunar-typescript, iztro, circular-natal-horoscope-js, zod | ✅ 上线（core 22 测试） |
-| `@eamvp/llm` | 承重事实 + 三声部 Prompt + 双线 LLM 客户端 + 反幻觉链 + eval | fetch（provider 无关） | ✅ 上线（llm 26 测试） |
+| `@sojan/core` | 排盘 + 统一 Schema + 每日运势 + 共振映射 | lunar-typescript, iztro, circular-natal-horoscope-js, zod | ✅ 上线（core 22 测试） |
+| `@sojan/llm` | 承重事实 + 三声部 Prompt + 双线 LLM 客户端 + 反幻觉链 + eval | fetch（provider 无关） | ✅ 上线（llm 26 测试） |
 | `apps/web` | 表单 + 命盘可视化 + 运势日历 + 档案 | Next.js 16, Supabase, tz-lookup | ✅ 上线 |
 
 ## 5. 解读层细节（反幻觉是重点）

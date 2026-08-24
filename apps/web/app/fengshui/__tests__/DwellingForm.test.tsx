@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { BirthInputSchema, computeUnifiedChart } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 // 上限的单一事实源，与 api/fengshui/reading/route.ts 的 `z.array(...).max()` 同源。
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";

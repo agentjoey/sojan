@@ -1,6 +1,6 @@
 import type { ReadingLanguage } from "./prompt";
-import type { UnifiedChart } from "@eamvp/core";
-import { deriveSpirit } from "@eamvp/core";
+import type { UnifiedChart } from "@sojan/core";
+import { deriveSpirit } from "@sojan/core";
 import { extractFacts } from "./facts";
 import { sanitizeReading } from "./prompt";
 import { correctMutagens } from "./correct";

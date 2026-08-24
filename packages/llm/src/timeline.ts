@@ -1,5 +1,5 @@
-import type { UnifiedChart, ZiweiHoroscope } from "@eamvp/core";
-import { deriveUsefulElements, SYNTHESIS_GUARDRAILS } from "@eamvp/core";
+import type { UnifiedChart, ZiweiHoroscope } from "@sojan/core";
+import { deriveUsefulElements, SYNTHESIS_GUARDRAILS } from "@sojan/core";
 import { resolveLlmConfig, isLlmConfigured, type LlmConfig } from "./provider";
 import { chat } from "./client";
 

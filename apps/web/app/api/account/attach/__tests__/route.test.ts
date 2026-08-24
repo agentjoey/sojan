@@ -11,7 +11,7 @@ vi.mock("@/lib/tg/identity-link", () => ({
 }));
 type VerifyResult = { ok: true; id: number; username?: string } | { ok: false; error: string };
 const verifyTelegramLoginMock = vi.fn<(p: unknown, token: string) => VerifyResult>(() => ({ ok: true, id: 999, username: "bob" }));
-vi.mock("@eamvp/core", () => ({ verifyTelegramLogin: (p: unknown, token: string) => verifyTelegramLoginMock(p, token) }));
+vi.mock("@sojan/core", () => ({ verifyTelegramLogin: (p: unknown, token: string) => verifyTelegramLoginMock(p, token) }));
 
 const { POST } = await import("../route");
 

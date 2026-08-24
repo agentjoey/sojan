@@ -1,4 +1,4 @@
-// @eamvp/llm — 命理+心理 双声部解读层（provider 无关，OpenAI 兼容）
+// @sojan/llm — 命理+心理 双声部解读层（provider 无关，OpenAI 兼容）
 export { resolveLlmConfig, isLlmConfigured } from "./provider";
 export type { LlmConfig, LlmProvider, LlmWire } from "./provider";
 export { extractFacts } from "./facts";

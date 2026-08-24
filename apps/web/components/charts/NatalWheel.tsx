@@ -1,6 +1,6 @@
 "use client";
 
-import type { WesternChart, Aspect } from "@eamvp/core";
+import type { WesternChart, Aspect } from "@sojan/core";
 import { useT } from "@/lib/i18n/I18nProvider";
 
 // ── 静态查表（纯展示，无任何排盘推算）─────────────────────────────

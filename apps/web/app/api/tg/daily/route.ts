@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { computeDailyFortune, formatQuestionnaire } from "@eamvp/core";
-import { generateDailySpiritGreeting } from "@eamvp/llm";
+import { computeDailyFortune, formatQuestionnaire } from "@sojan/core";
+import { generateDailySpiritGreeting } from "@sojan/llm";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { getProfileForUser } from "@/lib/tg/identity";
 import { getMemory, getQuestionnaire } from "@/lib/tg/data";

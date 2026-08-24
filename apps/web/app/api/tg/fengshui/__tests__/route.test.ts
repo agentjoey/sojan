@@ -70,7 +70,7 @@ const generateFengshuiReadingMock = vi.fn(async (..._a: unknown[]) => ({
   markdown: "",
   corrections: [],
 }));
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "anthropic" })),
   isLlmConfigured: () => isLlmConfiguredMock(),
   generateFengshuiReading: (...a: unknown[]) => generateFengshuiReadingMock(...a),

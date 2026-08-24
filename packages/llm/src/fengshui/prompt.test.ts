@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BirthInputSchema, computeUnifiedChart, computeFengshui, adviseObject, directionsFor, FENGSHUI_GUARDRAILS } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart, computeFengshui, adviseObject, directionsFor, FENGSHUI_GUARDRAILS } from "@sojan/core";
 import { extractFengshuiFacts } from "./facts";
 import {
   buildFengshuiSystemPrompt, buildFengshuiUserPrompt, parseFengshuiSections, FENGSHUI_SECTION_KEYS,

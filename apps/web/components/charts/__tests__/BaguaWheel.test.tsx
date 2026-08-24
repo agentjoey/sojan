@@ -7,7 +7,7 @@ import {
   DIRECTIONS,
   DIRECTION_LABEL,
   type Direction,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { BaguaWheel } from "../BaguaWheel";
 
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });

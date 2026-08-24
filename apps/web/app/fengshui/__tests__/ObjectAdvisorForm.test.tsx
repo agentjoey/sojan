@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import {
   BirthInputSchema, computeUnifiedChart, computeFengshui, dwellingGua,
   DIRECTIONS, DIRECTION_LABEL, type Direction,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { ObjectAdvisorForm } from "../ObjectAdvisorForm";
 
@@ -21,8 +21,8 @@ import { ObjectAdvisorForm } from "../ObjectAdvisorForm";
 const { adviseObjectCalls } = vi.hoisted(() => ({
   adviseObjectCalls: { inputs: [] as { dwellingSectors?: unknown }[] },
 }));
-vi.mock("@eamvp/core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@eamvp/core")>();
+vi.mock("@sojan/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sojan/core")>();
   return {
     ...actual,
     adviseObject: (

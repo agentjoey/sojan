@@ -1,5 +1,5 @@
 {
-  "name": "@eamvp/llm",
+  "name": "@sojan/llm",
   "version": "0.1.0",
   "private": true,
   "description": "命理+心理 双声部解读层 —— provider 无关（OpenAI 兼容），默认 MiniMax-M3，可切 DeepSeek/任意兼容端点",
@@ -12,7 +12,7 @@
     "probe:dream": "tsx scripts/probe-dream.ts"
   },
   "dependencies": {
-    "@eamvp/core": "workspace:*"
+    "@sojan/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20",

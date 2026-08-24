@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { DIRECTION_LABEL } from "@eamvp/core";
+import { DIRECTION_LABEL } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { useIsTelegram, haptics } from "@/lib/tg/ui";

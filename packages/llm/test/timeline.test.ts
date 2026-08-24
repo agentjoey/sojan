@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeUnifiedChart, computeZiweiHoroscope, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, computeZiweiHoroscope, BirthInputSchema } from "@sojan/core";
 import { extractTimelineFacts } from "../src/timeline";
 
 const input = BirthInputSchema.parse({ date: "1991-03-15", time: "14:30", gender: "male", latitude: 31.23, longitude: 121.47 });

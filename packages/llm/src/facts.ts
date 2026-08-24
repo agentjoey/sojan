@@ -1,5 +1,5 @@
-import type { UnifiedChart, Palace } from "@eamvp/core";
-import { deriveStrength, deriveUsefulElements, deriveTriad, deriveWesternProfile } from "@eamvp/core";
+import type { UnifiedChart, Palace } from "@sojan/core";
+import { deriveStrength, deriveUsefulElements, deriveTriad, deriveWesternProfile } from "@sojan/core";
 
 /**
  * 把 UnifiedChart 压成「带标签的承重事实」喂给 LLM。

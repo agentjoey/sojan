@@ -1,4 +1,4 @@
-// @eamvp/core — 排盘核心 barrel
+// @sojan/core — 排盘核心 barrel
 export * from "./types/birth-input";
 export * from "./types/chart";
 export { computeBaziChart } from "./bazi/index";

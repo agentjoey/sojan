@@ -1,7 +1,7 @@
 import {
   DIRECTIONS, DIRECTION_LABEL,
   type Direction, type FengshuiChart, type FengshuiStar, type Effort, type Remedy,
-} from "@eamvp/core";
+} from "@sojan/core";
 
 /**
  * 把 FengshuiChart 压成「带标签的承重事实」（EP-fs-05）。

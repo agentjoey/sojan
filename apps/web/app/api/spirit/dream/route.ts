@@ -1,5 +1,5 @@
-import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS, type SpiritTurn } from "@eamvp/llm";
-import type { UnifiedChart } from "@eamvp/core";
+import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
+import type { UnifiedChart } from "@sojan/core";
 import { supabaseAdmin } from "@/lib/tg/admin";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";

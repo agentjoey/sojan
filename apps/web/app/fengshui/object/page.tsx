@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   computeFengshui, dwellingGua,
   type FengshuiChart, type Direction, type DirectionVerdict,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { listDwellings } from "@/lib/dwellings";
 import { supabase } from "@/lib/supabase";

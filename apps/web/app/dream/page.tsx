@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatQuestionnaire } from "@eamvp/core";
+import { formatQuestionnaire } from "@sojan/core";
 import { getActiveProfile, getSpiritMemory, saveSpiritMemory, getQuestionnaire, type Profile } from "@/lib/profiles";
 import { listDreamHistory, appendDreamHistory, type DreamHistoryEntry } from "@/lib/dream-history";
 import { hasTgSession, tgGetProfile, tgListDreamHistory } from "@/lib/tg/client";

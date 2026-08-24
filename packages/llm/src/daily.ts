@@ -1,4 +1,4 @@
-import type { DailyFortune } from "@eamvp/core";
+import type { DailyFortune } from "@sojan/core";
 import { resolveLlmConfig, isLlmConfigured, type LlmConfig } from "./provider";
 import { chat } from "./client";
 

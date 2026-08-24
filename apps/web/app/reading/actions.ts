@@ -1,6 +1,6 @@
 "use server";
 
-import { computeUnifiedChart, type BirthInput } from "@eamvp/core";
+import { computeUnifiedChart, type BirthInput } from "@sojan/core";
 
 export type ChartHighlights = {
   normalizedSolarTime: string;
@@ -22,7 +22,7 @@ export type ReadingResult =
 
 /**
  * 解读 Server Action —— 端到端排盘已落地（EP-002/002b/003）。
- * 当前：校验 → @eamvp/core 三引擎排盘 → 抽取关键事实。
+ * 当前：校验 → @sojan/core 三引擎排盘 → 抽取关键事实。
  * 后续(EP-004/005)：事实 JSON → Claude 双声部解读（流式）→ 三段结果页。
  */
 export async function createReading(formData: FormData): Promise<ReadingResult> {

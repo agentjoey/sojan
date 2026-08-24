@@ -1,4 +1,4 @@
-import type { BirthInput } from "@eamvp/core";
+import type { BirthInput } from "@sojan/core";
 
 /** ~20 例评测语料：覆盖性别、有/无时辰、不同年代/经纬、农历、子时边界、西方盘降级。 */
 export const EVAL_CASES: { id: string; input: Partial<BirthInput> }[] = [

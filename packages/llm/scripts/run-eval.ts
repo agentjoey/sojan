@@ -1,6 +1,6 @@
 /**
  * 实跑接地性 eval（需 LLM_API_KEY）。增量打印（中断也有数据）。用法：
- *   LLM_API_KEY=sk-cp-... pnpm --filter @eamvp/llm exec tsx scripts/run-eval.ts [limit]
+ *   LLM_API_KEY=sk-cp-... pnpm --filter @sojan/llm exec tsx scripts/run-eval.ts [limit]
  */
 import { runEval } from "../src/index";
 import type { CaseResult } from "../src/index";

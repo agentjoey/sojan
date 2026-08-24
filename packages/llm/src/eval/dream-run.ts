@@ -1,9 +1,9 @@
 /**
  * 解梦风格探针（EP-dream-04）——需 LLM_API_KEY。
  * 2 个原型 × 8 个经典梦例，每条解读过 checkVoice（dreamMode）+ 预言措辞检查。
- *   LLM_API_KEY=sk-... pnpm --filter @eamvp/llm probe:dream
+ *   LLM_API_KEY=sk-... pnpm --filter @sojan/llm probe:dream
  */
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import { generateDreamReply } from "../dream";
 import { resolveLlmConfig, isLlmConfigured } from "../provider";
 import { EVAL_CASES } from "./cases";

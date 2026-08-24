@@ -1,6 +1,6 @@
 "use client";
 
-import { DIRECTIONS, DIRECTION_GUA, DIRECTION_LABEL, type Direction, type DirectionVerdict } from "@eamvp/core";
+import { DIRECTIONS, DIRECTION_GUA, DIRECTION_LABEL, type Direction, type DirectionVerdict } from "@sojan/core";
 
 /**
  * 八方位盘图（EP-fs-07）——「境」页视觉主体。

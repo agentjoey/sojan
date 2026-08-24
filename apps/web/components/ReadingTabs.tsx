@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UnifiedChart } from "@eamvp/core";
+import type { UnifiedChart } from "@sojan/core";
 import { Markdown } from "@/components/Markdown";
 import { useT } from "@/lib/i18n/I18nProvider";
 

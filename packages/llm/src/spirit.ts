@@ -1,5 +1,5 @@
-import type { UnifiedChart, DailyFortune } from "@eamvp/core";
-import { deriveSpirit, type SpiritPersona, SYNTHESIS_GUARDRAILS, computeDailyFortune } from "@eamvp/core";
+import type { UnifiedChart, DailyFortune } from "@sojan/core";
+import { deriveSpirit, type SpiritPersona, SYNTHESIS_GUARDRAILS, computeDailyFortune } from "@sojan/core";
 import { extractFacts } from "./facts";
 import { sanitizeReading, type ReadingLanguage } from "./prompt";
 import { correctMutagens } from "./correct";

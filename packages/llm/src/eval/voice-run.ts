@@ -3,9 +3,9 @@
  *
  * 5 个原型（从 EVAL_CASES 按主导五行各取一例，覆盖金木水火土）× 6 个标准问题，
  * 多轮实跑 streamSpiritChat，每条灵回应过 checkVoice，输出违规报告。用法：
- *   LLM_API_KEY=sk-... pnpm --filter @eamvp/llm probe:voice
+ *   LLM_API_KEY=sk-... pnpm --filter @sojan/llm probe:voice
  */
-import { computeUnifiedChart, BirthInputSchema, deriveSpirit, type SpiritElement } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema, deriveSpirit, type SpiritElement } from "@sojan/core";
 import { streamSpiritChat } from "../spirit";
 import { resolveLlmConfig, isLlmConfigured } from "../provider";
 import { EVAL_CASES } from "./cases";

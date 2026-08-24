@@ -1,5 +1,5 @@
-import { adviseObjectText, resolveLlmConfig, isLlmConfigured } from "@eamvp/llm";
-import { OBJECT_CATEGORIES, type ObjectAdvice } from "@eamvp/core";
+import { adviseObjectText, resolveLlmConfig, isLlmConfigured } from "@sojan/llm";
+import { OBJECT_CATEGORIES, type ObjectAdvice } from "@sojan/core";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";

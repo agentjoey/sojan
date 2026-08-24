@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { computeUnifiedChart, BirthInputSchema } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema } from "@sojan/core";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { getProfileForUser, createProfileForUser, listProfilesForUser, deleteProfileForUser } from "@/lib/tg/identity";
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   computeFengshui, FENGSHUI_ENGINE_VERSION, directionsFor, DIRECTION_LABEL, DIRECTIONS, deriveFengshuiTagline,
   type FengshuiChart, type DwellingInput, type CohabitantInput, type Direction,
-} from "@eamvp/core";
+} from "@sojan/core";
 import { getActiveProfile, getProfile, type Profile } from "@/lib/profiles";
 import { listDwellings, type Dwelling } from "@/lib/dwellings";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
@@ -29,7 +29,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
 const SPIRIT_ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1";
 
 /**
- * 「和 Mira 聊聊这条」链接携带的动作文本上限（最终评审 Blocking 2）。当前化解数据
+ * 「和 Sojan 聊聊这条」链接携带的动作文本上限（最终评审 Blocking 2）。当前化解数据
  * （remedy.ts / env-psych.ts）里最长的 action 也就三四十字，80 是留了充足余量的
  * 保守上限——真正起作用的是防止未来新增更长文案时把 query string 无限拉长。
  */
@@ -165,7 +165,7 @@ type EntitlementState = "idle" | "probing" | "entitled" | "blocked" | "unknown";
  *   2. degraded —— 请求成功，但 generateFengshuiReading 判定模型说错过
  *      确定性事实（方位↔星名对不上），已被机械纠正。纠正只救得回星名，
  *      救不回建立在错方位上的整段叙述，所以不能把它当正常结果直接渲染
- *      （见 @eamvp/llm 的 FengshuiReading.degraded 文档）；也不写入缓存，
+ *      （见 @sojan/llm 的 FengshuiReading.degraded 文档）；也不写入缓存，
  *      避免一份带瑕疵的报告被永久复用。
  * degraded/failed 提示在「盘」「化解」两个 tab 各自独立渲染（`NarrativeStatus`）——
  * 二者共用同一份 sections/degraded/failed 状态，只是分别嵌在各自 tab 里，不是重复请求。
@@ -615,7 +615,7 @@ export default function FengshuiPage() {
                     className="inline-block"
                     style={{ color: "var(--color-cinnabar)" }}
                   >
-                    {t("fengshui.askMira")}
+                    {t("fengshui.askSojan")}
                   </Link>
                 )}
               </span>
@@ -664,7 +664,7 @@ export default function FengshuiPage() {
                   className="mt-2 inline-block text-[13px]"
                   style={{ color: "var(--color-cinnabar)" }}
                 >
-                  {t("fengshui.askMira")}
+                  {t("fengshui.askSojan")}
                 </Link>
               )}
             </li>

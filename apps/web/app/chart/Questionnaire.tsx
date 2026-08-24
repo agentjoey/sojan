@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PROFILE_QUESTIONNAIRE, type QuestionnaireAnswers } from "@eamvp/core";
+import { PROFILE_QUESTIONNAIRE, type QuestionnaireAnswers } from "@sojan/core";
 import { saveQuestionnaire, type Profile } from "@/lib/profiles";
 import { hasTgSession, tgSaveQuestionnaire } from "@/lib/tg/client";
 import { Card } from "@/components/ui";

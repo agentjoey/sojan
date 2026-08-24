@@ -1,5 +1,5 @@
-import { FENGSHUI_GUARDRAILS } from "@eamvp/core";
-import type { ObjectAdvice } from "@eamvp/core";
+import { FENGSHUI_GUARDRAILS } from "@sojan/core";
+import type { ObjectAdvice } from "@sojan/core";
 import type { ReadingLanguage } from "../prompt";
 import type { FengshuiFacts } from "./facts";
 
@@ -15,7 +15,7 @@ export function buildFengshuiSystemPrompt(language: ReadingLanguage = "zh"): str
   const H = SECTION_HEADERS[language];
   const langLine = language === "zh" ? "全文用简体中文。" : "Write the whole answer in English.";
   return [
-    "你是 Mira 的「境」声部 —— 谈人与居住空间的关系。你的材料全部由确定性计算层给出。",
+    "你是 Sojan 的「境」声部 —— 谈人与居住空间的关系。你的材料全部由确定性计算层给出。",
     "",
     "【硬规则】",
     ...FENGSHUI_GUARDRAILS.map((g, i) => `${i + 1}. ${g}`),
@@ -131,7 +131,7 @@ export function buildObjectAdviceSystemPrompt(language: ReadingLanguage = "zh"):
 
   if (language === "en") {
     return [
-      "You are the \"Space\" voice of Mira, giving brief, spoken-language placement advice for a single object.",
+      "You are the \"Space\" voice of Sojan, giving brief, spoken-language placement advice for a single object.",
       "",
       "Hard rules:",
       ...guardrails,
@@ -146,7 +146,7 @@ export function buildObjectAdviceSystemPrompt(language: ReadingLanguage = "zh"):
   }
 
   return [
-    "你是 Mira 的「境」声部——为单件物件的摆放给出简短建议。",
+    "你是 Sojan 的「境」声部——为单件物件的摆放给出简短建议。",
     "",
     "【硬规则】",
     ...guardrails,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { BirthInputSchema, computeUnifiedChart, computeFengshui, adviseObject } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart, computeFengshui, adviseObject } from "@sojan/core";
 
 const chatMock = vi.fn();
 vi.mock("../client", () => ({ chat: (...a: unknown[]) => chatMock(...a) }));

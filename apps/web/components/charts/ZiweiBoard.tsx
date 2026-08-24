@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type { ZiweiChart, Palace, Star } from "@eamvp/core";
+import type { ZiweiChart, Palace, Star } from "@sojan/core";
 import { MutagenTag } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 

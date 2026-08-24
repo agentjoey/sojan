@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { BirthInputSchema } from "@eamvp/core";
+import { BirthInputSchema } from "@sojan/core";
 
 // EP-fs-debt：corrections 到 route 边界即丢弃、无日志——degraded 布尔量传到页面触发
 // 降级 UI，但被纠正的具体内容完全没地方看，这个失败模式会自我掩盖。这里守
@@ -9,7 +9,7 @@ const generateFengshuiReadingMock = vi.fn(async (..._a: unknown[]) => ({
   corrections: [] as unknown[],
   degraded: false,
 }));
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   generateFengshuiReading: (...a: unknown[]) => generateFengshuiReadingMock(...a),
 }));
 

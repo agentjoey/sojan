@@ -12,10 +12,16 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 用户输入出生信息 → 自动排盘 → **命理分析 + 心理分析 + 成长建议**。
 差异化：把「命理预测」重构为「心理自我认知 + 成长陪伴」，东西方双盘互证。
 
-**Location:** ~/AgentWorks/CodeSpace/eastern-astrology-mvp
-**Obsidian:** Brain#2/10_Projects/Active/P028-EasternAstrology（PRD / research / design / ADR）
-**GitHub:**   agentjoey/zhaojian-mvp · **线上:** https://zhaojian.agentjoey.ai （原 https://zhaojian-mvp.vercel.app 仍可用）
+**产品名（2026-08-25 定）：** 中文「**照见**」· 英文「**Sojan**」。项目内标识符、包名、文档一律用 `sojan`。
+**Obsidian:** Brain#2/10_Projects/Active/P028-Miro-Zhaojian（PRD / research / design / ADR）
+**GitHub:**   agentjoey/sojan
+**域名:**     production `sojan.app` · staging `zhaojian.agentjoey.ai`（原 `zhaojian-mvp.vercel.app` 仍可用）
 **Version:**  v0.1.0            ← release.sh 自动更新
+
+> **命名沿革**（避免后人困惑）：`照见/Zhaojian`（代号）→ 一度对外称 `Mira`（`2026-08-14-fengshui-environment-design.md` 有记载，已全部收回）→ 现定 `照见 / Sojan`。
+> **两处内部标识符刻意保留 `zhaojian` 旧名、不是漏改**（均已在代码里写了注释）：
+> ① `SYNTHETIC_EMAIL_DOMAIN = "zhaojian.local"`（`apps/web/lib/access.ts`）——生产库 `auth.users` 里已有真实用户邮箱是 `tg_<id>@zhaojian.local`，改常量会让存量 TG 用户不再被识别为合成邮箱、重开 EP-account2 堵上的付费门槛漏洞。
+> ② localStorage 缓存键前缀 `zhaojian.*`（`app/calendar/page.tsx`、`app/chart/page.tsx`、`lib/profiles.ts`）——改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度。
 
 **Technical docs:** [Architecture](docs/architecture.md) · [Deployment](docs/deployment.md) · [Operations](docs/operations.md)
 **前序资产:** Obsidian `research/fortune-engine-{prd,plan,tech-report}.md`（八字+紫微基础方案，本项目在其上叠加心理占星层）
@@ -29,9 +35,9 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 | 紫微排盘 | iztro (MIT) | ✅ 已定 |
 | 西方星盘 | circular-natal-horoscope-js（公有领域，规避 Swiss Ephemeris AGPL）| ✅ 已定 |
 | 校验 | Zod | ✅ 已定 |
-| LLM 解读 | **可插拔（OpenAI 兼容）**，默认 **MiniMax-M3**，env 可切 DeepSeek/任意兼容端点 | ✅ `@eamvp/llm` 已建 |
+| LLM 解读 | **可插拔（OpenAI 兼容）**，默认 **MiniMax-M3**，env 可切 DeepSeek/任意兼容端点 | ✅ `@sojan/llm` 已建 |
 
-**首发市场：海外**（华裔 + 西方探索者，英文 UI 优先）。产品正式名待定，代号 `astrology-mvp`。
+**首发市场：海外**（华裔 + 西方探索者，英文 UI 优先）。
 
 ## Key Implementation Details（仅记非显而易见的陷阱/约定）
 - **排盘不许 LLM 算**：星曜/宫位/四化/四柱一律由 iztro+tyme4ts 计算，LLM 只解释，杜绝幻觉。
@@ -54,14 +60,14 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 ## Dev Commands
 ```bash
 pnpm install
-pnpm --filter @eamvp/web dev        # 本地起 Next 应用（http://localhost:3000）
-pnpm --filter @eamvp/web build      # 生产构建（含 TS 校验）
-pnpm --filter @eamvp/core test      # 排盘核心单测（边界/跨节气/子时/真太阳时）
+pnpm --filter @sojan/web dev        # 本地起 Next 应用（http://localhost:3000）
+pnpm --filter @sojan/web build      # 生产构建（含 TS 校验）
+pnpm --filter @sojan/core test      # 排盘核心单测（边界/跨节气/子时/真太阳时）
 ./scripts/release.sh [patch|minor|major]
 ```
 **Monorepo:** `apps/web`（Next）+ `packages/core`（排盘）+ `packages/llm`（解读，均经 `transpilePackages` 接入）。
 集成边界：`apps/web/app/reading/actions.ts`（→ core 排盘）、`apps/web/app/api/reading/route.ts`（→ llm 流式解读）。
-**LLM 解读层（`@eamvp/llm`）：** provider 无关 fetch 客户端，**双线协议**：`anthropic`（Messages `/v1/messages`）/ `openai`（`/chat/completions`），env 驱动（`LLM_PROVIDER`/`LLM_MODEL`/`LLM_BASE_URL`/`LLM_API_KEY`[/`LLM_WIRE`]）。
+**LLM 解读层（`@sojan/llm`）：** provider 无关 fetch 客户端，**双线协议**：`anthropic`（Messages `/v1/messages`）/ `openai`（`/chat/completions`），env 驱动（`LLM_PROVIDER`/`LLM_MODEL`/`LLM_BASE_URL`/`LLM_API_KEY`[/`LLM_WIRE`]）。
 - **默认 = MiniMax-M3 Coding/Token Plan = Anthropic 兼容**：base `https://api.minimax.io/anthropic`，端点 `/v1/messages`，`Authorization: Bearer <sk-cp…>` + `anthropic-version`，body 顶层 `system`+`messages`+`max_tokens`，SSE 用 `content_block_delta…message_stop`。兼容读取 `ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL`。
 - DeepSeek 等走 `openai` 线协议。
 - 三声部提示（命理/心理/整合）+ 守护栏从 core `SYNTHESIS_GUARDRAILS`/`RESONANCE_ANCHORS` 取；输出契约 **markdown 四分节**（不依赖 json_schema）。反幻觉：只喂 `extractFacts(chart)` 承重事实，禁模型自行排盘。
@@ -69,7 +75,7 @@ pnpm --filter @eamvp/core test      # 排盘核心单测（边界/跨节气/子�
 ## 本地实测解读（需自备 MiniMax Coding/Token Plan key, sk-cp…）
 > ⚠️ Web 端口固定 **3030**（端口 3000 被本机 Hermes WhatsApp bridge 长期占用，故避开）。
 ```bash
-LLM_API_KEY=sk-cp-... pnpm --filter @eamvp/web dev   # → http://localhost:3030 ，/reading 点「Generate full reading」
+LLM_API_KEY=sk-cp-... pnpm --filter @sojan/web dev   # → http://localhost:3030 ，/reading 点「Generate full reading」
 # 或直接打 API：
 curl -s -X POST localhost:3030/api/reading -H 'content-type: application/json' \
   -d '{"date":"1991-03-15","time":"14:30","gender":"male","latitude":31.23,"longitude":121.47}'

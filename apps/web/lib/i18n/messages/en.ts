@@ -13,7 +13,7 @@ export const en: Messages = {
     close: "Close",
     sending: "Sending…",
     signingIn: "Signing in…",
-    brand: "照见 (Zhaojian)",
+    brand: "Sojan",
     listSeparator: ", ",
   },
   nav: {
@@ -34,7 +34,7 @@ export const en: Messages = {
     sectionBinding: "Bindings",
     sectionLogin: "Sign in",
     sectionData: "Data",
-    saveYourZhaojian: "Save your 照见 (Zhaojian)",
+    saveYourSojan: "Save your Sojan",
     signIn: "Sign in",
     signOut: "Sign out",
     email: "Email",
@@ -56,7 +56,7 @@ export const en: Messages = {
     linkEmailConflict: "This account already has a different verified email. Contact support to change it.",
     bindConfirmTitle: "Confirm email binding",
     bindConfirmBody:
-      "You're about to bind {email} to this Zhaojian account. If you didn't start this, tap Cancel — once bound, this address becomes the account's sign-in and recovery method.",
+      "You're about to bind {email} to this Sojan account. If you didn't start this, tap Cancel — once bound, this address becomes the account's sign-in and recovery method.",
     bindConfirmAction: "Confirm binding",
     bindCancel: "Cancel",
     bindExpired: "This binding link has expired or was already used. Start again from the account page.",
@@ -96,7 +96,7 @@ export const en: Messages = {
     heroTitle1: "Your chart,",
     kickerHero: "Prologue",
     kickerToc: "Contents",
-    footerBrand: "Zhaojian · Eastern Mingli",
+    footerBrand: "Sojan · Eastern Mingli",
     ctaSecondary: "See today’s reading →",
     heroTitle2: "is a mirror",
     heroSubtitle:
@@ -184,7 +184,7 @@ export const en: Messages = {
     noProfile: "No chart profile yet.",
     goCast: "去起盘 (Cast chart) →",
     share: "分享 (Share) →",
-    shareText: "照见 (Zhaojian) · Eastern astrology × Western psychology for self-reflection",
+    shareText: "Sojan · Eastern astrology × Western psychology for self-reflection",
     todayFortune: "今日运势 (Today's fortune) →",
 
     baziTitle: "八字四柱 (BaZi Four Pillars)",
@@ -193,9 +193,9 @@ export const en: Messages = {
     westernMissing: "Missing birth time or place; the Western chart and psychological layer are omitted. Complete them to unlock.",
     readingTitle: "三段式解读 (Three-Part Reading)",
 
-    castForMe: "为我照见 (Zhaojian for me)",
+    castForMe: "为我照见 (Sojan for me)",
     generating: "正在为你照见 (Reflecting for you)…",
-    generateReading: "为我照见 (Zhaojian for me) · 生成完整解读 (Generate full reading)",
+    generateReading: "为我照见 (Sojan for me) · 生成完整解读 (Generate full reading)",
     generateReadingSub: "Your chart is ready — read your core self, growth themes, and a word for this moment through 命理结构 (Mingli structure) + 深层心理 (depth psychology).",
 
 
@@ -412,7 +412,7 @@ export const en: Messages = {
     evidenceBoth: "Traditional + modern",
     modernLabel: "Modern rationale",
     traditionalLabel: "Traditional basis",
-    askMira: "Ask Mira about this",
+    askSojan: "Ask Sojan about this",
     narrativeFailed: "The narrative couldn't be generated right now — the chart and suggestions below are unaffected.",
     narrativeDegraded: "This narrative got a direction wrong and was auto-corrected, so it isn't shown — the chart and suggestions below are unaffected.",
     regenerate: "Regenerate narrative",

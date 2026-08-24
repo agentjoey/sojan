@@ -76,7 +76,7 @@
 
 ---
 
-## Phase 3 — 工程健壮性 / 成本（@eamvp/llm，改动小）
+## Phase 3 — 工程健壮性 / 成本（@sojan/llm，改动小）
 
 ### EP-512 LLM 客户端 重试 + 超时（可先做，最快收益）
 - `client.ts` `post()` 包重试：网络错误 / 5xx / 429 → 指数退避（如 300/900ms，最多 2 次）；4xx 不重试；尊重 `opts.signal`。
@@ -120,7 +120,7 @@ Phase 3: EP-512 重试（最快，可提前）、EP-511 缓存、EP-513 校验�
 Phase 4: EP-521 大限流年、EP-522 Placidus
 ```
 - 工程项 **EP-512 / EP-513 可提前到 Phase 1 并行**（改动小、收益即时）。
-- 每个 Phase 末跑 `pnpm --filter @eamvp/core test` + `@eamvp/llm` eval，确保**接地基线不降**且新事实被正确引用。
+- 每个 Phase 末跑 `pnpm --filter @sojan/core test` + `@sojan/llm` eval，确保**接地基线不降**且新事实被正确引用。
 
 ## 验收标准（整体）
 - core/llm 全测试通过；新增算法各有单测。

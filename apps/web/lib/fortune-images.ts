@@ -1,4 +1,4 @@
-import type { Relation } from "@eamvp/core";
+import type { Relation } from "@sojan/core";
 
 /**
  * 运势配图库（EP-cal-img · A 混合制）。

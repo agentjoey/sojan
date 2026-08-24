@@ -1,10 +1,10 @@
-# Current Status — 照见 Zhaojian
+# Current Status — 照见 Sojan
 
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🌙 **本命之灵（flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）**
 Last Updated:   2026-08-21 by claude-sonnet-5（EP-tg-parity，kimi 实施 + claude 验收合并）
-线上:           https://zhaojian-mvp.vercel.app · zhaojian.agentjoey.ai
+线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
 测试:           core 162 · llm 262 · web 483（全绿；`lint` 0 errors 已为阻塞闸门）
 ⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
 
@@ -25,8 +25,8 @@ Last Updated:   2026-08-21 by claude-sonnet-5（EP-tg-parity，kimi 实施 + cla
 | 档案 `/profiles` | Supabase 匿名+RLS 隔离、命盘触发器冻结 |
 
 ## 三层架构（详见 docs/architecture.md）
-- **@eamvp/core**：三引擎 + `normalizeBirth`(真太阳时+EoT+子时sect) + `computeDailyFortune` + 引擎深化 v2 派生(见下) + 共振映射；纯函数/Zod/可缓存。
-- **@eamvp/llm**：provider 无关双线(anthropic MiniMax-M3 / openai DeepSeek) + 三声部+时序声部 + **反幻觉链四道**(extractFacts→prompt硬规则→sanitize→correctMutagens)+eval + 重试/缓存/观测 + daily润色/行为/时序。
+- **@sojan/core**：三引擎 + `normalizeBirth`(真太阳时+EoT+子时sect) + `computeDailyFortune` + 引擎深化 v2 派生(见下) + 共振映射；纯函数/Zod/可缓存。
+- **@sojan/llm**：provider 无关双线(anthropic MiniMax-M3 / openai DeepSeek) + 三声部+时序声部 + **反幻觉链四道**(extractFacts→prompt硬规则→sanitize→correctMutagens)+eval + 重试/缓存/观测 + daily润色/行为/时序。
 - **apps/web**：Next 16/React 19/Tailwind 4，框景配图、Markdown 渲染、Supabase。
 
 ## 引擎深化 v2（本轮重点，spec `docs/specs/engine-v2-deepening.md`，全 11 项✅，TDD）

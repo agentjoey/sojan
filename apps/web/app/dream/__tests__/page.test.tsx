@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
-import { BirthInputSchema, computeUnifiedChart } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
  * 最终评审 I-1：/dream 页面级 flag 门控。此前 page.tsx 全文不查

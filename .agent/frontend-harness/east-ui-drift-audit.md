@@ -33,8 +33,8 @@ Human checkpoints: 逐页发现的结构性歧义（如首页是否保留东西�
 ## 验证状态（2026-08-18 完成）
 - `pnpm typecheck`：通过（core + llm + web 三包）
 - 全量测试：619/619 通过（core 158 / llm 182 / web 279，含本轮新增 profiles 5 + ReadingForm 3 + fengshui 新增 4）
-- `pnpm --filter @eamvp/web lint`：0 errors / 18 warnings（均为既有已知项，非本轮引入，详见 `apps/web/eslint.config.mjs` 注释）
-- `pnpm --filter @eamvp/web build`（`TELEGRAM_BOT_TOKEN=ci-placeholder-not-a-secret`）：成功，15 路由全部生成
+- `pnpm --filter @sojan/web lint`：0 errors / 18 warnings（均为既有已知项，非本轮引入，详见 `apps/web/eslint.config.mjs` 注释）
+- `pnpm --filter @sojan/web build`（`TELEGRAM_BOT_TOKEN=ci-placeholder-not-a-secret`）：成功，15 路由全部生成
 - 独立 Review+Verification：**已完成**（fresh general-purpose subagent，无本 session 记忆，独立重跑 typecheck/test/lint/build 全部复核一致）。逐条核对 7 项决定：全部 ✅ 正确落地、无越界。重点复核 fengshui 页 narrative-collapse 回归防护——直读活文件确认 `NarrativeStatus` 无条件挂载，只有 render 回调受折叠态约束，结构成立。结论：**无阻塞项，可视为完成**。
 
 ## 未完成项 / 已知缺口

@@ -27,7 +27,7 @@ const interpretDreamSpy = vi.fn(async function* () {
   yield "解读";
 });
 const continueDreamReplySpy = vi.fn(async (..._a: unknown[]) => ({ text: "追问的解读", stripped: [] }));
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "minimax", model: "m" })),
   isLlmConfigured: () => isLlmConfiguredMock(),
   interpretDream: (...a: unknown[]) => interpretDreamSpy(...(a as [])),

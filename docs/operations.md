@@ -23,8 +23,8 @@
 
 | 命令 | 用途 |
 |------|------|
-| `pnpm --filter @eamvp/web dev` | 本机开发，固定端口 **3030**（避开 :3000 的 Hermes WhatsApp bridge） |
-| `pnpm --filter @eamvp/web dev:lan` | 绑定 `0.0.0.0:3030`，**局域网可访问** |
+| `pnpm --filter @sojan/web dev` | 本机开发，固定端口 **3030**（避开 :3000 的 Hermes WhatsApp bridge） |
+| `pnpm --filter @sojan/web dev:lan` | 绑定 `0.0.0.0:3030`，**局域网可访问** |
 
 **局域网访问步骤：**
 1. 起 `dev:lan`，日志出现 `Network: http://0.0.0.0:3030`。

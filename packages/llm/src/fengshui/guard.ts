@@ -1,4 +1,4 @@
-import type { Direction } from "@eamvp/core";
+import type { Direction } from "@sojan/core";
 import type { FengshuiFacts } from "./facts";
 
 /**

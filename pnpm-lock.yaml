@@ -14,10 +14,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@eamvp/core':
+      '@sojan/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@eamvp/llm':
+      '@sojan/llm':
         specifier: workspace:*
         version: link:../../packages/llm
       '@supabase/supabase-js':
@@ -112,7 +112,7 @@ importers:
 
   packages/llm:
     dependencies:
-      '@eamvp/core':
+      '@sojan/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

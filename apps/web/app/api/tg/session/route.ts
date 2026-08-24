@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyInitData } from "@eamvp/core";
+import { verifyInitData } from "@sojan/core";
 import { resolveOrCreateTgUser, getProfileForUser } from "@/lib/tg/identity";
 import {
   makeSessionToken,

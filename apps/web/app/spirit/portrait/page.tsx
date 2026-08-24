@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getActiveProfile, getQuestionnaire, type Profile } from "@/lib/profiles";
 import { hasTgSession, tgGetProfile, tgGetQuestionnaire } from "@/lib/tg/client";
-import type { QuestionnaireAnswers } from "@eamvp/core";
+import type { QuestionnaireAnswers } from "@sojan/core";
 import { SelfPortrait } from "@/app/chart/SelfPortrait";
 import { useT } from "@/lib/i18n/I18nProvider";
 

@@ -59,7 +59,7 @@ const isLlmConfiguredMock = vi.fn(() => true);
 const summarizeSpiritMemorySpy = vi.fn(async () => "摘要：最近常梦见坠落，反映对失控的焦虑。");
 const continueDreamReplySpy = vi.fn(async (..._a: unknown[]) => ({ text: "追问的解读", stripped: [] }));
 const summarizeDreamEntrySpy = vi.fn(async (..._a: unknown[]) => "一个关于坠落的梦");
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "minimax", model: "m" })),
   isLlmConfigured: () => isLlmConfiguredMock(),
   interpretDream: (...a: unknown[]) => interpretDreamSpy(...(a as [])),

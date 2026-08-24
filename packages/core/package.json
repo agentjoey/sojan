@@ -1,5 +1,5 @@
 {
-  "name": "@eamvp/core",
+  "name": "@sojan/core",
   "version": "0.1.0",
   "private": true,
   "description": "排盘核心：八字(lunar-typescript) + 紫微(iztro) + 西方本命盘(circular-natal-horoscope-js) → 统一 Schema",

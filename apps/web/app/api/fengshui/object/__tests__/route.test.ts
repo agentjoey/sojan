@@ -2,8 +2,8 @@
 //
 // 与 apps/web/app/api/fengshui/reading/__tests__/route.test.ts 同一套约定：路由处理函数
 // 跑在 Node runtime，直接用原生 Request/Response 调 POST，不经过 Next 开发/构建服务器。
-// `@eamvp/llm` 整体 mock 掉（避免真实网络调用）；本路由只做「接收已算好的 ObjectAdvice →
-// 调 adviseObjectText 润色 → 原样吐出文本」，不涉及 @eamvp/core 的排盘计算，因此无需像
+// `@sojan/llm` 整体 mock 掉（避免真实网络调用）；本路由只做「接收已算好的 ObjectAdvice →
+// 调 adviseObjectText 润色 → 原样吐出文本」，不涉及 @sojan/core 的排盘计算，因此无需像
 // reading route 的测试那样保留真实 core 调用。
 //
 // 覆盖四条路径（与 reading route 对齐）：LLM 未配置 503、入参非法 400、正常路径 200、
@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const isLlmConfiguredMock = vi.fn<(...args: unknown[]) => boolean>(() => true);
 const adviseObjectTextMock = vi.fn<(...args: unknown[]) => Promise<string>>();
 
-vi.mock("@eamvp/llm", () => ({
+vi.mock("@sojan/llm", () => ({
   resolveLlmConfig: vi.fn(() => ({ provider: "anthropic", wire: "anthropic", model: "m", baseUrl: "http://x", apiKey: "k" })),
   isLlmConfigured: (...a: unknown[]) => isLlmConfiguredMock(...a),
   adviseObjectText: (...a: unknown[]) => adviseObjectTextMock(...a),

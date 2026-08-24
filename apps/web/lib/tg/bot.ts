@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard } from "grammy";
-import { computeDailyFortune, formatQuestionnaire } from "@eamvp/core";
-import { streamSpiritChat, generateDailySpiritGreeting, summarizeSpiritMemory } from "@eamvp/llm";
+import { computeDailyFortune, formatQuestionnaire } from "@sojan/core";
+import { streamSpiritChat, generateDailySpiritGreeting, summarizeSpiritMemory } from "@sojan/llm";
 import { resolveOrCreateTgUser, getProfileForUser } from "./identity";
 import { listMessages, appendMessage, getMemory, saveMemory, getQuestionnaire } from "./data";
 import { consumeQuota } from "./quota";

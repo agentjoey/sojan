@@ -1,5 +1,5 @@
-# Product Backlog — 照见 Zhaojian（zhaojian-mvp）
-> 线上 https://zhaojian-mvp.vercel.app · 排入 Sprint 后从此处移除。
+# Product Backlog — 照见 Sojan（sojan）
+> 线上 production https://sojan.app · staging https://zhaojian.agentjoey.ai · 排入 Sprint 后从此处移除。
 
 ## 🔴 HIGH
 ### 账号登录（EP-account-login，owner 实测发现 2026-08-21，**同日修复**）
@@ -98,9 +98,9 @@
 
 ## ✅ 已完成
 - Sprint 001：双体系调研、产品/架构/UI 设计、脚手架。
-- EP-001：Next.js App Router + Vercel；apps/web + @eamvp/core 集成。
+- EP-001：Next.js App Router + Vercel；apps/web + @sojan/core 集成。
 - EP-002/002b/003：三引擎（八字 lunar-typescript + 紫微 iztro + 西方 circular-natal-horoscope-js）+ normalizeBirth + computeUnifiedChart；core 14/14。
-- EP-004：@eamvp/llm 可插拔解读层（双线协议，默认 MiniMax-M3 Coding Plan）+ 三声部 + 守护栏 + 流式。
+- EP-004：@sojan/llm 可插拔解读层（双线协议，默认 MiniMax-M3 Coding Plan）+ 三声部 + 守护栏 + 流式。
 - EP-004-eval / 004b / 004c：接地性 eval（scorer + 20 例 + runner）；西方越界净化 sanitizeReading；四化确定性纠正 correctMutagens（引擎四化 20/20 与标准表一致，错配纯模型）。llm 26/26。
 - EP-MODELS：三模型对比（docs/llm-model-comparison.md）→ 维持 MiniMax-M3（首字 2.4s）。
 - EP-006：照见设计系统全站（令牌/宋体/宣纸 + UI 原语 + 响应式导航 + 全中文 + LLM 中文）。

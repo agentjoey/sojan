@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { BirthInputSchema, computeUnifiedChart, dwellingGua } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart, dwellingGua } from "@sojan/core";
 import type { Dwelling } from "@/lib/dwellings";
 
 /**
@@ -16,8 +16,8 @@ import type { Dwelling } from "@/lib/dwellings";
 const { adviseObjectCalls } = vi.hoisted(() => ({
   adviseObjectCalls: { inputs: [] as { dwellingSectors?: unknown }[] },
 }));
-vi.mock("@eamvp/core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@eamvp/core")>();
+vi.mock("@sojan/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sojan/core")>();
   return {
     ...actual,
     adviseObject: (

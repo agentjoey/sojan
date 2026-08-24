@@ -35,7 +35,7 @@ describe("GET /api/tg/session：确认 + 按需续期 + 无效清 cookie（EP-ac
   });
 
   it("有效但快过期（剩余 < 7 天）→ active=true，refreshed=true，响应里带新 cookie", async () => {
-    const { signSession } = await import("@eamvp/core");
+    const { signSession } = await import("@sojan/core");
     const exp = Math.floor(Date.now() / 1000) + SESSION_REFRESH_THRESHOLD_SECONDS - 10;
     const token = signSession({ uid: "u1", tgId: 42, exp }, "test-secret");
     const res = await GET(reqWithCookie(`${TG_COOKIE}=${token}`));

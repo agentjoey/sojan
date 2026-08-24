@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DIRECTIONS, DIRECTION_LABEL, type Direction } from "@eamvp/core";
+import { DIRECTIONS, DIRECTION_LABEL, type Direction } from "@sojan/core";
 import { createDwelling, updateDwelling, type Dwelling } from "@/lib/dwellings";
 import { listProfiles, getActiveProfileId, type Profile } from "@/lib/profiles";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";

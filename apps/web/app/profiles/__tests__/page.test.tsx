@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
-import { BirthInputSchema, computeUnifiedChart } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
 
 const birth1 = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });

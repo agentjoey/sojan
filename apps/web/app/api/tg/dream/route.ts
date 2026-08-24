@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { formatQuestionnaire } from "@eamvp/core";
-import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, summarizeSpiritMemory, summarizeDreamEntry, DREAM_MAX_CHARS, type SpiritTurn } from "@eamvp/llm";
+import { formatQuestionnaire } from "@sojan/core";
+import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, summarizeSpiritMemory, summarizeDreamEntry, DREAM_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
 import { readSession, TG_COOKIE } from "@/lib/tg/session";
 import { getProfileForUser } from "@/lib/tg/identity";
 import { getMemory, getQuestionnaire, saveMemory, appendDreamHistory, listDreamHistory } from "@/lib/tg/data";

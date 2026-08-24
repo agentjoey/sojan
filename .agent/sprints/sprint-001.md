@@ -37,7 +37,7 @@ Assignee:  claude
 | Skill | 触发条件 | 本 Sprint |
 |-------|---------|---------|
 | brainstorming | 新设计前 | ✅（已与用户对齐交付深度/技术栈/输入模型）|
-| verification-before-completion | Task Done 前 | ✅ `pnpm --filter @eamvp/core test` → 4 passed；iztro/lunar 冒烟通过 |
+| verification-before-completion | Task Done 前 | ✅ `pnpm --filter @sojan/core test` → 4 passed；iztro/lunar 冒烟通过 |
 | systematic-debugging | 发现 Bug 时 | N/A |
 
 ## Sprint 回顾

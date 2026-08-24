@@ -2,7 +2,7 @@ import { supabaseAdmin } from "./admin";
 import { getEntitlement, isMember } from "@/lib/entitlements";
 import { SYNTHETIC_EMAIL_DOMAIN } from "@/lib/access";
 import { recordConsentOnce, TERMS_VERSION } from "@/lib/consent";
-import type { BirthInput, UnifiedChart } from "@eamvp/core";
+import type { BirthInput, UnifiedChart } from "@sojan/core";
 export type Profile = { id: string; nickname: string; birthInput: BirthInput; chart: UnifiedChart; createdAt: string; reading: string | null };
 /** DB 行 → 领域对象。行来自 Supabase 的松散返回，用最小结构类型而非 any——
  * any 会让下面每个字段名的拼写错误都静默通过。 */

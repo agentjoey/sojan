@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyTelegramLogin } from "@eamvp/core";
+import { verifyTelegramLogin } from "@sojan/core";
 import { resolveOrCreateTgUser } from "@/lib/tg/identity";
 import { makeSessionToken, TG_COOKIE, SESSION_TTL_SECONDS } from "@/lib/tg/session";
 import { mergeAnonProfiles } from "@/lib/tg/merge";

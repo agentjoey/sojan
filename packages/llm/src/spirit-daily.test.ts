@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { computeUnifiedChart, BirthInputSchema, computeDailyFortune } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema, computeDailyFortune } from "@sojan/core";
 import type { LlmConfig } from "./provider";
 
 /**

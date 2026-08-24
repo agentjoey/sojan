@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deriveSpirit, formatQuestionnaire } from "@eamvp/core";
+import { deriveSpirit, formatQuestionnaire } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
 import { getSpiritMemory, saveSpiritMemory, getQuestionnaire } from "@/lib/profiles";
 import { listMessages, appendMessage, type SpiritMessage } from "@/lib/spirit";

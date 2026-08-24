@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BirthInputSchema, computeUnifiedChart, computeFengshui } from "@eamvp/core";
+import { BirthInputSchema, computeUnifiedChart, computeFengshui } from "@sojan/core";
 import { extractFengshuiFacts, FENGSHUI_FACT_KEYS } from "./facts";
 
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });

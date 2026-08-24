@@ -1,4 +1,4 @@
-import type { FengshuiChart, ObjectAdvice } from "@eamvp/core";
+import type { FengshuiChart, ObjectAdvice } from "@sojan/core";
 import { resolveLlmConfig, isLlmConfigured, type LlmConfig } from "../provider";
 import { chat } from "../client";
 import type { ReadingLanguage } from "../prompt";

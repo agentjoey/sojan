@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { computeUnifiedChart, BirthInputSchema, deriveSelfPortrait, deriveSpirit } from "@eamvp/core";
+import { computeUnifiedChart, BirthInputSchema, deriveSelfPortrait, deriveSpirit } from "@sojan/core";
 import { SelfPortrait, PortraitDimensions } from "../SelfPortrait";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 

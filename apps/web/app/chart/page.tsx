@@ -173,7 +173,7 @@ export default function ChartPage() {
                   const username = process.env.NEXT_PUBLIC_TG_BOT_USERNAME || "analyst_helen_bot";
                   window.Telegram?.WebApp?.openTelegramLink?.(
                     "https://t.me/share/url?url=" +
-                      encodeURIComponent(`https://t.me/${username}?startapp=zhaojian`) +
+                      encodeURIComponent(`https://t.me/${username}?startapp=sojan`) +
                       "&text=" +
                       encodeURIComponent(t("chart.shareText"))
                   );

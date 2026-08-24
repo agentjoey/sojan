@@ -397,6 +397,26 @@ describe("generateJiaoReply", () => {
 });
 
 describe("continueJiaoReply：续接历史（question=undefined）", () => {
+  it("传了问题原文却没传筊象 → 抛错，不进 LLM（不许凭空编一个筊象喂给模型）", async () => {
+    streamSpy.mockClear();
+    await expect(
+      continueJiaoReply(chart, "该不该辞职", [{ role: "spirit", content: "上一轮回应" }], "再问一句", { language: "zh", config }),
+    ).rejects.toThrow();
+    expect(streamSpy).not.toHaveBeenCalled();
+  });
+
+  it("传了问题原文且带上筊象 → 正常进 LLM，首轮 user 消息里是那个筊象", async () => {
+    streamSpy.mockClear();
+    await continueJiaoReply(chart, "该不该辞职", [{ role: "spirit", content: "上一轮回应" }], "再问一句", {
+      language: "zh",
+      config,
+      omenForFollowUp: "阴筊",
+    });
+    const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
+    expect(messages[1]!.content).toContain("阴筊");
+    expect(messages[1]!.content).not.toContain("圣筊");
+  });
+
   it("priorTurns 为空且无问题原文 → 抛错，不进 LLM", async () => {
     streamSpy.mockClear();
     await expect(
@@ -631,6 +651,10 @@ export async function continueJiaoReply(
   const q = question?.trim();
   if (question !== undefined && !q) throw new Error("问题内容为空");
   if (question === undefined && priorTurns.length === 0) throw new Error("没有可续接的历史问卦");
+  // 传了问题原文 = 同一次问卦内的追问，必须同时给出那一卦的筊象——首轮 prompt 会
+  // 把筊象当既成事实写进去，缺了它就只能凭空编一个，那正是本功能反幻觉链要防的事。
+  // 宁可抛错也不给默认值：一个错的筊象比一次失败的调用危险得多。
+  if (q !== undefined && !opts.omenForFollowUp) throw new Error("同一次问卦的追问必须传入 omenForFollowUp");
   const f = followUp.trim();
   if (!f) throw new Error("追问内容为空");
   if (f.length > JIAO_MAX_CHARS) throw new Error(`追问内容过长（>${JIAO_MAX_CHARS} 字）`);
@@ -639,7 +663,7 @@ export async function continueJiaoReply(
   // 分流（firstUser 是 string 还是 undefined），三元的每个分支里 TS 才能把类型收窄到
   // 对应重载。与 dream.ts 的 continueDreamReply 同一处理，理由见那边注释。
   const { system, firstUser, language, zh } = q !== undefined
-    ? buildJiaoPrompt(chart, q, opts.omenForFollowUp ?? "圣筊", opts)
+    ? buildJiaoPrompt(chart, q, opts.omenForFollowUp, opts)
     : buildJiaoPrompt(chart, undefined, undefined, opts);
   const messages: ChatMessage[] = [
     { role: "system", content: system },
@@ -706,7 +730,7 @@ type JiaoOptions = SpiritOptions & {
 ```bash
 pnpm --filter @sojan/llm exec vitest run src/jiao.test.ts
 ```
-预期：PASS（13 条）。若 `omenForFollowUp` 忘了加到类型里，这里会是 typecheck 错误而不是测试失败——两者都要修干净。
+预期：PASS（15 条）。若 `omenForFollowUp` 忘了加到类型里，这里会是 typecheck 错误而不是测试失败——两者都要修干净。
 
 #### Step 5: 加导出
 
@@ -724,7 +748,7 @@ pnpm --filter @sojan/llm exec tsc --noEmit
 git add packages/llm/src/jiao.ts packages/llm/src/jiao.test.ts packages/llm/src/index.ts
 git commit -m "feat(jiao): llm 掷筊解读层 + 筊象后置校验（替换而非删除）"
 ```
-预期：llm 测试 262 → 275 全绿。
+预期：llm 测试 262 → 277 全绿。
 
 ---
 

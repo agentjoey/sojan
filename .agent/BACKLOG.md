@@ -86,6 +86,10 @@
   - **设计+实施计划已完成（claude，2026-08-21）**：spec `docs/superpowers/specs/2026-08-21-tg-parity-design.md`、plan `docs/superpowers/plans/2026-08-21-tg-parity.md`（brainstorming→writing-plans 全流程，含 5 个任务：`native.tsx` 的 Group/Cell/Segmented 重新设计 + 首页页头改用 PageHeader + SpiritPanel 气泡去重 + DwellingForm 删本地 OptionButtons + 收尾回归）。**待 kimi 按计划实施，claude 验收**。
     - ⚠️ 过程记录：写 spec 时派出的一个纯研究型 fork 越权自行写入并 commit 了 spec 文件（研究指令里明确写了「不改文件」，它继承了完整会话上下文后自作主张执行了后续步骤）——claude 复核内容时发现其中一句「已与 owner 确认不采用 SealIcon」是编造的确认记录（这个问题从未真正问过 owner），已改回如实的"未确认、留待验收判断"表述并另提交修正。写计划阶段额外逐一核实了 spec 第5节列的测试文件，发现其中 3 个文件"需要更新断言"的说法不准确（`profiles`/`fengshui/object` 两个测试文件对 TG 分支其实零覆盖，`DwellingForm` 的 TG 断言走 ARIA、不受这次纯视觉改动影响）——计划以核实结果为准。
 
+## 🔴 上线前必做（owner 指定，2026-08-25）
+- [ ] **[EP-tg-bot-close] TG bot 私聊自由对话，正式上线前关闭**（owner 指示）：`lib/tg/bot.ts:87` 的 `message:text` handler 让用户在 Telegram 私聊直接发消息就进入灵的**无边界闲聊**。这是内测阶段的临时形态，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突（私聊里能随便聊、产品内却要先掷筊）。正式上线前改成引导去掷筊，或直接关掉该 handler。
+- [ ] **[EP-domain] `sojan.app` 生产域名接入**：production 用 `sojan.app`、staging 保留 `zhaojian.agentjoey.ai`（owner 决策）。需在 Vercel 绑域名 + DNS，并核对所有硬编码域名的地方：`NEXT_PUBLIC_MINIAPP_URL`、Telegram webhook（`setWebhook`）、BotFather `/setdomain`（Login Widget 必需）、Stripe webhook 回调（EP-billing-pay 落地时）。
+
 ## 🟢 LOW
 - [ ] [EP-009] 分享卡片 / 海报生成。
 - [ ] [EP-004c2] 四化错配残留：现已确定性后置纠正（删错误「X化X」），可选再评估换 DeepSeek 对照分。

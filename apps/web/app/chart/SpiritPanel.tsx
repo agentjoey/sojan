@@ -15,11 +15,35 @@ import { QuickPrompts } from "@/components/spirit/QuickPrompts";
 import { spiritMemoryAction } from "@/app/actions";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 
-export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?: string }) {
+export function SpiritPanel({
+  profile,
+  autoSend,
+  seedTurns,
+}: {
+  profile: Profile;
+  autoSend?: string;
+  /**
+   * 对话开场（EP-jiao）：掷筊问事的「问题 + 灵解」由 /spirit 页注入，作为这次
+   * 对话的头两条消息渲染。**不落 spirit_messages**——它们已经由 jiao_history
+   * 单独存了摘要与回复全文，再写一份进消息表是重复存储。
+   * 后续追问走正常的 /api/spirit/chat，seedTurns 会随历史一起发给模型。
+   */
+  seedTurns?: { role: "user" | "spirit"; content: string }[];
+}) {
   const { locale } = useLocale();
   const t = useT();
   const spirit = deriveSpirit(profile.chart);
   const [messages, setMessages] = useState<SpiritMessage[]>([]);
+  // seedTurns 拼成与 SpiritMessage 同形的伪消息（id 用固定前缀，不会与库里的 uuid 撞）。
+  // 只用于渲染 + 拼进发给模型的历史——绝不写回 setMessages/appendMessage，否则会在
+  // 下一轮追问时把 seed 一起并入「真实消息」state，导致重复注入。
+  const seeded: SpiritMessage[] = (seedTurns ?? []).map((st, i) => ({
+    id: `seed-${i}`,
+    role: st.role,
+    content: st.content,
+    createdAt: "",
+  }));
+  const allMessages = seeded.length > 0 ? [...seeded, ...messages] : messages;
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +117,9 @@ export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?
           const convo = ms[0]?.role === "spirit" ? ms.slice(1) : ms;
           if (convo.length > 0) {
             setMessages(convo);
+          } else if (seedTurns && seedTurns.length > 0) {
+            // EP-jiao：seedTurns 本身就是这次对话的开场（掷筊问答），不需要再生成
+            // 一条通用欢迎语——那样会在 seed 之后又插一条不搭调的寒暄，还白烧一次 LLM 额度。
           } else {
             const greeting = await sendToSpirit([]);
             if (cancelled) return;
@@ -107,7 +134,7 @@ export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?
       }
     })();
     return () => { cancelled = true; };
-  }, [profile.id, sendToSpirit]);
+  }, [profile.id, sendToSpirit, seedTurns]);
 
   // 新消息到达时滚动到底部
   useEffect(() => {
@@ -149,7 +176,10 @@ export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?
       }
 
       setStreaming(true);
-      const historyForApi = nextMessages.map((m) => ({ role: m.role, content: m.content }));
+      // 发给模型的历史必须带上 seedTurns（掷筊那一卦的问答）——否则用户在这里追问时，
+      // 模型看不到刚才那一卦问了什么、灵怎么回的。seeded 只进这里，不进 setMessages，
+      // 见上面「不落 spirit_messages」的注释。
+      const historyForApi = [...seeded, ...nextMessages].map((m) => ({ role: m.role, content: m.content }));
 
       if (hasTgSession()) {
         const tempId = `spirit-${Date.now()}`;
@@ -234,7 +264,7 @@ export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?
         setStreaming(false);
       }
     },
-    [streaming, messages, profile.id, profile.chart, memory, questionnaire, locale, t],
+    [streaming, messages, seedTurns, profile.id, profile.chart, memory, questionnaire, locale, t],
   );
 
   async function handleSubmit(e?: React.FormEvent) {
@@ -278,12 +308,12 @@ export function SpiritPanel({ profile, autoSend }: { profile: Profile; autoSend?
         ref={scrollRef}
         className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
       >
-        {messages.length === 0 && isTelegram() && (
+        {allMessages.length === 0 && isTelegram() && (
           <div className="flex justify-start">
             <Bubble role="spirit">{t("spirit.emptyPrompt")}</Bubble>
           </div>
         )}
-        {messages.map((m) => (
+        {allMessages.map((m) => (
           <div
             key={m.id}
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}

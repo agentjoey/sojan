@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import React from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
@@ -9,13 +10,26 @@ import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
  * 这里改为 `?topic=fengshui&q=<动作文本>`：/spirit 据此拼出一句关于这条化解的提问，
  * 复用既有的 autoSend 机制（与 topic=portrait 同一套接线）。
  *
- * 全文件用 `SpiritPanel` 的桩组件截获 autoSend prop——真实 SpiritPanel 依赖 Supabase /
- * fetch / Telegram 等一整套外部世界，这里只关心「page.tsx 算出的 autoSend 是什么」，
- * 与 SpiritPanel 内部如何消费它是两件事（后者已有 SpiritPanel 自己的测试覆盖）。
+ * 全文件用 `SpiritPanel` 的桩组件截获 autoSend/seedTurns prop——真实 SpiritPanel 依赖
+ * Supabase / fetch / Telegram 等一整套外部世界，这里只关心「page.tsx 算出的
+ * autoSend/seedTurns 是什么」，与 SpiritPanel 内部如何消费它是两件事（后者已有
+ * SpiritPanel 自己的测试覆盖）。
+ *
+ * EP-jiao：/spirit 从「随便聊」收缩为「先对一件具体的事掷筊」，但 topic=portrait /
+ * topic=fengshui 这两个深链入口（画像页「聊聊这个」、境页每条化解的「聊聊这条」）
+ * 已经带着一件具体的事进来，语义上不需要再补一次掷筊仪式——保留旧行为，直接进对话。
+ * 掷筊闸门只挡「冷启动」的默认入口（不带 topic）。
+ *
+ * 已知陷阱（与 app/__tests__/page.test.tsx、dream/fengshui 测试相同）：
+ * page.tsx 顶层 `const ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"`
+ * 在**模块加载时**求值，必须 `vi.resetModules()` 之后再动态 import；`I18nProvider`
+ * 必须出自**同一次**动态 import，否则 `useT()` 拿到的 context 实例对不上 Wrapper
+ * 提供的那个；supabase 会话用 `vi.hoisted` 共享可变量，不能直接摆弄 mock 实例
+ * （resetModules 后会打到旧实例）。
  */
 const spiritPanelPropsSpy = vi.fn();
 vi.mock("@/app/chart/SpiritPanel", () => ({
-  SpiritPanel: (props: { autoSend?: string }) => {
+  SpiritPanel: (props: { autoSend?: string; seedTurns?: { role: string; content: string }[] }) => {
     spiritPanelPropsSpy(props);
     return <div data-testid="spirit-panel-stub">{props.autoSend ?? "(no autoSend)"}</div>;
   },
@@ -24,29 +38,76 @@ vi.mock("@/app/chart/SpiritPanel", () => ({
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
 const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart: computeUnifiedChart(birth), createdAt: "", reading: null };
 
-vi.mock("@/lib/profiles", () => ({ getActiveProfile: vi.fn(async () => profile) }));
+const getSpiritMemoryMock = vi.fn(async (..._a: unknown[]): Promise<string | null> => null);
+const getQuestionnaireMock = vi.fn(async (..._a: unknown[]): Promise<null> => null);
+vi.mock("@/lib/profiles", () => ({
+  getActiveProfile: vi.fn(async () => profile),
+  getSpiritMemory: (...a: unknown[]) => getSpiritMemoryMock(...a),
+  getQuestionnaire: (...a: unknown[]) => getQuestionnaireMock(...a),
+}));
 vi.mock("@/lib/tg/client", () => ({ hasTgSession: () => false, tgGetProfile: vi.fn() }));
 
+const throwJiaoMock = vi.fn();
+vi.mock("@/lib/jiao", () => ({ throwJiao: (...a: unknown[]) => throwJiaoMock(...a) }));
+
+const listJiaoHistoryMock = vi.fn(async (..._a: unknown[]): Promise<unknown[]> => []);
+const appendJiaoHistoryMock = vi.fn(async (..._a: unknown[]): Promise<void> => {});
+vi.mock("@/lib/jiao-history", () => ({
+  listJiaoHistory: (...a: unknown[]) => listJiaoHistoryMock(...a),
+  appendJiaoHistory: (...a: unknown[]) => appendJiaoHistoryMock(...a),
+}));
+
+const jiaoSummaryActionMock = vi.fn(async (..._a: unknown[]): Promise<string | null> => null);
+vi.mock("@/app/actions", () => ({
+  jiaoSummaryAction: (...a: unknown[]) => jiaoSummaryActionMock(...a),
+}));
+
 /**
- * 与 AppShell.test.tsx / fengshui/__tests__/page.test.tsx 同样的坑：page.tsx 顶层
- * `const ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"` 在模块加载时求值，
- * 必须与 I18nProvider 出自同一次刚 resetModules 后的动态 import，否则 useT() 拿到的
- * I18nContext 实例对不上 Wrapper 提供的那个。
+ * EP-jiao：page.tsx 直接 import `@/lib/supabase`（掷筊落定后调 /api/spirit/jiao 时
+ * 读会话 access_token 附到请求头）。会话内容做成可按测试改写的共享可变量
+ * （vi.hoisted）——renderSpiritPage() 每次 resetModules + 动态 import，mock 工厂
+ * 可能重新执行，直接摆弄 mock 实例会打到旧实例（dream/fengshui 测试记过同一个坑）。
  */
-async function renderSpiritPage(url: string) {
+const { supabaseSession } = vi.hoisted(() => ({
+  supabaseSession: { current: { access_token: "test-access-token" } as { access_token: string } | null },
+}));
+vi.mock("@/lib/supabase", () => ({
+  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
+}));
+
+/**
+ * `render()` 包一层 `await act(async () => {...})`：page.tsx 挂载时
+ * `getActiveProfile().then(setProfile)` 落在真实微任务里，同步 render 返回后
+ * setState 可能落在 act 作用域之外（dream/fengshui 测试记过同一时序竞争，这里沿用
+ * 同一解法）——本文件新增的掷筊闸门测试在 render 后立即同步断言（不经 findBy /
+ * waitFor），必须保证 profile 加载在 render 返回前就已完成。
+ */
+async function renderSpiritPage(url: string = "/spirit") {
   window.history.pushState({}, "", url);
   const { default: Page } = await import("../page");
   const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
   function Wrapper({ children }: { children: React.ReactNode }) {
     return <I18nProvider locale="zh">{children}</I18nProvider>;
   }
-  return render(<Page />, { wrapper: Wrapper });
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(<Page />, { wrapper: Wrapper });
+  });
+  return result;
 }
 
 beforeEach(() => {
   vi.resetModules();
   vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
   spiritPanelPropsSpy.mockReset();
+  getSpiritMemoryMock.mockClear();
+  getQuestionnaireMock.mockClear();
+  throwJiaoMock.mockReset();
+  listJiaoHistoryMock.mockClear();
+  listJiaoHistoryMock.mockResolvedValue([]);
+  appendJiaoHistoryMock.mockClear();
+  jiaoSummaryActionMock.mockClear();
+  supabaseSession.current = { access_token: "test-access-token" };
 });
 
 describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文本>", () => {
@@ -59,11 +120,13 @@ describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文�
     expect(lastCall.autoSend).toContain("床头靠东南一侧的实墙");
   });
 
-  it("topic=fengshui 但没有 q（畸形链接）时，autoSend 仍是 undefined，不拼出一句空话", async () => {
+  it("topic=fengshui 但没有 q（畸形链接）时，autoSend 仍是 undefined，不拼出一句空话——落回掷筊闸门而不是空白通用聊天", async () => {
+    // EP-jiao 之前：autoSend undefined 时 SpiritPanel 仍会直接渲染（空白通用聊天）。
+    // EP-jiao 之后：/spirit 默认（无有效 topic）入口统一收窄成掷筊闸门，畸形链接
+    // 等价于「没有 topic」，同样落进闸门——好过把用户扔进一个没有上下文的空聊天。
     await renderSpiritPage("/spirit?topic=fengshui");
-    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
-    const lastCall = spiritPanelPropsSpy.mock.calls.at(-1)![0] as { autoSend?: string };
-    expect(lastCall.autoSend).toBeUndefined();
+    await waitFor(() => expect(screen.getByPlaceholderText(/该不该/)).toBeInTheDocument());
+    expect(spiritPanelPropsSpy).not.toHaveBeenCalled();
   });
 
   it("回归：topic=portrait 时 autoSend 仍是既有的画像开场白（不受本次改动影响）", async () => {
@@ -73,11 +136,10 @@ describe("最终评审 Blocking 2：/spirit 消费 ?topic=fengshui&q=<动作文�
     expect(lastCall.autoSend).toBe("我想聊聊我的自我画像");
   });
 
-  it("回归：不带 topic 时 autoSend 为 undefined", async () => {
+  it("回归：不带 topic 时 autoSend 为 undefined（走掷筊闸门，而不是空白通用聊天）", async () => {
     await renderSpiritPage("/spirit");
-    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
-    const lastCall = spiritPanelPropsSpy.mock.calls.at(-1)![0] as { autoSend?: string };
-    expect(lastCall.autoSend).toBeUndefined();
+    await waitFor(() => expect(screen.getByPlaceholderText(/该不该/)).toBeInTheDocument());
+    expect(spiritPanelPropsSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -87,5 +149,95 @@ describe("回归：/spirit flag 关闭时显示未开启文案，不渲染 Spiri
     await renderSpiritPage("/spirit?topic=fengshui&q=x");
     expect(screen.getByText("本命之灵尚未开启。")).toBeInTheDocument();
     expect(screen.queryByTestId("spirit-panel-stub")).toBeNull();
+  });
+});
+
+describe("EP-jiao 掷筊闸门", () => {
+  // vi.stubGlobal 而非 vi.spyOn：globalThis.fetch 的重载签名会让 vi.spyOn 的返回类型
+  // 推导出错（TS2344/TS2322），本仓其余测试文件（dream/fengshui）也一律用
+  // vi.fn() + vi.stubGlobal 桩 fetch，这里保持同一约定。
+  const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
+
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("未掷筊时不渲染对话面板，只有问题输入与掷筊按钮", async () => {
+    const { container } = await renderSpiritPage();
+    expect(screen.getByPlaceholderText(/该不该/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "掷筊" })).toBeInTheDocument();
+    expect(container.querySelector("textarea[placeholder*='对话']")).toBeNull();
+    expect(screen.queryByTestId("spirit-panel-stub")).toBeNull();
+  });
+
+  it("问题少于 4 字时掷筊按钮禁用", async () => {
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "嗯" } });
+    expect(screen.getByRole("button", { name: "掷筊" })).toBeDisabled();
+  });
+
+  it("笑筊 → 显示重掷提示，且不调用 /api/spirit/jiao（不烧额度）", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "仰"], omen: "笑筊" });
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("圣筊 → 调用 /api/spirit/jiao 并带上筊象", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValue(new Response("这一掷是圣筊。"));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("/api/spirit/jiao");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.omen).toBe("圣筊");
+    expect(body.question).toBe("该不该换工作");
+    expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBe("Bearer test-access-token");
+
+    // 落定之后转入对话态：SpiritPanel（桩组件）拿到 seedTurns，问题与灵解都在里面，
+    // 而不是只拼进请求体、渲染时又丢了。
+    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
+    const lastCall = spiritPanelPropsSpy.mock.calls.at(-1)![0] as {
+      seedTurns?: { role: string; content: string }[];
+    };
+    expect(lastCall.seedTurns).toEqual([
+      { role: "user", content: "该不该换工作" },
+      { role: "spirit", content: "这一掷是圣筊。" },
+    ]);
+  });
+
+  it("三掷仍笑筊 → exhausted:true 随请求体一起发出", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "仰"], omen: "笑筊" });
+    fetchSpy.mockResolvedValue(new Response("这个问题本身就是答案的一部分。"));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+
+    // 连掷三次，前两次笑筊仍可重掷，第三次笑筊触发 exhausted
+    for (let i = 0; i < 3; i++) {
+      fireEvent.click(screen.getByRole("button", { name: i === 0 ? "掷筊" : "再掷一次" }));
+      fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+      if (i < 2) {
+        await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+      }
+    }
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+    const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.exhausted).toBe(true);
+    expect(body.omen).toBe("笑筊");
+    // 等对话态落定，让 askSpirit 里的异步链在测试结束前跑完，不留悬挂的
+    // act-外 setState 污染下一个测试的输出。
+    await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
   });
 });

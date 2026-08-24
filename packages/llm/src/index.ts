@@ -32,3 +32,4 @@ export { checkVoice, anchorKeyTerms, VOICE_LIMITS, BANNED_ZH, BANNED_EN } from "
 export type { VoiceViolation, VoiceOptions } from "./eval/voice";
 export { runVoiceProbe } from "./eval/voice-run";
 export { interpretDream, generateDreamReply, continueDreamReply, summarizeDreamEntry, sanitizeDream, DREAM_MAX_CHARS } from "./dream";
+export { correctOmen, generateJiaoReply, continueJiaoReply, summarizeJiaoEntry, JIAO_MAX_CHARS } from "./jiao";

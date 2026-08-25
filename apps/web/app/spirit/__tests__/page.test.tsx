@@ -389,3 +389,57 @@ describe("EP-jiao 掷筊闸门", () => {
     expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
   });
 });
+
+/**
+ * EP-jiao 最终评审补项：危机前置拦截（lib/jiao-crisis.ts）。
+ * 两条要一起钉住：①命中最窄一层自伤/医疗急症词表 → 不掷、不烧额度、渲染求助引导；
+ * ②正常的人生抉择类问题（该不该辞职/分手）不被误伤，照常掷筊——这是防假阳性的
+ * 回归网，本模块自身的详尽词表验证见 lib/__tests__/jiao-crisis.test.ts，这里只
+ * 钉「page.tsx 接线正确」这一层：doThrow 里的短路真的在 throwJiao 之前生效。
+ */
+describe("EP-jiao 危机前置拦截：doThrow 接线", () => {
+  const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
+
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("命中危机词表 → 不调用 throwJiao、不发起请求，直接渲染求助引导", async () => {
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "我该不该活下去，撑不下去了" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+
+    await waitFor(() => expect(screen.getByText("先别急着掷这一卦")).toBeInTheDocument());
+    expect(screen.getByText(/120（急救）/)).toBeInTheDocument();
+    expect(throwJiaoMock).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // 揭晓屏/掷筊动画都不该出现——命中拦截时压根没进 throwing 阶段。
+    expect(screen.queryByTestId("jiao-block")).toBeNull();
+
+    // 「我知道了」把用户带回空白的 asking 阶段，而不是让他一键重掷同一句话。
+    fireEvent.click(screen.getByRole("button", { name: "我知道了" }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/该不该/)).toHaveValue(""));
+  });
+
+  it.each([
+    ["该不该辞职", "圣筊"],
+    ["这段关系要不要继续", "阴筊"],
+    ["该不该结束这段关系", "圣筊"],
+    ["这份工作要不要放弃，累死了每天", "圣筊"], // 含「死」但非危机短语，不应被裸字误伤
+    ["这家公司还能不能活下去，要不要继续投钱", "圣筊"], // 「活下去」用于公司比喻，非人身危机
+  ])("正常人生抉择问题「%s」不被误伤，照常掷筊", async (question, omen) => {
+    throwJiaoMock.mockReturnValueOnce({ blocks: omen === "圣筊" ? ["仰", "俯"] : ["俯", "俯"], omen });
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: question } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+
+    expect(throwJiaoMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getAllByTestId("jiao-block")).toHaveLength(2));
+    expect(screen.queryByText("先别急着掷这一卦")).toBeNull();
+  });
+});

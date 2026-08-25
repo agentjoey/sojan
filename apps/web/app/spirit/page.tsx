@@ -7,6 +7,7 @@ import { getActiveProfile, getSpiritMemory, getQuestionnaire, type Profile } fro
 import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { supabase } from "@/lib/supabase";
 import { throwJiao } from "@/lib/jiao";
+import { detectJiaoCrisis } from "@/lib/jiao-crisis";
 import { listJiaoHistory, appendJiaoHistory, type JiaoHistoryEntry } from "@/lib/jiao-history";
 import { JiaoThrow, JiaoBlocksStatic } from "@/components/JiaoThrow";
 import { SpiritPanel } from "@/app/chart/SpiritPanel";
@@ -20,6 +21,7 @@ const ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1";
 
 type Stage =
   | { kind: "asking" } // 输入问题，尚未掷
+  | { kind: "crisis" } // 危机前置拦截命中：不掷，直接转向求助资源（见 lib/jiao-crisis.ts）
   | { kind: "throwing"; blocks: [BlockFace, BlockFace]; omen: Omen }
   | { kind: "revealed"; blocks: [BlockFace, BlockFace]; omen: Omen } // UAT②：动画落定后先定格揭晓，用户点「继续」才推进
   | { kind: "rethrow"; omen: Omen } // 笑筊，可重掷
@@ -112,6 +114,14 @@ export default function SpiritPage() {
     if (!canThrow) return;
     setError(null);
     setNeedLogin(false); // 新一次掷筊即视为用户已处理过登录态，不让旧横幅挂到刷新页面才消失
+    // 危机前置拦截（EP-jiao 最终评审补项，见 lib/jiao-crisis.ts 顶部注释）：
+    // 命中最窄的一层自伤/医疗急症词表时，不调用 throwJiao（全仓唯一随机点）、不进
+    // throwing 阶段、不发起任何消耗额度的请求——检查必须发生在这里、真正掷筊之前，
+    // 否则「阴筊·不允」会先被大字定格展示给一个正在讲「我该不该活下去」的人。
+    if (detectJiaoCrisis(question)) {
+      setStage({ kind: "crisis" });
+      return;
+    }
     const r = throwJiao();
     setStage({ kind: "throwing", blocks: r.blocks, omen: r.omen });
   }
@@ -298,14 +308,18 @@ export default function SpiritPage() {
               ? "mt-6 text-[14px] leading-relaxed text-ink-2"
               : stage.kind === "reading" || stage.kind === "throwing"
                 ? "mt-8 text-center text-[14px] text-muted"
-                : "sr-only"
+                : stage.kind === "crisis"
+                  ? "mt-6 text-left text-[14px] leading-relaxed text-ink-2"
+                  : "sr-only"
         }
       >
         {/* jiao.throwing：此前这个 live region 的上方长注释就写着「跨…throwing…五个
             stage」，但下面的分支从未真正接上 throwing——筊块抛起翻转的这几秒，屏幕
             阅读器用户什么都听不到，直到落定才突然听见筊象名。补上这一分支才是
             注释原本承诺的样子（最终评审 I5 顺带项：jiao.throwing 键此前定义了却
-            无人使用，正是这个缺口的症状）。 */}
+            无人使用，正是这个缺口的症状）。
+            crisis 分支同一套道理：命中危机拦截时页面从「输入问题」直接换成求助
+            引导，这个变化本身也必须被播报出来，而不是静默换了一屏文字。 */}
         {stage.kind === "revealed"
           ? t(OMEN_NAME_KEY[stage.omen])
           : stage.kind === "rethrow"
@@ -314,8 +328,16 @@ export default function SpiritPage() {
               ? t("jiao.reading")
               : stage.kind === "throwing"
                 ? t("jiao.throwing")
-                : ""}
+                : stage.kind === "crisis"
+                  ? <><strong className="block text-[15px] font-medium text-ink">{t("jiao.crisisTitle")}</strong><span className="mt-2 block">{t("jiao.crisisBody")}</span></>
+                  : ""}
       </p>
+
+      {stage.kind === "crisis" && (
+        <div className="mt-5 flex justify-center">
+          <Button onClick={reset}>{t("jiao.crisisBack")}</Button>
+        </div>
+      )}
 
       {stage.kind === "asking" && (
         <div className="mt-6">

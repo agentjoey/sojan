@@ -386,6 +386,15 @@ export const en: Messages = {
     followUpSubmit: "Ask more",
     historyTitle: "Recent questions",
     newThrow: "Ask about something else",
+    // Crisis pre-throw guard (EP-jiao final-review gap-fill, see lib/jiao-crisis.ts):
+    // when the narrow self-harm/medical-emergency wordlist hits, we skip the throw
+    // entirely and swap in this guidance instead. Only numbers we're confident stay
+    // accurate long-term are named (988 / Samaritans in the UK); anything we're not
+    // sure of is left as "your local emergency number" rather than guessed.
+    crisisTitle: "Let's not cast this one yet",
+    crisisBody:
+      "This sounds heavier than a throw can hold. If you're having thoughts of harming yourself, or are in a medical emergency, please reach out right now — call your local emergency number (911 in the US), or call or text 988 (Suicide & Crisis Lifeline, US); in the UK, Samaritans is 116 123. If you're safe for the moment but still struggling, please reach out to a local mental health professional or crisis line. Your safety matters more than any throw.",
+    crisisBack: "Okay",
   },
   fengshui: {
     kicker: "Feng Shui",

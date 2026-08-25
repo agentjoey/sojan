@@ -162,6 +162,41 @@ describe("EP-jiao 掷筊闸门", () => {
     vi.unstubAllGlobals();
   });
 
+  /**
+   * UAT②：动画落定后不再直接分流——先进揭晓屏定格展示筊象结果，用户点「继续」
+   * 才真正推进（笑筊→重掷提示 / 圣筊|阴筊→发起 /api/spirit/jiao）。下面各用例
+   * 原先在 `fireEvent.animationEnd(...)` 之后就直接断言分流结果，现在统一改成
+   * 这个 helper：animationEnd → 等揭晓屏「继续」按钮出现 → 点掉它，行为等价于
+   * 「用户看完揭晓屏、确认继续」，之后再断言原本的分流结果。
+   */
+  async function settleThrow() {
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    const continueBtn = await screen.findByRole("button", { name: "继续" });
+    fireEvent.click(continueBtn);
+  }
+
+  it("落定后先进揭晓屏：展示筊象大字名、传统释义与落地的两枚筊，用户确认前不发起请求", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValue(new Response("这一掷是圣筊。"));
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+
+    // 筊象结果本身必须被展示——大字名 + 传统释义 + 落地的两枚筊（一俯一仰）。
+    await waitFor(() => expect(screen.getByText("圣筊")).toBeInTheDocument());
+    expect(screen.getByText(/传统释义为「允」/)).toBeInTheDocument();
+    const settledBlocks = screen.getAllByTestId("jiao-block-static");
+    expect(settledBlocks).toHaveLength(2);
+    expect(settledBlocks[0]).toHaveAttribute("data-face", "仰");
+    expect(settledBlocks[1]).toHaveAttribute("data-face", "俯");
+    // 揭晓屏停在原地，不自动推进——用户确认前不该发起请求。
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "继续" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+  });
+
   it("未掷筊时不渲染对话面板，只有问题输入与掷筊按钮", async () => {
     const { container } = await renderSpiritPage();
     expect(screen.getByPlaceholderText(/该不该/)).toBeInTheDocument();
@@ -198,7 +233,7 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -209,7 +244,7 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe("/api/spirit/jiao");
@@ -239,7 +274,7 @@ describe("EP-jiao 掷筊闸门", () => {
     // 连掷三次，前两次笑筊仍可重掷，第三次笑筊触发 exhausted
     for (let i = 0; i < 3; i++) {
       fireEvent.click(screen.getByRole("button", { name: i === 0 ? "掷筊" : "再掷一次" }));
-      fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+      await settleThrow();
       if (i < 2) {
         await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
       }
@@ -261,7 +296,7 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
 
     await waitFor(() => expect(screen.getByText("升级会员，解锁无限")).toBeInTheDocument());
     // 裸 JSON 错误体不应该出现在页面上
@@ -278,7 +313,7 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/先确认身份/)).toBeInTheDocument());
 
     // 发起下一次掷筊尝试：不必等网络返回，横幅应立刻消失
@@ -286,7 +321,7 @@ describe("EP-jiao 掷筊闸门", () => {
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
     expect(screen.queryByText(/先确认身份/)).toBeNull();
 
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(spiritPanelPropsSpy).toHaveBeenCalled());
   });
 
@@ -299,14 +334,14 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
 
     // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
     // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
     throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
     expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
   });
@@ -320,14 +355,14 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/先确认身份/)).toBeInTheDocument());
 
     // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
     // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
     throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
     expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
   });
@@ -341,14 +376,14 @@ describe("EP-jiao 掷筊闸门", () => {
     await renderSpiritPage();
     fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText("升级会员，解锁无限")).toBeInTheDocument());
 
     // 重新掷（这次笑筊）：若刚才失败的那一卦没被撤回，会被误算进三掷计数，
     // 这里就会显示只剩 1 次可掷；撤回后应正确显示还剩 2 次。
     throwJiaoMock.mockReturnValueOnce({ blocks: ["仰", "仰"], omen: "笑筊" });
     fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
-    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    await settleThrow();
     await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
     expect(screen.getByText("还可以掷 2 次")).toBeInTheDocument();
   });

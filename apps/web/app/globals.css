@@ -127,13 +127,16 @@ body {
 @keyframes zjStamp { 0% { opacity: 0; transform: scale(1.7) rotate(-7deg); } 55% { opacity: 1; transform: scale(0.9) rotate(-7deg); } 100% { opacity: 1; transform: scale(1) rotate(-7deg); } }
 @keyframes zjDraw { to { stroke-dashoffset: 0; } }
 @keyframes zjGZ { 0% { opacity: 0; transform: translateY(12px) scale(0.6); } 100% { opacity: 1; transform: none; } }
-/* 掷筊（EP-jiao）：抛起 → 翻转 → 落地。两枚错峰用 inline animation-delay。
+/* 掷筊（EP-jiao）：抛起 → 翻转 → 落地。两枚错峰用 inline animation-delay
+   （JiaoThrow.tsx：`i * 0.18s`）。总时长 1.4s（JiaoThrow.tsx 内联），抛起幅度
+   随 UAT 修复轮把筊块从 56×38px 放大到 128×86px 按比例放大到 -120px（原 -42px
+   看不清「抛起」这一拍）。
    注意上方 prefers-reduced-motion 区块会把 duration 压到 0.001ms，
    animationend 因此立刻触发 —— 结果揭晓挂在 onAnimationEnd 上即天然降级。 */
 @keyframes zjJiaoToss {
   0%   { transform: translateY(0) rotate(0deg); }
-  35%  { transform: translateY(-42px) rotate(220deg); }
-  70%  { transform: translateY(-10px) rotate(400deg); }
+  35%  { transform: translateY(-120px) rotate(220deg); }
+  70%  { transform: translateY(-28px) rotate(400deg); }
   100% { transform: translateY(0) rotate(540deg); }
 }
 

@@ -60,6 +60,18 @@ describe("generateJiaoReply", () => {
     expect(messages[0]!.content).toContain("不给方向性结论");
   });
 
+  // UAT③修复：①拍此前只要求「点出筊象」，模型可以点完名字就转去讲一段与筊象
+  // 语义无关的泛泛反思。改为要求①拍同时带出筊象的传统含义、②拍必须扣着这个具体
+  // 含义展开（换成另一个筊象就说不通），而不是任何筊象都能套用的模板句。
+  it("system 规则要求①拍复述筊象并带出传统含义、②拍扣紧这一具体筊象（不是套话）", async () => {
+    streamSpy.mockClear();
+    await generateJiaoReply(chart, "该不该搬家", "圣筊", { language: "zh", config });
+    const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
+    expect(messages[0]!.content).toContain("开口先复述掷出的是什么筊象");
+    expect(messages[0]!.content).toContain("圣筊=允，阴筊=不允，笑筊=神明发笑、问得不清楚");
+    expect(messages[0]!.content).toContain("换成另一个筊象就说不通");
+  });
+
   it("模型输出的筊象与实际不符 → 被后置校验纠正，并记进 fixedOmens", async () => {
     streamSpy.mockClear();
     streamSpy.mockImplementationOnce(async function* () {

@@ -88,6 +88,9 @@
 
 ## 🔴 上线前必做（owner 指定，2026-08-25）
 - [ ] **[EP-tg-bot-close] TG bot 私聊自由对话，正式上线前关闭**（owner 指示）：`lib/tg/bot.ts:87` 的 `message:text` handler 让用户在 Telegram 私聊直接发消息就进入灵的**无边界闲聊**。这是内测阶段的临时形态，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突（私聊里能随便聊、产品内却要先掷筊）。正式上线前改成引导去掷筊，或直接关掉该 handler。
+- [ ] **[EP-spirit-chat-orphan] `/api/spirit/chat` 在 web 侧已零调用**（EP-jiao 合并后的副产物，2026-08-25）：追问改走 `/api/spirit/jiao` 的 `continueJiaoReply` 之后，web 侧再没有任何代码调用 `/api/spirit/chat`。它**不是死代码**——TG bot 私聊走 `/api/tg/spirit`，两者共用底层 `streamSpiritChat`；悬空的只是 web 那条入口。
+  留着不删是因为「通用灵自由对话这条产品线要不要彻底关掉」是产品决策，不该由一轮技术修复顺带定了。与 `EP-tg-bot-close` 是同一个决策的两面：若决定彻底关闭自由对话，两条一起处理（删 web 路由 + 改 bot handler）；若保留 TG 私聊闲聊，则 web 路由可单独删、`streamSpiritChat` 保留给 TG 用。
+
 - [ ] **[EP-jiao-tg] TG 侧掷筊未接入——`/api/tg/jiao` 中介臂待补**（最终评审 C1，owner 决定内测期不做）：`/spirit` 的 `askSpirit`（初次掷筊）与 `SpiritPanel`（追问）一律走浏览器侧 `supabase().auth.getSession()` 取 Bearer token 调 `/api/spirit/jiao`——Telegram Mini App webview 里**没有这份浏览器侧 Supabase 会话**，token 恒为 `undefined`，每次掷筊必然撞 401（引导去 `/account` 登录，对 TG 用户是死胡同）。
   **为什么现在不上**：根因是 TG 认证机制与 web 完全不同——TG 侧向来是靠 `hasTgSession()` 分流到专门的 `api/tg/*` 中介端点（用 Telegram initData 校验身份，不是 Bearer JWT，参见 `api/tg/dream`/`api/tg/fengshui` 的既有模式），而掷筊/追问从未接入这条分流。这不是一个小补丁——需要新写一条 `api/tg/jiao` 中介端点（服务端读取 profile 关联的 memory/questionnaire，同 `api/tg/dream` 的既有模式）+ `SpiritPanel`/`askSpirit` 补 `hasTgSession()` 分流，工作量与已有 dream/fengshui 的 TG 适配相当，评审阶段时间不允许现做半成品。
   **已处理**：TG 首页入口（`app/page.tsx` 的 `TG_ENTRIES`）已摘除「灵」这一项，回归测试见 `app/__tests__/page.test.tsx`；`/spirit` 页面本身仍可通过直接 URL 访问（TG webview 内），加了注释如实说明现状（能看到输入框、掷筊会在追问/首解那一步撞 401，不是静默失败）。

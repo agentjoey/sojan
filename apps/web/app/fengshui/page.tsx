@@ -217,7 +217,7 @@ export default function FengshuiPage() {
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
 
   // 首揭仪式（2026-08 创意 B / critique P1）：每会话每档案一次——复用 calendar 的
-  // CastingOverlay（seal 换「境」），盘扇区随后按吉凶 rank 错峰入场。用户第一次看到
+  // CastingOverlay（品牌风铃主角过场），盘扇区随后按吉凶 rank 错峰入场。用户第一次看到
   // 「自己的八方吉凶」是这条产品线的存在理由，不能是一个 SVG 瞬间出现。
   const [revealing, setRevealing] = useState(false);
   const [staggerIn, setStaggerIn] = useState(false);
@@ -678,11 +678,9 @@ export default function FengshuiPage() {
     <main className="mx-auto max-w-[720px] px-4 pb-8 pt-6">
       {revealing && profile && (
         <CastingOverlay
-          gan={profile.chart.bazi.pillars.day.stem}
-          zhi={profile.chart.bazi.pillars.day.branch}
-          seal="境"
           title={t("fengshui.castingTitle")}
           hint={t("common.casting")}
+          mode="brief"
         />
       )}
       <PageHeader

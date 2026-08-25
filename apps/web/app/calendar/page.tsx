@@ -151,7 +151,7 @@ export default function CalendarPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8">
-      {casting && <CastingOverlay gan={(fortune?.dayGanZhi ?? "庚申")[0]} zhi={(fortune?.dayGanZhi ?? "庚申")[1]} seal="今" title={t("calendar.calculating")} hint={t("common.casting")} />}
+      {casting && <CastingOverlay title={t("calendar.calculating")} hint={t("common.casting")} mode="brief" />}
       <PageHeader
         kicker={t("calendar.kicker")}
         title={t("calendar.title")}

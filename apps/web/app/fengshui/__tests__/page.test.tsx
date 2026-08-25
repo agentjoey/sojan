@@ -1485,7 +1485,7 @@ describe("EP-fs-tg TG 会话：原生分段 Tab + 原生化解清单", () => {
  *   切回后 delay 必须不在（去掉 staggerIn 复位红）。
  */
 describe("2026-08 设计评审后续", () => {
-  it("首揭仪式：首次进入播 CastingOverlay（seal=境），同会话同一档案不重复播", async () => {
+  it("首揭仪式：首次进入播风铃 CastingOverlay，同会话同一档案不重复播", async () => {
     sessionStorage.removeItem("zj.fsReveal.p1");
     const first = await renderPage();
     await waitFor(() => expect(screen.getByText("正在起你的八方盘")).toBeInTheDocument());

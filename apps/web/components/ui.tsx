@@ -18,27 +18,57 @@ export function elementOf(ganzhi: string): Element | null {
 export function BellLogo({
   size = 26,
   motion = "idle",
+  detail = "compact",
   ringKey,
 }: {
   size?: number;
   /**
-   * "idle"（默认）＝常驻循环微摆，供 CastingOverlay 等「进行中」语境用；
+   * "idle"（默认）＝常驻循环微摆；
    * "ring"＝敲响式摆动，播完即停，供导航/卷首这类高频常驻位置用——持续
-   * 晃动在那些位置是干扰而非提示。"none"＝静止。
+   * 晃动在那些位置是干扰而非提示；"cast"＝过场专属的完整阵风；"none"＝静止。
    */
-  motion?: "idle" | "ring" | "none";
+  motion?: "idle" | "ring" | "cast" | "none";
+  /** compact 保留小尺寸识别度；full 为过场的大尺寸版本增加铃面与横梁材质。 */
+  detail?: "compact" | "full";
   /** motion="ring" 时变化则重放一次摆动（用于点击触发，如再次点 Logo）。 */
   ringKey?: number;
 }) {
-  const className = motion === "idle" ? "zj-bell-idle" : motion === "ring" ? "zj-bell-ring" : undefined;
+  const className = motion !== "none" ? `zj-bell-${motion}` : undefined;
+  const bodyClassName = cn("zj-bell-body", motion !== "none" && `zj-bell-body-${motion}`);
+  const clapperClassName = cn("zj-bell-clapper", motion !== "none" && `zj-bell-clapper-${motion}`);
   return (
     <svg viewBox="0 0 80 84" style={{ width: size, height: "auto" }} aria-hidden>
       <g key={motion === "ring" ? ringKey : undefined} className={className} style={{ transformOrigin: "40px 16px" }}>
-        <path d="M40,12 L43,16 L40,20 L37,16 Z" fill="var(--color-ink)" />
-        <path d="M6,20 C18,24 28,26 40,26 C52,26 62,24 74,20" fill="none" stroke="var(--color-ink)" strokeWidth="5" strokeLinecap="round" />
-        <line x1="40" y1="26" x2="40" y2="40" stroke="var(--color-ink)" strokeWidth="1.4" />
-        <path d="M40,43 C35,43 32,48 32,55 C32,59 33,62 35,65 C37,63 39,62 40,62 C41,62 43,63 45,65 C47,62 48,59 48,55 C48,48 45,43 40,43 Z" fill="var(--color-cinnabar)" />
-        <path d="M40,70 L43,74 L40,79 L37,74 Z" fill="var(--color-cinnabar)" />
+        {/* 挂环与结扣：大尺寸有明确的穿绳关系，小尺寸仍保持一个干净的墨点。 */}
+        <circle cx="40" cy="8" r="4" fill="none" stroke="var(--color-ink)" strokeWidth="2.2" />
+        <path d="M40 12V16" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M40 14.5L44 18.5L40 22.5L36 18.5Z" fill="var(--color-ink)" />
+
+        {/* 微弧横梁是品牌识别主轮廓。 */}
+        <path d="M7 21.5C18 24 29 27 40 27S62 24 73 21.5" fill="none" stroke="var(--color-ink)" strokeWidth="5.5" strokeLinecap="round" />
+        {detail === "full" && (
+          <path className="zj-bell-detail" d="M12 22.6C22 25 31 27.2 40 27.2S58 25 68 22.6" fill="none" stroke="var(--color-paper)" strokeWidth="1" strokeLinecap="round" opacity=".22" />
+        )}
+        <path d="M40 27.5V40" stroke="var(--color-ink)" strokeWidth="1.6" strokeLinecap="round" />
+
+        {/* 铃舌和尾坠独立于铜铃，动效时响应最晚。 */}
+        <g className={clapperClassName} style={{ transformOrigin: "40px 48px" }}>
+          <path d="M40 55V72" stroke="var(--color-ink)" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="40" cy="66" r="2.8" fill="var(--color-ink)" />
+          <path d="M40 71L44 76L40 82L36 76Z" fill="var(--color-cinnabar)" />
+        </g>
+
+        {/* 铜铃：加厚下沿与暗面让大号过场不再像平面图标。 */}
+        <g className={bodyClassName} style={{ transformOrigin: "40px 43px" }}>
+          <path d="M40 39C33.8 39 30 46.1 29.5 54.5C29.2 60.1 27.6 63.3 25.5 66C29.8 68.8 34.6 70.2 40 70.2S50.2 68.8 54.5 66C52.4 63.3 50.8 60.1 50.5 54.5C50 46.1 46.2 39 40 39Z" fill="var(--color-cinnabar)" />
+          <path d="M25.5 66C29.8 68.8 34.6 70.2 40 70.2S50.2 68.8 54.5 66C52.8 70 47.6 72.2 40 72.2S27.2 70 25.5 66Z" fill="var(--color-ink)" opacity=".84" />
+          {detail === "full" && (
+            <>
+              <path className="zj-bell-detail" d="M35 43.5C32.5 47.3 32 52.8 31.8 57.4" fill="none" stroke="var(--color-paper)" strokeWidth="1.5" strokeLinecap="round" opacity=".3" />
+              <path className="zj-bell-detail" d="M29 65.8C35.8 68.6 44.2 68.6 51 65.8" fill="none" stroke="var(--color-paper)" strokeWidth=".9" strokeLinecap="round" opacity=".24" />
+            </>
+          )}
+        </g>
       </g>
     </svg>
   );

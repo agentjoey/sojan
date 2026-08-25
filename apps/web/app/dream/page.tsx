@@ -194,14 +194,9 @@ export default function DreamPage() {
   return (
     <main className="mx-auto max-w-[720px] px-4 pb-8 pt-6">
       {/* EP-motion：解梦是 buffered 调用（sanitizeDream 需要完整文本，见 spec §4），
-          等待期间此前是零反馈——不像 chart 的解读有渐进流式文字打底。用 CastingOverlay
-          兜底这段秒级空等，gan/zhi 复用命主日柱（与 fengshui 同一「锚人」思路，不是
-          真的在起一份新盘）。 */}
+          等待期间不像 chart 的解读有渐进流式文字打底；用品牌风铃过场兜底秒级空等。 */}
       {pending && (
         <CastingOverlay
-          gan={profile.chart.bazi.pillars.day.stem}
-          zhi={profile.chart.bazi.pillars.day.branch}
-          seal="梦"
           title={t("dream.castingTitle")}
         />
       )}

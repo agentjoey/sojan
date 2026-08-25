@@ -115,14 +115,113 @@ body {
 @keyframes zjFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes zjSpinSlow { to { transform: rotate(360deg); } }
 @keyframes zjSpinFast { to { transform: rotate(360deg); } }
-/* 常驻摆动：风吹感——幅度加大到 ±14deg（原 ±3.5deg 太弱，读不出「风过则动」）。 */
-@keyframes zjBellIdle { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
-/* 敲响一次：单次大幅左右晃动即停，不是原来那种衰减多次小抖——一次进场/点击只该看到一下明显的摆动。 */
+/* 风铃主体：一阵风吹起后逐次衰减，后半程停歇，避免机械式匀速摇摆。 */
+@keyframes zjBellIdle {
+  0%, 14%, 63%, 100% { transform: rotate(0deg); }
+  21% { transform: rotate(-12deg); }
+  30% { transform: rotate(9deg); }
+  38% { transform: rotate(-6deg); }
+  45% { transform: rotate(4deg); }
+  51% { transform: rotate(-2deg); }
+  57% { transform: rotate(1deg); }
+}
+/* 铃身相对横梁略滞后：方向相反、幅度更小，体现悬挂物的重量。 */
+@keyframes zjBellBodyIdle {
+  0%, 16%, 63%, 100% { transform: rotate(0deg); }
+  23% { transform: rotate(6deg); }
+  32% { transform: rotate(-5deg); }
+  40% { transform: rotate(3.5deg); }
+  47% { transform: rotate(-2deg); }
+  54% { transform: rotate(1deg); }
+}
+/* 铃舌最轻，响应最晚、相对摆幅最大。 */
+@keyframes zjBellClapperIdle {
+  0%, 18%, 65%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(14deg); }
+  34% { transform: rotate(-11deg); }
+  42% { transform: rotate(8deg); }
+  49% { transform: rotate(-5deg); }
+  56% { transform: rotate(2deg); }
+}
+/* 点击敲响：同一套惯性关系压缩为一次明确反馈。 */
 @keyframes zjBellRing {
   0% { transform: rotate(0deg); }
-  30% { transform: rotate(-26deg); }
-  68% { transform: rotate(18deg); }
+  22% { transform: rotate(-24deg); }
+  48% { transform: rotate(17deg); }
+  68% { transform: rotate(-9deg); }
+  84% { transform: rotate(4deg); }
   100% { transform: rotate(0deg); }
+}
+@keyframes zjBellBodyRing {
+  0% { transform: rotate(0deg); }
+  28% { transform: rotate(8deg); }
+  54% { transform: rotate(-6deg); }
+  74% { transform: rotate(3.5deg); }
+  90% { transform: rotate(-1.5deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes zjBellClapperRing {
+  0% { transform: rotate(0deg); }
+  32% { transform: rotate(20deg); }
+  58% { transform: rotate(-15deg); }
+  78% { transform: rotate(8deg); }
+  92% { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+/* 测算过场：主风在 300ms 内抵达，随后非对称衰减；后 2.4s 留白，长等待才重放。 */
+@keyframes zjBellCast {
+  0%, 2%, 45%, 100% { transform: rotate(0deg); }
+  7% { transform: rotate(-18deg); }
+  15% { transform: rotate(13deg); }
+  23% { transform: rotate(-8deg); }
+  30% { transform: rotate(4.5deg); }
+  36% { transform: rotate(-2deg); }
+  41% { transform: rotate(.7deg); }
+}
+@keyframes zjBellBodyCast {
+  0%, 5%, 46%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(7deg); }
+  18% { transform: rotate(-6deg); }
+  26% { transform: rotate(4deg); }
+  33% { transform: rotate(-2deg); }
+  40% { transform: rotate(.8deg); }
+}
+@keyframes zjBellClapperCast {
+  0%, 7%, 47%, 100% { transform: rotate(0deg); }
+  12% { transform: rotate(22deg); }
+  20% { transform: rotate(-17deg); }
+  28% { transform: rotate(10deg); }
+  35% { transform: rotate(-5deg); }
+  41% { transform: rotate(1.5deg); }
+}
+@keyframes zjCastingEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes zjCastingBrief {
+  0% { opacity: 0; }
+  12%, 90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes zjCastingBellEnter {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes zjCastingCopyEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes zjCastingAir {
+  0%, 3%, 15%, 100% { opacity: 0; transform: translateX(-56%) scaleX(.62) rotate(-4deg); }
+  7% { opacity: .18; }
+  13% { opacity: 0; transform: translateX(-44%) scaleX(1.22) rotate(-4deg); }
+}
+@keyframes zjCastingShadow {
+  0%, 2%, 45%, 100% { transform: translateX(0) scaleX(.9); opacity: .09; }
+  7% { transform: translateX(-9px) scaleX(1.08); opacity: .13; }
+  15% { transform: translateX(7px) scaleX(1); opacity: .11; }
+  23% { transform: translateX(-4px) scaleX(.96); opacity: .1; }
+  30% { transform: translateX(2px) scaleX(.93); opacity: .09; }
 }
 @keyframes zjStamp { 0% { opacity: 0; transform: scale(1.7) rotate(-7deg); } 55% { opacity: 1; transform: scale(0.9) rotate(-7deg); } 100% { opacity: 1; transform: scale(1) rotate(-7deg); } }
 @keyframes zjDraw { to { stroke-dashoffset: 0; } }
@@ -143,9 +242,67 @@ body {
 /* 入场：淡入 + 上移；子项错峰用 inline animation-delay */
 .zj-rise { animation: zjRise 0.6s var(--ease-rise) both; }
 .zj-fade { animation: zjFade 0.5s ease both; }
-.zj-bell-idle { transform-origin: 40px 16px; animation: zjBellIdle 3.6s ease-in-out infinite; }
-.zj-bell-ring { transform-origin: 40px 16px; animation: zjBellRing 0.85s ease-in-out both; }
+.zj-bell-idle { transform-origin: 40px 16px; animation: zjBellIdle 5.2s var(--ease-cast) infinite; }
+.zj-bell-body-idle { animation: zjBellBodyIdle 5.2s var(--ease-cast) infinite; }
+.zj-bell-clapper-idle { animation: zjBellClapperIdle 5.2s var(--ease-cast) infinite; }
+.zj-bell-ring { transform-origin: 40px 16px; animation: zjBellRing 0.95s var(--ease-cast) both; }
+.zj-bell-body-ring { animation: zjBellBodyRing 0.95s var(--ease-cast) both; }
+.zj-bell-clapper-ring { animation: zjBellClapperRing 0.95s var(--ease-cast) both; }
+.zj-bell-cast { transform-origin: 40px 16px; animation: zjBellCast 4.4s var(--ease-cast) infinite; }
+.zj-bell-body-cast { animation: zjBellBodyCast 4.4s var(--ease-cast) infinite; }
+.zj-bell-clapper-cast { animation: zjBellClapperCast 4.4s var(--ease-cast) infinite; }
 .zj-spin-slow { transform-origin: center; animation: zjSpinSlow 72s linear infinite; }
+
+/* 风铃主角过场：只给风、重量和文案层级，不叠加命盘或装饰粒子。 */
+.zj-casting-overlay {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.zj-casting-overlay-pending {
+  animation: zjCastingEnter .28s ease-out both;
+}
+.zj-casting-overlay-brief {
+  animation: zjCastingBrief 2.1s ease-out both;
+}
+.zj-casting-bell-stage {
+  display: block;
+  isolation: isolate;
+  animation: zjCastingBellEnter .42s var(--ease-rise) both;
+}
+.zj-casting-bell-stage::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 43%;
+  left: 50%;
+  width: 190px;
+  height: 28px;
+  border-top: 1px solid var(--color-line-strong);
+  border-radius: 50%;
+  opacity: 0;
+  animation: zjCastingAir 4.4s ease-out infinite;
+}
+.zj-casting-bell-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  bottom: -10px;
+  left: calc(50% - 34px);
+  width: 68px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  filter: blur(7px);
+  animation: zjCastingShadow 4.4s var(--ease-cast) infinite;
+}
+.zj-casting-title {
+  color: var(--color-ink);
+  animation: zjCastingCopyEnter .45s var(--ease-rise) .52s both;
+}
+.zj-casting-hint {
+  color: var(--color-muted);
+  animation: zjCastingCopyEnter .45s var(--ease-rise) .76s both;
+}
 
 /* 键盘焦点（I2：八方盘扇区；全站此前无任何 :focus-visible 规则） */
 .zj-wheel-focus:focus-visible { outline: 2px solid var(--color-cinnabar); outline-offset: 2px; }
@@ -157,7 +314,23 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  .zj-spin-slow, .zj-bell-idle, .zj-bell-ring { animation: none !important; }
+  .zj-spin-slow,
+  .zj-bell-idle,
+  .zj-bell-body-idle,
+  .zj-bell-clapper-idle,
+  .zj-bell-ring,
+  .zj-bell-body-ring,
+  .zj-bell-clapper-ring,
+  .zj-bell-cast,
+  .zj-bell-body-cast,
+  .zj-bell-clapper-cast,
+  .zj-casting-overlay-pending,
+  .zj-casting-overlay-brief,
+  .zj-casting-bell-stage,
+  .zj-casting-title,
+  .zj-casting-hint,
+  .zj-casting-bell-stage::after { animation: none !important; }
+  .zj-casting-bell-stage::before { display: none; }
 }
 
 /* ============================================================

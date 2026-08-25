@@ -24,7 +24,16 @@ type Stage =
   | { kind: "revealed"; blocks: [BlockFace, BlockFace]; omen: Omen } // UAT②：动画落定后先定格揭晓，用户点「继续」才推进
   | { kind: "rethrow"; omen: Omen } // 笑筊，可重掷
   | { kind: "reading" } // 落定，等灵解
-  | { kind: "conversing"; seed: { role: "user" | "spirit"; content: string }[] };
+  | {
+      kind: "conversing";
+      seed: { role: "user" | "spirit"; content: string }[];
+      /** 这一卦的筊象——追问要带着它走 continueJiaoReply 的 omenForFollowUp 契约（最终评审 I4）。 */
+      omen: Omen;
+      /** 是否为「三笑筊拆解」那一卦；追问沿用同一套规则，见 SpiritPanel 的注释。 */
+      exhausted: boolean;
+      /** 首轮问题原文；续接历史时未知（jiao_history 不存问题原文，迁移 0019），传 undefined。 */
+      question?: string;
+    };
 
 /** 筊象 → 大字名 / 传统释义 的 i18n 键（UAT②：揭晓屏用，两个键此前定义了却无人使用）。 */
 const OMEN_NAME_KEY: Record<Omen, string> = { 圣筊: "jiao.omenSheng", 笑筊: "jiao.omenXiao", 阴筊: "jiao.omenYin" };
@@ -49,6 +58,17 @@ export default function SpiritPage() {
     if (!ENABLED) return;
     (async () => {
       try {
+        // EP-jiao 最终评审 C1：TG 首页入口已摘除（`app/page.tsx` 的 `TG_ENTRIES`），
+        // 但这个分支特意保留——用户仍可能在 TG webview 里直接打开 /spirit 的 URL
+        // （比如浏览器历史、别处的深链）。**如实说明现状**：这里能把 TG 身份下的
+        // profile 读出来、页面能正常渲染到「输入问题」这一步，但掷筊落定后的
+        // `askSpirit`（下面）与追问（`SpiritPanel`）一律走浏览器侧
+        // `supabase().auth.getSession()` 取 Bearer token——TG webview 里没有这份
+        // 浏览器侧 Supabase 会话，token 恒为 undefined，会在那一步撞 401（引导去
+        // /account 登录，对 TG 用户是死胡同）。这不是「看起来支持其实不支持」的
+        // 假象：会话真的成立，只是流程后半段确实无法完成，且会给出清晰的登录引导
+        // 而不是静默失败。TG 侧要接得起来需要照抄 `api/tg/dream` 补一条
+        // `api/tg/jiao` 中介臂，见 `.agent/BACKLOG.md` 的 EP-jiao-tg。
         if (hasTgSession()) {
           setProfile(await tgGetProfile());
           return;
@@ -146,7 +166,10 @@ export default function SpiritPage() {
         throw new Error(await res.text());
       }
       const reply = await res.text();
-      setStage({ kind: "conversing", seed: [{ role: "user", content: q }, { role: "spirit", content: reply }] });
+      // omen/exhausted/question 一并带进 conversing 阶段：SpiritPanel 的追问要靠它们
+      // 重建 continueJiaoReply 的 omenForFollowUp 契约，让掷筊守护栏覆盖整场对话
+      // （最终评审 I4），而不只是首轮受管、第二轮起失控。
+      setStage({ kind: "conversing", seed: [{ role: "user", content: q }, { role: "spirit", content: reply }], omen, exhausted, question: q });
       // 历史摘要 fire-and-forget（同 /dream 的处理）：失败不影响已经拿到的回应
       jiaoSummaryAction(q, reply, locale).then((summary) => {
         if (!summary) return;
@@ -204,7 +227,11 @@ export default function SpiritPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setStage({ kind: "conversing", seed: [{ role: "spirit", content: h.fullText! }] });
+                  // 续接历史：没有问题原文（jiao_history 不存，迁移 0019），question 传
+                  // undefined——continueJiaoReply 据此走「续接历史」重载，不重建首轮 prompt。
+                  // exhausted 未知，默认 false：历史列表不存这一位，绝大多数条目本就不是
+                  // 「三笑筊拆解」那种，默认按普通规则续问，代价可接受。
+                  setStage({ kind: "conversing", seed: [{ role: "spirit", content: h.fullText! }], omen: h.omen, exhausted: false, question: undefined });
                   setHistoryOpen(false);
                 }}
                 className="block w-full text-left text-[13px] leading-relaxed text-ink-2 underline decoration-[var(--color-line)] underline-offset-4 transition-colors hover:text-ink hover:decoration-[var(--color-cinnabar)]"
@@ -228,7 +255,15 @@ export default function SpiritPage() {
           {historyToggle}
         </header>
         {historyPanel}
-        <SpiritPanel profile={profile} seedTurns={stage.seed} />
+        <SpiritPanel
+          profile={profile}
+          seedTurns={stage.seed}
+          omen={stage.omen}
+          exhausted={stage.exhausted}
+          question={stage.question}
+          memory={memory ?? undefined}
+          questionnaire={questionnaire}
+        />
         <p className="px-5 pb-2 pt-1 text-[11px] leading-relaxed text-muted">{t("spirit.disclaimer")}</p>
       </main>
     );
@@ -261,18 +296,25 @@ export default function SpiritPage() {
             ? "mt-6 text-center font-serif text-[26px] font-bold text-ink"
             : stage.kind === "rethrow"
               ? "mt-6 text-[14px] leading-relaxed text-ink-2"
-              : stage.kind === "reading"
+              : stage.kind === "reading" || stage.kind === "throwing"
                 ? "mt-8 text-center text-[14px] text-muted"
                 : "sr-only"
         }
       >
+        {/* jiao.throwing：此前这个 live region 的上方长注释就写着「跨…throwing…五个
+            stage」，但下面的分支从未真正接上 throwing——筊块抛起翻转的这几秒，屏幕
+            阅读器用户什么都听不到，直到落定才突然听见筊象名。补上这一分支才是
+            注释原本承诺的样子（最终评审 I5 顺带项：jiao.throwing 键此前定义了却
+            无人使用，正是这个缺口的症状）。 */}
         {stage.kind === "revealed"
           ? t(OMEN_NAME_KEY[stage.omen])
           : stage.kind === "rethrow"
             ? t("jiao.xiaoHint")
             : stage.kind === "reading"
               ? t("jiao.reading")
-              : ""}
+              : stage.kind === "throwing"
+                ? t("jiao.throwing")
+                : ""}
       </p>
 
       {stage.kind === "asking" && (

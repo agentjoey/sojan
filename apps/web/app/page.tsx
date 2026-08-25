@@ -34,11 +34,15 @@ const CARDS = [{ id: "east" as const }, { id: "west" as const }, { id: "resonanc
 const TG_ENTRIES = [
   { icon: "运", accent: "var(--color-cinnabar)", key: "calendar" as const, path: "/calendar" },
   { icon: "盘", accent: "var(--color-water)", key: "chart" as const, path: "/chart" },
-  // EP-fs-debt：此前「灵」在这里无条件显示，而 AppShell.NAV 的「灵」受
-  // NEXT_PUBLIC_SPIRIT_ENABLED 门控——两处门控条件必须一致（CLAUDE.md 的教训）。
-  ...(process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"
-    ? [{ icon: "灵", accent: "var(--color-metal)", key: "spirit" as const, path: "/spirit" }]
-    : []),
+  // EP-jiao 最终评审 C1：「灵」入口在此摘除（内测期 TG 不上掷筊，owner 决定）。
+  // 根因：`/spirit` 的 `askSpirit`/`SpiritPanel` 追问一律走浏览器侧
+  // `supabase().auth.getSession()` 取 Bearer token——Telegram Mini App webview 里
+  // 没有这份浏览器侧 Supabase 会话，token 恒为 undefined，每次掷筊必然撞 401，
+  // 对 TG 用户是死胡同。TG 侧要接得起来需要照抄 `api/tg/dream` 补一条
+  // `api/tg/jiao` 中介臂（`hasTgSession()` 分流），这条待办记在
+  // `.agent/BACKLOG.md` 的 EP-jiao-tg。**加回来时别忘了同时恢复这里的
+  // NEXT_PUBLIC_SPIRIT_ENABLED 门控**——两处（这里 + AppShell.NAV）条件必须一致
+  // （CLAUDE.md 记的教训）；本文件顶部这条历史注释也留着，因为它是另一半同形状的坑。
   ...(process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1"
     ? [{ icon: "境", accent: "var(--color-earth)", key: "fengshui" as const, path: "/fengshui" }]
     : []),

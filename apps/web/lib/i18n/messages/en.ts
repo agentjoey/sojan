@@ -321,11 +321,11 @@ export const en: Messages = {
     disclaimer:
       "The 本命之灵 (Natal Spirit) converses based on your frozen chart; all content is for self-reflection only, not prediction or diagnosis.",
 
-    send: "Send",
-    writing: "本命之灵 (Natal Spirit) is writing…",
+    // EP-jiao final review C2+I4: send/writing/emptyPrompt/inputPlaceholder retired
+    // with the SpiritPanel rewrite — the panel now only carries jiao follow-up
+    // conversations, using jiao.followUpSubmit/jiao.reading/jiao.youAsked/
+    // jiao.followUpPlaceholder instead (see comments on those keys).
     unavailable: "本命之灵 (Natal Spirit) is temporarily unavailable",
-    emptyPrompt: "Say something to your 本命之灵 (Natal Spirit)…",
-    inputPlaceholder: "Talk to your 本命之灵 (Natal Spirit)…",
     quickPrompts: ["Should I change jobs", "Should this relationship continue", "Is now a good time to move", "Should I start this"],
     quickPromptsLabel: "Quick follow-up:",
     online: "Online",

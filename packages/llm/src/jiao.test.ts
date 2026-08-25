@@ -31,9 +31,19 @@ describe("correctOmen：筊象是既成事实，模型不得改写", () => {
     expect(r.fixed).toEqual([]);
   });
 
-  it("一段里混着两个错筊象 → 全部替换成实际的", () => {
+  // 最终评审 I3：这条此前把机械替换后的病句形状（"先是阴筊，后来又是阴筊。"）
+  // 当成了「正确」的期望值——但那本身就是自相矛盾的句子，还凭空断言了「阴筊=允」，
+  // 反幻觉链自己制造了幻觉。correctOmen 是无条件全量替换、天生不管上下文是否
+  // 通顺，这一层「不产生病句」的责任移交给了 prompt 硬规则（JIAO_RULES_*：
+  // 只允许提到被告知的那一个筊象名，不得提另外两个）——一旦模型真的遵守规则，
+  // 输出里根本不会出现另外两个筊象名，correctOmen 也就没有东西可替换。
+  // 这里只断言这道机械安全网本身的行为（替换、不删除、fixed 记录了哪些被替换），
+  // 不再断言替换后的具体病句形状是「期望产出」。
+  it("一段里混着两个错筊象 → 全部替换成实际的（不断言替换后的病句形状，只断言安全网属性）", () => {
     const r = correctOmen("先是笑筊，后来又是圣筊。", "阴筊");
-    expect(r.text).toBe("先是阴筊，后来又是阴筊。");
+    expect(r.text).not.toContain("笑筊");
+    expect(r.text).not.toContain("圣筊");
+    expect(r.text).toContain("阴筊");
     expect(r.fixed.sort()).toEqual(["圣筊", "笑筊"]);
   });
 
@@ -58,6 +68,35 @@ describe("generateJiaoReply", () => {
     await generateJiaoReply(chart, "该不该搬家", "圣筊", { language: "zh", config });
     const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
     expect(messages[0]!.content).toContain("不给方向性结论");
+  });
+
+  // 最终评审 I1：灵的人格底座（buildSpiritSystemPrompt）里「正面回答，先给立场」
+  // 与掷筊规则「绝不给方向性结论」在同一个 system prompt 里正面冲突——底座在前、
+  // 拼在后面的掷筊规则若不显式声明覆盖关系，两条指令谁赢并不确定。这里钉住：
+  // 覆盖声明真的拼进了 system，且确实出现在「绝不给方向性结论」这条规则之前
+  // （顺序本身也是覆盖生效的一部分——模型读到冲突点之前就先看到了「以下为准」）。
+  it("system 显式声明掷筊规则覆盖人格底座的「正面回答，先给立场」（I1）", async () => {
+    streamSpy.mockClear();
+    await generateJiaoReply(chart, "该不该搬家", "圣筊", { language: "zh", config });
+    const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
+    const system = messages[0]!.content;
+    expect(system).toContain("正面回答，先给立场"); // 底座原句仍在（不改 spirit.ts）
+    expect(system).toContain("本节规则覆盖"); // 掷筊规则显式声明覆盖关系
+    const overrideIdx = system.indexOf("本节规则覆盖");
+    const banIdx = system.indexOf("绝不给方向性结论");
+    expect(overrideIdx).toBeGreaterThan(-1);
+    expect(banIdx).toBeGreaterThan(overrideIdx); // 覆盖声明在冲突规则之前，不是事后追加
+  });
+
+  // 最终评审 I3：correctOmen 是无条件全量替换，模型若在一句话里同时提另外两个
+  // 筊象名（哪怕是做对比），替换后必然是自相矛盾的病句。这里钉住 prompt 层面的
+  // 根治：硬规则要求只提被告知的那一个筊象名，不得提另外两个——前提假设成立了，
+  // correctOmen 的机械替换才不会有病句可制造。
+  it("system 硬规则要求只提被告知的那一个筊象名，不得提另外两个（I3）", async () => {
+    streamSpy.mockClear();
+    await generateJiaoReply(chart, "该不该搬家", "圣筊", { language: "zh", config });
+    const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
+    expect(messages[0]!.content).toContain("只能出现你被告知的那一个筊象名");
   });
 
   // UAT③修复：①拍此前只要求「点出筊象」，模型可以点完名字就转去讲一段与筊象
@@ -88,6 +127,11 @@ describe("generateJiaoReply", () => {
     await generateJiaoReply(chart, "我该怎么办", "笑筊", { language: "zh", config, exhausted: true });
     const [, messages] = streamSpy.mock.calls.at(-1) as unknown as [unknown, { role: string; content: string }[]];
     expect(messages[0]!.content).toContain("拆解");
+    // I1/I3 同样要在 exhausted 分支生效——它复用同一份人格底座，同样会拼出
+    // 「正面回答，先给立场」，同样需要覆盖声明；后续追问也可能提到「笑筊」以外
+    // 的筊象名，同样需要「只提这一个」的硬规则兜底。
+    expect(messages[0]!.content).toContain("本节同样覆盖");
+    expect(messages[0]!.content).toContain("只可能提到「笑筊」这一个筊象名");
   });
 
   it("问题为空 → 抛错，不进 LLM", async () => {

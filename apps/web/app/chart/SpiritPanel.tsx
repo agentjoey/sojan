@@ -1,143 +1,97 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deriveSpirit, formatQuestionnaire } from "@sojan/core";
+import Link from "next/link";
+import type { Omen } from "@sojan/core";
+import { deriveSpirit } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
-import { getSpiritMemory, saveSpiritMemory, getQuestionnaire } from "@/lib/profiles";
-import { listMessages, appendMessage, type SpiritMessage } from "@/lib/spirit";
-import { hasTgSession, isTelegram, tgListMessages, tgSpiritStream } from "@/lib/tg/client";
+import { isTelegram } from "@/lib/tg/client";
 import { useTgMainButton, haptics } from "@/lib/tg/ui";
 import { supabase } from "@/lib/supabase";
 import { Markdown } from "@/components/Markdown";
 import { Paywall } from "@/components/Paywall";
 import { Bubble } from "@/components/tg/native";
 import { QuickPrompts } from "@/components/spirit/QuickPrompts";
-import { spiritMemoryAction } from "@/app/actions";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 
+type Turn = { id: string; role: "user" | "spirit"; content: string };
+
+/**
+ * 掷筊问事的追问面板（EP-jiao 最终评审 C2 + I4 合并修复）。
+ *
+ * 这个组件此前叫「本命之灵通用聊天面板」，挂在 /chart 页做常驻多轮对话：读写
+ * `spirit_messages`（`apps/web/lib/spirit.ts` 的 `listMessages`/`appendMessage`，
+ * 该文件按 profile 存全量历史、不按会话切分），追问打通用 `/api/spirit/chat`。
+ * EP-jiao 把它挪来 /spirit 承载「掷完筊之后的追问」，只加了 `seedTurns` 去渲染
+ * 开场，但 `listMessages`/`appendMessage`/`/api/spirit/chat` 三处都原样留着，
+ * 于是：
+ *   1) 第二次问卦时，`listMessages` 拉出的是同一 profile 下**上一卦的全部追问
+ *      记录**，倒序拼在新一卦的 seed 后面——时序错乱、旧对话污染新卦上下文
+ *      （最终评审 C2，100% 复现于每个用户的第二次问卦）。
+ *   2) 追问打通用 `/api/spirit/chat`，不带掷筊的 `JIAO_RULES_*` 与
+ *      `correctOmen` 后置校验——掷筊守护栏在第二轮就消失（最终评审 I4）。
+ *
+ * 现在的形态：**整个组件一次性、不持久化，追问统一走 `/api/spirit/jiao` 的
+ * `followUp` 分支（`continueJiaoReply`）**。本仓库唯一的挂载点就是掷筊后的对话
+ * （`app/spirit/page.tsx`），不再有别的调用方需要「常驻可续、写库」的语义——
+ * 历史续问走的是 `jiao_history` 的 `full_text` 锚点（见 spec §2），与这里的
+ * `turns` state 完全无关，从不读写 `spirit_messages`。追问因此与首轮同一套
+ * `JIAO_RULES_*`/`correctOmen`，掷筊守护栏覆盖整场对话，不再有「第一轮受管、
+ * 第二轮起失控」的缺口。
+ *
+ * 若未来真要重新引入一条「常驻可续」的通用灵对话（非掷筊语境），请新开一个
+ * 组件，不要把这两种持久化语义拧回同一个文件——历史已经证明它们的边界完全不同。
+ */
 export function SpiritPanel({
   profile,
   seedTurns,
+  omen,
+  exhausted,
+  question,
+  memory,
+  questionnaire,
 }: {
   profile: Profile;
+  /** 这一卦（或续接的历史那一卦）的开场：用户问的 + 灵的解读。只用于渲染 + 拼历史，不持久化。 */
+  seedTurns: { role: "user" | "spirit"; content: string }[];
+  /** 这一卦的筊象——追问必须带上，见 `continueJiaoReply` 的 `omenForFollowUp` 契约。 */
+  omen: Omen;
+  /** 是否为「三笑筊拆解」那一卦；决定追问沿用哪一套掷筊规则（同一场对话保持一致）。 */
+  exhausted: boolean;
   /**
-   * 对话开场（EP-jiao）：掷筊问事的「问题 + 灵解」由 /spirit 页注入，作为这次
-   * 对话的头两条消息渲染。**不落 spirit_messages**——它们已经由 jiao_history
-   * 单独存了摘要与回复全文，再写一份进消息表是重复存储。
-   * 后续追问走正常的 /api/spirit/chat，seedTurns 会随历史一起发给模型。
+   * 首轮问题原文。同一次问卦内追问时有值（服务端据此重建首轮 prompt）；
+   * 从历史摘要续接时为 `undefined`——`jiao_history` 不存问题原文（迁移 0019），
+   * 见 `continueJiaoReply` 的「续接历史」重载。
    */
-  seedTurns?: { role: "user" | "spirit"; content: string }[];
+  question?: string;
+  memory?: string;
+  questionnaire?: string;
 }) {
   const { locale } = useLocale();
   const t = useT();
   const spirit = deriveSpirit(profile.chart);
-  const [messages, setMessages] = useState<SpiritMessage[]>([]);
-  // seedTurns 拼成与 SpiritMessage 同形的伪消息（id 用固定前缀，不会与库里的 uuid 撞）。
-  // 只用于渲染 + 拼进发给模型的历史——绝不写回 setMessages/appendMessage，否则会在
-  // 下一轮追问时把 seed 一起并入「真实消息」state，导致重复注入。
-  const seeded: SpiritMessage[] = (seedTurns ?? []).map((st, i) => ({
-    id: `seed-${i}`,
-    role: st.role,
-    content: st.content,
-    createdAt: "",
-  }));
-  const allMessages = seeded.length > 0 ? [...seeded, ...messages] : messages;
+  const [turns, setTurns] = useState<Turn[]>(() =>
+    seedTurns.map((st, i) => ({ id: `seed-${i}`, role: st.role, content: st.content })),
+  );
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [memory, setMemory] = useState<string | null>(null);
-  const [questionnaire, setQuestionnaire] = useState<string | undefined>(undefined);
-  const [initialized, setInitialized] = useState(false);
+  const [needLogin, setNeedLogin] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useTgMainButton({
-    text: streaming ? t("spirit.writing") : t("spirit.send"),
+    text: streaming ? t("jiao.reading") : t("jiao.followUpSubmit"),
     onClick: () => handleSubmit(),
     enabled: !streaming && !!input.trim(),
-    visible: isTelegram() && !streaming ? true : isTelegram(),
+    visible: isTelegram(),
   });
-
-  const sendToSpirit = useCallback(
-    async (historyForApi: { role: "user" | "spirit"; content: string }[]): Promise<string> => {
-      // 开场白分支（messages 为空）现在同样要求 Bearer 身份并计量（EP-account2 阻断 2），
-      // 匿名 web 会话的 access_token 也要带上——取法与下方 submitText 的对话路径一致。
-      const { data: sessionData } = await supabase().auth.getSession();
-      const token = sessionData.session?.access_token;
-      const res = await fetch("/api/spirit/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ chart: profile.chart, messages: historyForApi, memory, questionnaire }),
-      });
-      // 匿名级免费额度烧完 → 402：按付费墙渲染，别把裸 JSON 错误体扔给用户
-      if (res.status === 402) {
-        throw new Error("__paywall__");
-      }
-      if (!res.ok || !res.body) {
-        throw new Error(await res.text() || t("spirit.unavailable"));
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let full = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += dec.decode(value, { stream: true });
-      }
-      return full;
-    },
-    [profile.chart, memory, questionnaire, locale, t],
-  );
-
-  // 初始化：读取历史。开场白是「临时的」——每次按当前语言重新生成、不持久化，
-  // 故避免被旧语言冻结（旧版曾把开场白存库，这里剥离首条 spirit 消息以兼容）。
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (hasTgSession()) {
-          const ms = await tgListMessages();
-          if (cancelled) return;
-          // 真实对话从首条「用户消息」起算；开场白（首条 spirit 消息）一律丢弃
-          const convo = ms[0]?.role === "spirit" ? ms.slice(1) : ms;
-          setMessages(convo);
-        } else {
-          const [mem, ms, qa] = await Promise.all([
-            getSpiritMemory(profile.id),
-            listMessages(profile.id),
-            getQuestionnaire(profile.id),
-          ]);
-          if (cancelled) return;
-          setMemory(mem);
-          setQuestionnaire(qa ? formatQuestionnaire(qa) : undefined);
-          // 真实对话从首条「用户消息」起算；开场白（首条 spirit 消息）一律丢弃、按当前语言重生成
-          const convo = ms[0]?.role === "spirit" ? ms.slice(1) : ms;
-          if (convo.length > 0) {
-            setMessages(convo);
-          } else if (seedTurns && seedTurns.length > 0) {
-            // EP-jiao：seedTurns 本身就是这次对话的开场（掷筊问答），不需要再生成
-            // 一条通用欢迎语——那样会在 seed 之后又插一条不搭调的寒暄，还白烧一次 LLM 额度。
-          } else {
-            const greeting = await sendToSpirit([]);
-            if (cancelled) return;
-            // 不持久化：仅作当次展示，确保始终是当前语言
-            setMessages([{ id: `intro-${Date.now()}`, role: "spirit", content: greeting, createdAt: new Date().toISOString() }]);
-          }
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setInitialized(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [profile.id, sendToSpirit, seedTurns]);
 
   // 新消息到达时滚动到底部
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streaming]);
+  }, [turns, streaming]);
 
   // 清空输入后重置 textarea 高度
   useEffect(() => {
@@ -151,117 +105,65 @@ export function SpiritPanel({
       if (!trimmed || streaming) return;
 
       setError(null);
-      const userMsg: SpiritMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: trimmed,
-        createdAt: new Date().toISOString(),
-      };
-      const nextMessages = [...messages, userMsg];
-      setMessages(nextMessages);
+      setNeedLogin(false);
+      // 追问续接锚点：question 有值 = 同一次问卦内追问——continueJiaoReply 会用
+      // question+omen 重建首轮 prompt，priorTurns 因此要从「灵的第一条回应」算起
+      // （跳过 turns[0] 那条用户原始提问，它会被重建，不能重复喂给模型）。
+      // question 为 undefined = 续接历史：turns[0] 本身就是历史里存的回复全文，
+      // priorTurns 就是 turns 原样。两种场景与 continueJiaoReply 的两个重载一一对应。
+      const priorTurns = (question !== undefined ? turns.slice(1) : turns).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const userTurn: Turn = { id: `user-${Date.now()}`, role: "user", content: trimmed };
+      setTurns((prev) => [...prev, userTurn]);
       setInput("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       try { haptics.light(); } catch {}
 
-      if (!hasTgSession()) {
-        try {
-          await appendMessage(profile.id, "user", trimmed);
-        } catch (e) {
-          setError(e instanceof Error ? e.message : String(e));
-          return;
-        }
-      }
-
       setStreaming(true);
-      // 发给模型的历史必须带上 seedTurns（掷筊那一卦的问答）——否则用户在这里追问时，
-      // 模型看不到刚才那一卦问了什么、灵怎么回的。seeded 只进这里，不进 setMessages，
-      // 见上面「不落 spirit_messages」的注释。
-      const historyForApi = [...seeded, ...nextMessages].map((m) => ({ role: m.role, content: m.content }));
-
-      if (hasTgSession()) {
-        const tempId = `spirit-${Date.now()}`;
-        setMessages((prev) => [...prev, { id: tempId, role: "spirit", content: "", createdAt: new Date().toISOString() }]);
-        try {
-          let full = "";
-          await tgSpiritStream(historyForApi, (chunk) => {
-            full += chunk;
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, content: full } : m)));
-          });
-          try { haptics.success(); } catch {}
-          setMessages((prev) =>
-            prev.map((m) => (m.id === tempId ? { id: `spirit-${Date.now()}`, role: "spirit", content: full, createdAt: new Date().toISOString() } : m)),
-          );
-        } catch (e) {
-          setMessages((prev) => prev.filter((m) => m.id !== tempId));
-          if (e instanceof Error && (e.message === "quota" || e.message === "paywall" || e.message.includes("paywall"))) {
-            setError("__paywall__");
-          } else {
-            setError(e instanceof Error ? e.message : String(e));
-          }
-        } finally {
-          setStreaming(false);
-        }
-        return;
-      }
-
       try {
-        let full = "";
         const { data: sessionData } = await supabase().auth.getSession();
         const token = sessionData.session?.access_token;
-        const res = await fetch("/api/spirit/chat", {
+        const res = await fetch("/api/spirit/jiao", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ chart: profile.chart, messages: historyForApi, memory, questionnaire }),
+          body: JSON.stringify({
+            chart: profile.chart,
+            followUp: trimmed,
+            priorTurns,
+            omen,
+            exhausted,
+            ...(question !== undefined ? { question } : {}),
+            memory,
+            questionnaire,
+          }),
         });
-        if (res.status === 402) {
-          setError("__paywall__");
-          setStreaming(false);
+        if (res.status === 401) {
+          // 未登录/会话过期：连 LLM 都没调用，撤回刚追加的用户消息——不该孤零零挂在对话里。
+          setTurns((prev) => prev.slice(0, -1));
+          setNeedLogin(true);
           return;
         }
-        const contentType = res.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          const body = await res.json().catch(() => null);
-          if (body && typeof body === "object" && "error" in body && body.error === "paywall") {
-            setError("__paywall__");
-            setStreaming(false);
-            return;
-          }
+        if (res.status === 402) {
+          // 匿名级免费额度烧完：走付费墙 UI，别把服务端裸 JSON 错误体当文案展示。
+          setTurns((prev) => prev.slice(0, -1));
+          setError("__paywall__");
+          return;
         }
-        if (!res.ok || !res.body) {
-          throw new Error(await res.text() || t("spirit.unavailable"));
-        }
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-
-        // 临时 spirit 气泡，边流边更新
-        const tempId = `spirit-${Date.now()}`;
-        setMessages((prev) => [...prev, { id: tempId, role: "spirit", content: "", createdAt: new Date().toISOString() }]);
-
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          full += dec.decode(value, { stream: true });
-          setMessages((prev) =>
-            prev.map((m) => (m.id === tempId ? { ...m, content: full } : m)),
-          );
-        }
+        if (!res.ok) throw new Error((await res.text()) || t("spirit.unavailable"));
+        const reply = await res.text();
+        setTurns((prev) => [...prev, { id: `spirit-${Date.now()}`, role: "spirit", content: reply }]);
         try { haptics.success(); } catch {}
-
-        await appendMessage(profile.id, "spirit", full);
-        const fullHistory = [...historyForApi, { role: "spirit" as const, content: full }];
-        spiritMemoryAction(fullHistory, memory ?? undefined)
-          .then((m) => { if (m) { setMemory(m); void saveSpiritMemory(profile.id, m); } })
-          .catch(() => {});
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { id: `spirit-${Date.now()}`, role: "spirit", content: full, createdAt: new Date().toISOString() } : m)),
-        );
       } catch (e) {
+        setTurns((prev) => prev.slice(0, -1));
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setStreaming(false);
       }
     },
-    [streaming, messages, seedTurns, profile.id, profile.chart, memory, questionnaire, locale, t],
+    [streaming, turns, question, omen, exhausted, profile.chart, memory, questionnaire, locale, t],
   );
 
   async function handleSubmit(e?: React.FormEvent) {
@@ -296,19 +198,19 @@ export function SpiritPanel({
         ref={scrollRef}
         className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
       >
-        {allMessages.length === 0 && isTelegram() && (
-          <div className="flex justify-start">
-            <Bubble role="spirit">{t("spirit.emptyPrompt")}</Bubble>
-          </div>
-        )}
-        {allMessages.map((m) => (
+        {turns.map((m) => (
           <div
             key={m.id}
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <Bubble role={m.role === "user" ? "user" : "spirit"}>
               {m.role === "user" ? (
-                <p className="whitespace-pre-wrap">{m.content}</p>
+                <p className="whitespace-pre-wrap">
+                  {/* 气泡本身只靠位置/配色区分角色——视觉上够用，但屏幕阅读器听到的
+                      是无差别的一段段文本。补一个可视隐藏前缀区分「你问」/灵答。 */}
+                  <span className="sr-only">{t("jiao.youAsked")}：</span>
+                  {m.content}
+                </p>
               ) : m.content ? (
                 <div className="reading-prose"><Markdown text={m.content} /></div>
               ) : streaming ? (
@@ -321,6 +223,17 @@ export function SpiritPanel({
 
       {/* Error & Quick Prompts */}
       <div className="px-4 pb-2">
+        {needLogin && (
+          <div
+            className="mb-3 px-3 py-2 text-[12px]"
+            style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}
+          >
+            {t("jiao.needLogin")}
+            <Link href="/account?next=/spirit" className="ml-2 underline underline-offset-4" style={{ color: "var(--color-cinnabar)" }}>
+              {t("jiao.needLoginCta")} →
+            </Link>
+          </div>
+        )}
         {error === "__paywall__" ? (
           <div className="mb-3">
             <Paywall reason="quota" onClose={() => setError(null)} />
@@ -362,7 +275,7 @@ export function SpiritPanel({
               void handleSubmit();
             }
           }}
-          placeholder={t("spirit.inputPlaceholder")}
+          placeholder={t("jiao.followUpPlaceholder")}
           rows={1}
           disabled={streaming}
           className="flex-1 resize-none rounded-[var(--radius-button)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 text-[14px] text-ink placeholder:text-muted focus:border-[var(--color-cinnabar)] focus:outline-none disabled:opacity-60"
@@ -375,7 +288,7 @@ export function SpiritPanel({
             className="inline-flex h-[44px] shrink-0 items-center justify-center px-4 text-[14px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-button)" }}
           >
-            {t("spirit.send")}
+            {t("jiao.followUpSubmit")}
           </button>
         )}
       </form>

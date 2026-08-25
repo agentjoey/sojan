@@ -311,11 +311,11 @@ export const zh = {
     subtitle: "从你自己的命盘里走出来的那个声音 —— 陪你照见，而非预言。",
     disclaimer: "本命之灵基于你的冻结命盘对话；所有内容仅供自我观照，非预测、非诊断。",
 
-    send: "发送",
-    writing: "本命之灵书写中…",
+    // EP-jiao 最终评审 C2+I4：send/writing/emptyPrompt/inputPlaceholder 四键随
+    // SpiritPanel 改写而清空——组件现在专职承载掷筊追问，对应文案已改用
+    // jiao.followUpSubmit/jiao.reading/jiao.youAsked/jiao.followUpPlaceholder
+    // （这几个键此前定义了却无人使用，见 jiao 命名空间那几行的注释）。
     unavailable: "本命之灵暂时无法回应",
-    emptyPrompt: "与本命之灵说点什么吧…",
-    inputPlaceholder: "与本命之灵对话…",
     quickPrompts: ["该不该换工作", "这段关系要不要继续", "现在适合搬家吗", "要不要开始这件事"],
     quickPromptsLabel: "想继续问：",
     online: "在线",

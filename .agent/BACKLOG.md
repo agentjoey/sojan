@@ -55,7 +55,7 @@
 - [x] ~~**[EP-motion-bell] 首页与主菜单风铃图标增强动态**~~ —— **2026-08-21 交付**。`BellLogo` 新增 `motion` 参数（`idle` 常驻循环 / `ring` 敲响一次即停），首页卷首与桌面主菜单 Logo 改用 `ring`（进入渲染时 + 点击各触发一次）；`CastingOverlay` 的常驻摆动语义不变（仍是 `idle`）。
 
 ## 🟡 MED
-- [ ] **[EP-account2-debt] 开场白计量 × SpiritPanel 每次挂载重生成且不持久化**——开 30 次 /chart 可烧光月度额度；BILLING_ENABLED 关闭时休眠，开收费前必修（intro 结果持久化或挂载去重）。
+- [x] ~~**[EP-account2-debt] 开场白计量 × SpiritPanel 每次挂载重生成且不持久化**~~ —— **随 EP-jiao 最终评审 C2/I4 修复一并解决（2026-08-25）**：这条描述的 `/chart` 页挂载即触发的通用开场白生成，其载体（`SpiritPanel` 的 `sendToSpirit([])` 分支）已随本轮重写整个删除——`SpiritPanel` 现在只承载掷筊追问、种子固定为掷筊问答，不再有「无消息 → 生成开场白」这条路径；且 `/chart` 页本身早已（EP-jiao Task 8）不再挂载 `SpiritPanel`。两个前提（挂载在 /chart、无消息时现算开场白）都已不成立，无需额外修复。
 - [ ] **[EP-account2-debt] chat 路由请求体无校验**——chart/memory/questionnaire 字段无校验/无长度上限；计量封住了成本但没封提示注入面。
 - [ ] [EP-profile-q] 建档交互式心理问卷：起盘流程插入若干心理学问题（自我认知/关系/动机倾向），结果并入 LLM 解读上下文以完善分析（与命盘事实互证，标注主观自陈 vs 命盘客观）。降低起盘摩擦：可「先出盘、后渐进追问」。
 - [ ] [EP-ui-v2-rest] UI v2 素白收尾（主体已上线，剩余增项）：① 解读页 Tab 化（命理/心理/共振 sticky Tab + 摘要先行：大宋体结论 + 关键词 chips）② 命之书封面（海水江崖 + 竖排宋体）+ 桌面双栏运势/周历条 web 布局 ③ 进度条 + 命盘 hero 高亮弧随 Tab 旋转。设计参考 `design/zhaojian_ui_v2`。
@@ -88,6 +88,10 @@
 
 ## 🔴 上线前必做（owner 指定，2026-08-25）
 - [ ] **[EP-tg-bot-close] TG bot 私聊自由对话，正式上线前关闭**（owner 指示）：`lib/tg/bot.ts:87` 的 `message:text` handler 让用户在 Telegram 私聊直接发消息就进入灵的**无边界闲聊**。这是内测阶段的临时形态，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突（私聊里能随便聊、产品内却要先掷筊）。正式上线前改成引导去掷筊，或直接关掉该 handler。
+- [ ] **[EP-jiao-tg] TG 侧掷筊未接入——`/api/tg/jiao` 中介臂待补**（最终评审 C1，owner 决定内测期不做）：`/spirit` 的 `askSpirit`（初次掷筊）与 `SpiritPanel`（追问）一律走浏览器侧 `supabase().auth.getSession()` 取 Bearer token 调 `/api/spirit/jiao`——Telegram Mini App webview 里**没有这份浏览器侧 Supabase 会话**，token 恒为 `undefined`，每次掷筊必然撞 401（引导去 `/account` 登录，对 TG 用户是死胡同）。
+  **为什么现在不上**：根因是 TG 认证机制与 web 完全不同——TG 侧向来是靠 `hasTgSession()` 分流到专门的 `api/tg/*` 中介端点（用 Telegram initData 校验身份，不是 Bearer JWT，参见 `api/tg/dream`/`api/tg/fengshui` 的既有模式），而掷筊/追问从未接入这条分流。这不是一个小补丁——需要新写一条 `api/tg/jiao` 中介端点（服务端读取 profile 关联的 memory/questionnaire，同 `api/tg/dream` 的既有模式）+ `SpiritPanel`/`askSpirit` 补 `hasTgSession()` 分流，工作量与已有 dream/fengshui 的 TG 适配相当，评审阶段时间不允许现做半成品。
+  **已处理**：TG 首页入口（`app/page.tsx` 的 `TG_ENTRIES`）已摘除「灵」这一项，回归测试见 `app/__tests__/page.test.tsx`；`/spirit` 页面本身仍可通过直接 URL 访问（TG webview 内），加了注释如实说明现状（能看到输入框、掷筊会在追问/首解那一步撞 401，不是静默失败）。
+  **正式上线前需决定**：①照抄 `api/tg/dream` 补一条 `api/tg/jiao` 中介臂，正式接入 TG（工作量：中）②还是维持不上、TG 用户永久走 web（等价于把「灵」整体挪出 Mini App 的能力范围，需要 owner 明确拍板而非默认延续）。
 - [x] ~~**[EP-domain] `sojan.app` 生产域名接入**~~ —— **2026-08-25 完成**。owner 已做完 Vercel 绑域名+DNS / GitHub repo 改名 / Supabase 项目改名；claude 侧改完代码：`git remote` 指向新 repo、`apps/web/lib/tg/bot.ts` 的 `MINIAPP_URL` 兜底值 → `https://sojan.app`（**staging 必须显式设 `NEXT_PUBLIC_MINIAPP_URL=https://zhaojian.agentjoey.ai`，否则 staging 的 bot 会把用户送进 production Mini App**）。核查结论：代码里硬编码域名**只有这一处**——此前记的"四处"里，`setWebhook` 是一次性 curl 不在代码中、BotFather `/setdomain` 是 Telegram 侧外部动作、Stripe webhook 尚未实现（留待 EP-billing-pay）。
 
 ## 🟢 LOW

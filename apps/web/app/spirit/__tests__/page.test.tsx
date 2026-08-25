@@ -12,8 +12,9 @@ import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
  *
  * 全文件用 `SpiritPanel` 的桩组件截获 autoSend/seedTurns prop——真实 SpiritPanel 依赖
  * Supabase / fetch / Telegram 等一整套外部世界，这里只关心「page.tsx 算出的
- * autoSend/seedTurns 是什么」，与 SpiritPanel 内部如何消费它是两件事（后者已有
- * SpiritPanel 自己的测试覆盖）。
+ * autoSend/seedTurns 是什么」，与 SpiritPanel 内部如何消费它是两件事（后者的测试见
+ * `app/chart/__tests__/SpiritPanel.test.tsx`——最终评审 I5 之前这句话曾经是失实的，
+ * 全仓当时并不存在那个文件；I5 已补上，这里改成指向具体路径而不是一句空口承诺）。
  *
  * EP-jiao：/spirit 从「随便聊」收缩为「先对一件具体的事掷筊」，但 topic=portrait /
  * topic=fengshui 这两个深链入口（画像页「聊聊这个」、境页每条化解的「聊聊这条」）

@@ -85,9 +85,11 @@ describe("TG 首页入口列表：风水「境」", () => {
     expect(routerPush).not.toHaveBeenCalled();
   });
 
-  it("既有五项不受影响（防止加入口时挤掉别人）", async () => {
+  it("既有四项不受影响（防止加入口时挤掉别人）", async () => {
+    // EP-jiao 最终评审 C1：「本命之灵」已从这份列表摘除（内测期 TG 不上掷筊），
+    // 不再断言它在场——见下面新增的「TG 首页入口列表：本命之灵」describe 块。
     await renderHome();
-    for (const label of ["今日运势", "我的命盘", "本命之灵", "起盘建档", "我的档案"]) {
+    for (const label of ["今日运势", "我的命盘", "起盘建档", "我的档案"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
   });
@@ -127,21 +129,34 @@ describe("web 首页目录列表：解梦「梦」（inTg=false 臂）", () => {
   });
 });
 
-describe("TG 首页入口列表：本命之灵「灵」（EP-fs-debt：补齐此前缺失的 flag 门控）", () => {
-  it("TG 内 + flag 开：「灵」入口出现，且点击后真的导向 /spirit", async () => {
+describe("TG 首页入口列表：本命之灵「灵」——EP-jiao 最终评审 C1：TG 内测期摘除入口", () => {
+  // 根因：`/spirit` 的追问链路（`SpiritPanel`/`askSpirit`）一律走浏览器侧
+  // `supabase().auth.getSession()` 取 Bearer token，Telegram Mini App webview 里
+  // 没有这份浏览器侧 Supabase 会话，token 恒为 undefined → 每次掷筊必然撞 401，
+  // 对 TG 用户是死胡同。owner 决定内测期直接摘掉 TG 首页入口（见 `.agent/BACKLOG.md`
+  // 的 EP-jiao-tg：正式上线前再决定是补 `api/tg/jiao` 中介臂还是维持不上）。
+  // 这条测试钉住「摘干净」——不管 flag 开关，TG 首页都不该再出现「灵」这一行，
+  // 也不该有任何一次点击把用户导向 /spirit。
+  it("TG 内 + flag 开（beforeEach 默认）：「灵」入口不出现、不可能导向 /spirit", async () => {
     await renderHome();
-    const cell = await screen.findByText("本命之灵");
-    fireEvent.click(cell);
-    expect(routerPush).toHaveBeenCalledWith("/spirit");
+    // 先确认列表本身渲染出来了，否则「不出现」会因为整页没渲染而恒真。
+    expect(await screen.findByText("今日运势")).toBeInTheDocument();
+    expect(screen.queryByText("本命之灵")).toBeNull();
+    expect(routerPush).not.toHaveBeenCalledWith("/spirit");
   });
 
-  it("TG 内 + flag 关：「灵」入口不出现（与 AppShell.NAV 的门控保持一致）", async () => {
+  it("TG 内 + flag 关：「灵」入口同样不出现——摘除是无条件的，不是又套了一层门控", async () => {
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "");
     await renderHome();
     expect(await screen.findByText("今日运势")).toBeInTheDocument();
     expect(screen.queryByText("本命之灵")).toBeNull();
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerPush).not.toHaveBeenCalledWith("/spirit");
   });
+
+  // 反向钉住「只摘了 TG 这一处，没有连带误删 web 侧的入口」：AppShell 的 NAV 数组
+  // 是模块私有常量（未导出），`components/__tests__/AppShell.test.tsx` 已经独立
+  // 覆盖 NEXT_PUBLIC_SPIRIT_ENABLED 开/关两种情况下侧栏/底栏「灵」入口的显隐
+  // （见该文件 104/116/128 行），这里不重复造一份、只留这条指针注释。
 });
 
 describe("TG 首页入口列表：解梦「梦」", () => {

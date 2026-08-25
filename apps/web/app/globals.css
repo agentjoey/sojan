@@ -131,7 +131,7 @@ body {
    （JiaoThrow.tsx：`i * 0.18s`）。总时长 1.4s（JiaoThrow.tsx 内联），抛起幅度
    随 UAT 修复轮把筊块从 56×38px 放大到 128×86px 按比例放大到 -120px（原 -42px
    看不清「抛起」这一拍）。
-   注意上方 prefers-reduced-motion 区块会把 duration 压到 0.001ms，
+   注意下方 prefers-reduced-motion 区块会把 duration 压到 0.001ms，
    animationend 因此立刻触发 —— 结果揭晓挂在 onAnimationEnd 上即天然降级。 */
 @keyframes zjJiaoToss {
   0%   { transform: translateY(0) rotate(0deg); }

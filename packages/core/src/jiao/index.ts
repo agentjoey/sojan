@@ -39,6 +39,14 @@ export type JiaoPhase =
 export function phaseAfter(throws: Omen[]): JiaoPhase {
   const last = throws.at(-1);
   if (!last) throw new Error("尚未掷筊");
+  // 前缀不变量：settled/exhausted 一旦出现就该结束这一轮，调用方不该在那之后
+  // 又掷一次还来问 phaseAfter——所以除最后一掷外，前面每一掷都必须是笑筊。
+  // `packages/core/test/` 不过类型检查（tsconfig `include` 只有 `src`），这类
+  // 不变量因此只能靠运行时断言守住：写错测试用例（或调用方状态机出 bug）时
+  // 第一时间炸出来，而不是被静默放过、算出一个看似合理实则无意义的结果。
+  if (!throws.slice(0, -1).every((o) => o === "笑筊")) {
+    throw new Error("phaseAfter：非法的掷筊序列——settled/exhausted 之后不该再有更多掷");
+  }
   if (last !== "笑筊") return { kind: "settled", omen: last };
   return throws.length >= MAX_THROWS ? { kind: "exhausted" } : { kind: "rethrow" };
 }

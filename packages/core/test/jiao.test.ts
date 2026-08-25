@@ -28,6 +28,14 @@ describe("phaseAfter：三掷规则", () => {
   it("第三次仍笑筊 → exhausted（改为拆解问题本身，不再解筊象）", () => {
     expect(phaseAfter(["笑筊", "笑筊", "笑筊"])).toEqual({ kind: "exhausted" });
   });
+  it("第四次仍笑筊（异常序列，仍只看最后一掷）→ exhausted", () => {
+    expect(phaseAfter(["笑筊", "笑筊", "笑筊", "笑筊"])).toEqual({ kind: "exhausted" });
+  });
+  it("settled 之后又混进一掷（非法前缀）→ 抛错——运行时不变量兜住", () => {
+    // "圣筊" 落定之后不该再有更多掷；这类调用方状态机的错误只能靠运行时断言拦，
+    // 见 phaseAfter 内的前缀不变量注释（packages/core/test 不过类型检查）。
+    expect(() => phaseAfter(["圣筊", "笑筊"])).toThrow();
+  });
   it("笑筊之后掷出圣筊 → 仍是落定（只看最后一掷）", () => {
     expect(phaseAfter(["笑筊", "圣筊"])).toEqual({ kind: "settled", omen: "圣筊" });
   });

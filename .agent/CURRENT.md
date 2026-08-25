@@ -9,7 +9,10 @@ Last Updated:   2026-08-25 by claude-sonnet-5（EP-jiao 掷筊问事，subagent 
 ⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
 
 > ⏸️ **现处于「收集反馈」阶段**：除非用户反馈驱动或线上 bug，否则不主动改代码。新需求先入 BACKLOG，待反馈后排期。
-> 🎋 **掷筊问事（EP-jiao，2026-08-25 合并）**：`/spirit` 的产品定义已从「随便聊」**收缩为「先对一件具体的事掷筊」**——`NEXT_PUBLIC_SPIRIT_ENABLED` 仍**默认关闭**（复用旧 flag，未新建）。**「本命之灵」作为自由对话产品形态已不存在**；`deriveSpirit` 人格层仍在，是解梦/分享卡/五行印记的共用地基，动不得。周边归属：自我画像挪进 `/chart`、每日问今留运势页、风水化解入口改「就这条问一卦」。**TG 侧本轮不上**（token 机制不通，见 BACKLOG `EP-jiao-tg`）。
+> 🎚️ **生产 flag 实际取值（2026-08-25 核实，别再被 Vercel 面板骗一次）**：`SPIRIT=1` / `FENGSHUI=1` / `DREAM=1`，**三个在生产都是开的**。
+> ⚠️ Vercel 面板、`vercel env pull`、REST API `decrypt=true` 三条路径读 `NEXT_PUBLIC_FENGSHUI_ENABLED` 与 `NEXT_PUBLIC_DREAM_ENABLED` 都返回**空字符串**——那不是真实值，是这两条被建成了 Vercel 的 **Sensitive 类型**（值写入后不可回读）。对照组：同为 sensitive 的 `LLM_API_KEY` 也读出空，而它显然非空。
+> **判定 flag 真实状态只能看行为**：`NEXT_PUBLIC_*` 是构建期内联的，去线上抓 `AppShell` 导航里有没有 `/fengshui`、页面上有没有 `尚未开启` 文案。2026-08-25 对 `production@9925baa` 的生产包实测：三个入口俱在、无 notEnabled 文案。
+> 🎋 **掷筊问事（EP-jiao，2026-08-25 合并）**：`/spirit` 的产品定义已从「随便聊」**收缩为「先对一件具体的事掷筊」**——复用旧 flag `NEXT_PUBLIC_SPIRIT_ENABLED`，未新建；**代码里不设即关，但生产环境该变量实测 `=1`**（见上方「生产 flag 实际取值」），所以 **production 分支一推，掷筊立刻对真实用户可见**，没有第二道闸。**「本命之灵」作为自由对话产品形态已不存在**；`deriveSpirit` 人格层仍在，是解梦/分享卡/五行印记的共用地基，动不得。周边归属：自我画像挪进 `/chart`、每日问今留运势页、风水化解入口改「就这条问一卦」。**TG 侧本轮不上**（token 机制不通，见 BACKLOG `EP-jiao-tg`）。
 > 🧭 **风水「境」波1+波2+TG适配（EP-fs，已合 main）**：`NEXT_PUBLIC_FENGSHUI_ENABLED` **线上已开启**（2026-08-16，Production + Preview 均设 `=1`），底部导航「境」对所有访客可见。迁移 `0011_dwellings` 已 apply 生产（仅新增两表）。**⚠️ 开启时英文侧缺口尚未修（见 EP-fs-en）：`detectLocale()` 对任何非中文浏览器返回 `en`，而两道机械反幻觉校验都是中文匹配、在英文路径上完全失效——这是已知且已被接受的风险，不是遗漏。**
 
 ## 产品现状（一句话）

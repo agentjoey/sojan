@@ -94,8 +94,12 @@ function NavItem({
     <Link
       href={href}
       data-testid="nav-item"
-      className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")}
+      className={cn(
+        "zj-nav flex flex-col items-center gap-1 py-1.5 zj-wheel-focus",
+        compact ? "px-1.5" : "px-2",
+      )}
       aria-label={label}
+      aria-current={active ? "page" : undefined}
       style={style}
     >
       <span

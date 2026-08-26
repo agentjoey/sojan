@@ -148,13 +148,19 @@ export function SealIcon({
  * `Card.topAccent` 就是被这条规则废掉的——一旦有先例，后面 8 屏就守不住。
  *
  * 用于：当前候、现行大运、当前流年、当前档案、命宫、生气方、危险区、选中筊象。
+ *
+ * ⚠️ `style` 从 props 里被 `Omit` 掉（终审必修 6）：本组件的 `style={{...}}`
+ * 写在 `{...rest}` **之前**，消费者若传 `style` 会把朱砂条整体静默吞掉——
+ * 而「强调只有一种手法」正是这个设计包的核心硬约束，静默失效是最坏的失败
+ * 模式。`Omit<..., "style">` 让消费者传 `style` 变成编译期错误而非运行时
+ * 静默吞掉（该改法零行为变更：现无消费者传 style，见报告 tsc 报错样例）。
  */
 export function Emphasis({
   axis = "horizontal",
   className,
   children,
   ...rest
-}: { axis?: "horizontal" | "vertical" } & React.HTMLAttributes<HTMLDivElement>) {
+}: { axis?: "horizontal" | "vertical" } & Omit<React.HTMLAttributes<HTMLDivElement>, "style">) {
   const horizontal = axis === "horizontal";
   return (
     <div
@@ -170,13 +176,16 @@ export function Emphasis({
   );
 }
 
-/** 方角小 chip（设计包 §4）：padding 4px 11px / radius 4px。 */
+/**
+ * 方角小 chip（设计包 §4）：padding 4px 11px / radius 4px。
+ * `style` 同样 `Omit` 掉（终审必修 6，理由见 `Emphasis` 上方注释）。
+ */
 export function Chip({
   emphasis = false,
   className,
   children,
   ...rest
-}: { emphasis?: boolean } & React.HTMLAttributes<HTMLSpanElement>) {
+}: { emphasis?: boolean } & Omit<React.HTMLAttributes<HTMLSpanElement>, "style">) {
   return (
     <span
       className={cn("inline-flex items-center text-[12px]", className)}
@@ -194,12 +203,15 @@ export function Chip({
   );
 }
 
-/** 胶囊 chip（生肖 / 纳音 / 年龄 / 流年）：radius 9999px / 1px 细线 / 11.5px。 */
+/**
+ * 胶囊 chip（生肖 / 纳音 / 年龄 / 流年）：radius 9999px / 1px 细线 / 11.5px。
+ * `style` 同样 `Omit` 掉（终审必修 6，理由见 `Emphasis` 上方注释）。
+ */
 export function PillChip({
   className,
   children,
   ...rest
-}: React.HTMLAttributes<HTMLSpanElement>) {
+}: Omit<React.HTMLAttributes<HTMLSpanElement>, "style">) {
   return (
     <span
       className={cn("inline-flex items-center text-[11.5px]", className)}
@@ -217,6 +229,7 @@ export function PillChip({
 }
 
 // —— 按钮 ——
+// `style` 同样 `Omit` 掉（终审必修 6，理由见 `Emphasis` 上方注释）。
 export function Button({
   variant = "primary",
   className,
@@ -224,7 +237,7 @@ export function Button({
   ...rest
 }: {
   variant?: "primary" | "secondary" | "text" | "action";
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "style">) {
   const base = "zj-btn inline-flex items-center justify-center gap-2 text-[15px] font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed";
   const styles =
     variant === "primary"

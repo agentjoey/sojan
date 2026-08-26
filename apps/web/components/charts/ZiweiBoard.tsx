@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import type { ZiweiChart, Palace, Star } from "@sojan/core";
-import { deriveTriad } from "@sojan/core";
+import { deriveTriad, type ZiweiChart, type Palace, type Star } from "@sojan/core";
 import { Emphasis, MutagenTag } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 

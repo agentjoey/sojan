@@ -170,11 +170,39 @@ describe("ZiweiBoard：选中宫详情块（6b）", () => {
     for (const k of ["禄", "权", "科", "忌"]) expect(legend).toHaveTextContent(k);
   });
 
-  it("空宫的详情块显示借星来源（来自 core 的 deriveTriad，不在组件里算对宫）", () => {
-    // 兄弟宫（午）在既有 fixture 里本就无主星（makePalace 默认 majorStars: []），
-    // 无需另造派生 fixture——直接复用满足「空宫」条件。
+  it("四化图例：每个签实际渲染出对应五行底色（禄=木/权=土/科=水/忌=火），换裸 <span> 会锁不住", () => {
+    // 评审 Important 2：上一条只查文字，裸 <span>{k}</span> 也能通过。
+    // 这里核对 MutagenTag 真实渲染出的 background 变量，锁定「必须复用 MutagenTag」。
     renderBoard();
-    fireEvent.click(screen.getByTestId("palace-cell-兄弟"));
+    const legend = screen.getByTestId("mutagen-legend");
+    const expectedElement: Record<string, string> = { 禄: "wood", 权: "earth", 科: "water", 忌: "fire" };
+    for (const [k, el] of Object.entries(expectedElement)) {
+      const tag = within(legend).getByText(k);
+      expect(tag.style.background).toBe(`var(--color-${el})`);
+    }
+  });
+
+  it("空宫的详情块显示借星来源（来自 core 的 deriveTriad，不在组件里算对宫）", () => {
+    // 疾厄（戌）在 fixture 里无主星，满足「空宫」条件。
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-疾厄"));
     expect(screen.getByTestId("palace-detail")).toHaveTextContent("借");
+  });
+
+  it("空宫详情块的借星必须真的来自 deriveTriad：疾厄借田宅/命宫/父母，借来的星为紫微、天府", () => {
+    // 评审 Important 1：上一条只查「借」这个模板字，换成硬编码桩
+    // { isEmpty:true, borrowedFrom:[], stars:[] } 也能过。这里核对
+    // deriveTriad(palaces, "疾厄") 的实跑输出（见 packages/core/src/ziwei/triad.ts，
+    // probe 已核实并删除）：
+    //   { stars: ["紫微","天府"], borrowedFrom: ["田宅","命宫","父母"], isEmpty: true }
+    // 断言这些真实的借宫名/借星名，锁定「必须真调用 deriveTriad」（mutation 复验见报告）。
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-疾厄"));
+    const detail = screen.getByTestId("palace-detail");
+    expect(detail).toHaveTextContent("田宅");
+    expect(detail).toHaveTextContent("命宫");
+    expect(detail).toHaveTextContent("父母");
+    expect(detail).toHaveTextContent("紫微");
+    expect(detail).toHaveTextContent("天府");
   });
 });

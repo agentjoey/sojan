@@ -236,7 +236,7 @@ export const en: Messages = {
     bodyPalaceSuffix: "身 (Body)",
 
     palaceDetailStars: "主星 (Major Stars): {stars}",
-    palaceDetailEmpty: "本宫无主星 (empty palace) — borrowing from its 三方四正 ({palaces}): {stars}",
+    palaceDetailEmpty: "This palace has no major stars — stars are borrowed from its 三方四正 (Triad) ({palaces}): {stars}",
     mutagenLegendTitle: "四化 (Four Transforms)",
 
     radarAria: "五行雷达图 (Five Elements Radar)",

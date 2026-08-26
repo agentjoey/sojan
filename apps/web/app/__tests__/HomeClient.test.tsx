@@ -68,7 +68,7 @@ describe("HomeClient：今日日期/星期（终审必修 1，收口版）", () 
   });
 
   describe("首次渲染值 = 服务端传入的 today prop（防 mismatch 的关键点）", () => {
-    it("用 renderToStaticMarkup 模拟服务端预渲染的 HTML，再用不同系统时间 hydrate 同一份 prop：不触发 React hydration mismatch，首帧文本 = prop", () => {
+    it("用 renderToString 模拟服务端预渲染的 HTML，再用不同系统时间 hydrate 同一份 prop：不触发 React hydration mismatch，首帧文本 = prop", () => {
       // 三个时刻刻意互不相同，才能真正区分「读 prop」与「读 new Date()」：
       // - prerenderClock：模拟 ISR 重新生成机器当时的系统时钟
       // - staleToday（date: 2000.01.01）：那一刻服务端算出来、传给 HomeClient 的 prop

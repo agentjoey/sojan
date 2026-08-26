@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCurrentSolarHou, parseSolarHouIndex } from "../src/daily/season";
+import { getCurrentSolarHou, parseSolarHouIndex, TERMS_FROM_LICHUN } from "../src/daily/season";
 
 /**
  * getCurrentSolarHou 不是纯转发第三方库：Date → Solar.fromYmd(year, month + 1, day)
@@ -82,5 +82,33 @@ describe("parseSolarHouIndex：解析防脆", () => {
 
   it("正常输入解析出正确 index/term", () => {
     expect(parseSolarHouIndex("处暑 初候")).toEqual({ index: 40, term: "处暑" });
+  });
+
+  // 评审 Minor：HOU_ORDINAL 是 Record<string, number> + 方括号取值，若候序词恰好
+  // 撞上 Object.prototype 上的属性名（constructor/toString/...），方括号取值会
+  // 返回内置函数而不是 undefined，绕过 `=== undefined` 校验、静默算出非数字 index。
+  // 校验已改成 `typeof houOrdinal !== "number"`，这里钉住修复后的行为。
+  it("候序词撞上 Object.prototype 属性名（如 constructor）时仍必须抛错，不能返回怪值", () => {
+    expect(() => parseSolarHouIndex("处暑 constructor")).toThrow(/无法解析候序号/);
+    expect(() => parseSolarHouIndex("处暑 toString")).toThrow(/无法解析候序号/);
+  });
+});
+/**
+ * 评审 Important：3 个锚点（立春=0/处暑=13/大寒=23）只守得住表的两端和一个中段点，
+ * 中段任意两项颠倒（比如「小满」「芒种」互换）不会让任何既有测试变红——全年候序号
+ * 会整体错位却没人发现。选整表等值比较：这张表是固定不动的领域常量（24 节气顺序
+ * 不随年份变），整表断言维护成本为零、判别力最强，任何一项错位都会直接翻红。
+ *
+ * 下面 24 项是按四季顺序（立春起）独立核对写出的，不是从 season.ts 复制——
+ * 从实现复制粘贴的断言在实现出错时会跟着错，等于什么也没测。
+ */
+describe("TERMS_FROM_LICHUN：24 节气整表（堵中段错位）", () => {
+  it("24 节气自立春起顺序完整、不可颠倒任意一项", () => {
+    expect(TERMS_FROM_LICHUN).toEqual([
+      "立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
+      "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+      "立秋", "处暑", "白露", "秋分", "寒露", "霜降",
+      "立冬", "小雪", "大雪", "冬至", "小寒", "大寒",
+    ]);
   });
 });

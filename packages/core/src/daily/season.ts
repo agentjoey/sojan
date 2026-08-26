@@ -1,13 +1,23 @@
 import { Solar } from "lunar-typescript";
 
-/** 24 节气自立春定序——七十二候的序号基准。顺序固定，不随年份变。 */
-const TERMS_FROM_LICHUN = [
+/**
+ * 24 节气自立春定序——七十二候的序号基准。顺序固定，不随年份变。
+ * 导出以便测试对整表做等值比较（表中段顺序错位不会被锚点式测试发现，见
+ * `daily-season.test.ts` 里「24 节气整表」这条）。
+ */
+export const TERMS_FROM_LICHUN = [
   "立春","雨水","惊蛰","春分","清明","谷雨",
   "立夏","小满","芒种","夏至","小暑","大暑",
   "立秋","处暑","白露","秋分","寒露","霜降",
   "立冬","小雪","大雪","冬至","小寒","大寒",
 ] as const;
 
+/**
+ * `Record<string, number>` + 方括号取值有原型链隐患：若 `houWord` 恰好是
+ * `"constructor"`/`"toString"` 这类继承自 `Object.prototype` 的属性名，
+ * 方括号取值会返回内置函数而不是 `undefined`。校验必须用 `typeof ... !== "number"`
+ * （而不是 `=== undefined`）来堵住这条路径，否则会静默算出一个非数字的 index。
+ */
 const HOU_ORDINAL: Record<string, number> = { 初候: 1, 二候: 2, 三候: 3 };
 
 /** 当前七十二候（候名 + 物候名 + 1–72 序号）。 */
@@ -37,7 +47,7 @@ export function parseSolarHouIndex(hou: string): { index: number; term: string }
   const termIndex = term !== undefined ? TERMS_FROM_LICHUN.indexOf(term as (typeof TERMS_FROM_LICHUN)[number]) : -1;
   const houOrdinal = houWord !== undefined ? HOU_ORDINAL[houWord] : undefined;
 
-  if (parts.length !== 2 || termIndex === -1 || houOrdinal === undefined) {
+  if (parts.length !== 2 || termIndex === -1 || typeof houOrdinal !== "number") {
     throw new Error(
       `parseSolarHouIndex：无法解析候序号——lunar-typescript getHou() 返回「${hou}」，` +
         `期望「<节气> <初候|二候|三候>」格式（节气须在 24 节气表内），未能匹配。`,

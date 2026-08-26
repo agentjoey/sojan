@@ -107,14 +107,20 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
     }
   });
 
-  it("保留的三块都还在（防静默失踪回归网：紫微棋盘/西方盘/自我画像）", async () => {
+  // I6：spec §8 的保留三块是「西方星盘 / SelfPortrait / 当下时序」——紫微已经在
+  // 上面第一条用例里断言过两次（左列不存在 + 右列存在），这里不重复。原用例断的
+  // 是「紫微/西方/自我画像」，与 spec 点名的三块对不上，且完全没覆盖时序块。
+  // 时序块默认 `timelineActionMock` 恒返回 null（`{timeline && …}` 从未渲染过），
+  // 故这里显式 mock 一次 resolved value，让时序块真正出现在断言里。
+  it("保留的三块都还在（防静默失踪回归网：西方星盘/SelfPortrait/当下时序）", async () => {
+    timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
     await renderChart();
     const right = screen.getByTestId("two-col-right");
-    expect(within(right).getByTestId("ziwei-board-anchor")).toBeInTheDocument();
     expect(within(right).getAllByText(/西方|Western/).length).toBeGreaterThan(0);
     // SelfPortrait 组件内部自己也渲染一次同名标题（见 SelfPortrait.test.tsx），
     // 与 ChartBlock 的 h2 标签重复，因此用 getAllByText 而非 getByText。
     expect(within(right).getAllByText(/自我画像|Self/).length).toBeGreaterThan(0);
+    expect(await within(right).findByText(/流年上下文占位内容/)).toBeInTheDocument();
   });
 
   it("PageHeader 在 TwoColumn 里不再嵌套 <header>", async () => {
@@ -127,7 +133,33 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
     const left = screen.getByTestId("two-col-left");
     const right = screen.getByTestId("two-col-right");
     // BaziPillars 渲染四柱标题；LuckPillars 有数据时渲染 luck-row。
+    // I5：用例名承诺「四柱」，此前断言只覆盖了 luck-row——把 page.tsx 里四柱那个
+    // ChartBlock 整段删掉，760 条测试原本全绿（已 mutation 复验，报告见
+    // final-fix-report.md）。补上对 bazi-pillars-grid 的正/负断言堵住这个口子。
+    expect(within(left).getByTestId("bazi-pillars-grid")).toBeInTheDocument();
+    expect(within(right).queryByTestId("bazi-pillars-grid")).toBeNull();
     expect(within(left).getAllByTestId("luck-row").length).toBeGreaterThan(0);
     expect(within(right).queryAllByTestId("luck-row")).toHaveLength(0);
+  });
+
+  // I6：当下时序缓存策略（spec §8「缓存策略与 LLM 调用逐字不动」）此前零覆盖——
+  // 时序块能不能出现、算出的结果有没有按 (档案,年) 落盘缓存，全仓没有一条断言。
+  it("当下时序：mock LLM 结果渲染，且按 (档案,年) 写入 localStorage 缓存", async () => {
+    timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
+    await renderChart();
+    const right = screen.getByTestId("two-col-right");
+    expect(await within(right).findByText(/流年上下文占位内容/)).toBeInTheDocument();
+    expect(localStorage.getItem(`zhaojian.timeline.${profile.id}.${new Date().getFullYear()}`)).not.toBeNull();
+  });
+
+  // M2：`renderChart(locale)` 的 locale 参数此前从未被传入过（死参数），spec §9
+  // 明文要求补一条 locale="en" 渲染断言。
+  it("locale=\"en\" 时目录行以英文渲染（M2：renderChart(locale) 曾是死参数）", async () => {
+    await renderChart("en");
+    const rows = screen.getAllByTestId("chart-toc-row");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining("Twelve Palaces"),
+      expect.stringContaining("Three-Part Reading"),
+    ]);
   });
 });

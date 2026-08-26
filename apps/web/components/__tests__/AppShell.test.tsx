@@ -483,3 +483,54 @@ describe("复审二轮 C5：NavGrid 模块只在打开菜单时才被求值", ()
     vi.doUnmock("@/components/NavGrid");
   });
 });
+
+/**
+ * 复审二轮 C4：上一轮给语境胶囊、菜单键、九宫格格子、竖栏 NavItem 四处都加了
+ * `.zj-wheel-focus`，但复审做 mutation 实测发现——摘掉胶囊、菜单键、竖栏这
+ * 三处的 class，全量测试仍然绿；只有九宫格格子那处有护栏（`NavGrid.test.tsx`
+ * 「九宫格格子挂 zj-wheel-focus」）。这里补齐另外三处 + 竖栏当前项的
+ * `aria-current="page"`（同样此前没有护栏）。
+ */
+describe("复审二轮 C4：四处焦点环护栏补全", () => {
+  it("语境胶囊带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-capsule")).toHaveClass("zj-wheel-focus");
+  });
+
+  it("菜单键带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-menu")).toHaveClass("zj-wheel-focus");
+  });
+
+  it("竖栏 NavItem 带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const items = screen.getAllByTestId("nav-item");
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item).toHaveClass("zj-wheel-focus");
+    }
+  });
+
+  it("竖栏当前项带 aria-current=page", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const current = screen.getByLabelText("命盘");
+    expect(current.getAttribute("aria-current")).toBe("page");
+  });
+});

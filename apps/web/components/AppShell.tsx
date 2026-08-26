@@ -8,6 +8,8 @@ import { useIsTelegram } from "@/lib/tg/ui";
 import { isTelegram } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { enabled, isActive, RAIL_ORDER } from "@/lib/nav";
+import { ShellProvider } from "@/components/ShellContext";
+import { MobileShell } from "@/components/MobileShell";
 
 // Task 2：项集改为 RAIL_ORDER（运/盘/灵/境/梦/起/我）。「照」由顶部铜铃承担、不占项；
 // 「账」已并入「我的」（/profiles），不再作为独立导航项常驻。
@@ -37,48 +39,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className={tg ? "min-h-screen" : "min-h-screen md:pl-[82px]"}>
-      {!tg && (
-        <>
-          {/* 桌面：左侧素白图标栏 */}
-          <nav
-            className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
-            style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
-          >
-            <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
-              <BellLogo size={30} motion="ring" ringKey={bellRing} />
-            </Link>
-            {RAIL.map((item) => (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                char={item.char}
-                label={t(item.labelKey)}
-                active={isActive(pathname, item.href)}
-                compact={NAV_COMPACT}
-                style={item.id === "profiles" ? { marginTop: "auto" } : undefined}
-              />
-            ))}
-          </nav>
+    <ShellProvider>
+      <div className={tg ? "min-h-screen" : "min-h-screen md:pl-[82px]"}>
+        {!tg && (
+          <>
+            {/* 桌面：左侧素白图标栏 */}
+            <nav
+              className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
+              style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
+            >
+              <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
+                <BellLogo size={30} motion="ring" ringKey={bellRing} />
+              </Link>
+              {RAIL.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  char={item.char}
+                  label={t(item.labelKey)}
+                  active={isActive(pathname, item.href)}
+                  compact={NAV_COMPACT}
+                  style={item.id === "profiles" ? { marginTop: "auto" } : undefined}
+                />
+              ))}
+            </nav>
 
-          {/* 移动：底部素白图标栏 */}
-          <nav
-            className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-around pt-2.5 md:hidden"
-            style={{
-              background: "var(--color-paper)",
-              borderTop: "1px solid var(--color-line)",
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
-            }}
-          >
-            {RAIL.map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.labelKey)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
-            ))}
-          </nav>
-        </>
-      )}
+            {/* 移动：Task 6——顶部语境胶囊 + 菜单键 + 九宫格覆盖层，取代旧底栏。 */}
+            <MobileShell currentPath={pathname} />
+          </>
+        )}
 
-      <div className={tg ? "" : "pb-24 md:pb-0"}>{children}</div>
-    </div>
+        <div className={tg ? "" : "pb-0"}>{children}</div>
+      </div>
+    </ShellProvider>
   );
 }
 

@@ -25,6 +25,8 @@ export const zh = {
     profiles: "我的",
     account: "账号",
     start: "起盘",
+    menu: "菜单",
+    close: "关闭",
   },
   account: {
     title: "账号",

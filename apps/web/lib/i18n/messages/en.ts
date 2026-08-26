@@ -27,6 +27,8 @@ export const en: Messages = {
     profiles: "Me",
     account: "Account",
     start: "New Chart",
+    menu: "Menu",
+    close: "Close",
   },
   account: {
     title: "Account",

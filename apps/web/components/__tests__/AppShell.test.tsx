@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { zh } from "@/lib/i18n/messages/zh";
 import { en } from "@/lib/i18n/messages/en";
 
@@ -273,5 +273,98 @@ describe("EP-account2-fix：AppShell 对 zj_tg_hint 会话续期（fire-and-forg
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // 等一拍让 reject 链跑完：若未 catch，测试进程会收到 unhandled rejection
     await new Promise((r) => setTimeout(r, 10));
+  });
+});
+
+describe("UI v3 移动外壳", () => {
+  it("底栏已删除（全站不再有 fixed bottom 导航）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const { container } = render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(container.querySelector("nav.fixed.bottom-0")).toBeNull();
+  });
+
+  it("语境胶囊默认取当前路由的 nav 标签，且链到 /profiles", async () => {
+    // 裁定 R4：本文件顶层已把 next/navigation 的路由 mock 改成读取模块级可变
+    // 变量 `currentPath`（见文件头 vi.mock），切路由直接赋值即可，不用 vi.doMock
+    // ——两者混用会导致模块解析出两份不同的 mock 实例，路由读不到新值。
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/profiles");
+    expect(capsule).toHaveTextContent("命盘");
+  });
+
+  it("页面声明语境词时优先用声明值", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { useShellContext } = await import("../ShellContext");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    function Page() {
+      useShellContext("圣筊");
+      return <div />;
+    }
+    render(<AppShell><Page /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-capsule")).toHaveTextContent("圣筊");
+  });
+
+  it("菜单键打开九宫格；覆盖层里同位换成关闭键，尺寸不变", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const close = screen.getByTestId("shell-menu");
+    expect(close.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(close);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("关闭后焦点归还菜单键", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const menu = screen.getByTestId("shell-menu");
+    fireEvent.click(menu);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("SSR 水合安全：打开前七十二候节点不存在，只在用户点开菜单后才挂载", async () => {
+    // 验证选择的方案（打开前整体不求值，见 MobileShell.tsx 注释）：`open` 初始为
+    // false，服务端与客户端首帧渲染一致地跳过 NavGrid 内部依赖 new Date() 的
+    // 七十二候节点，杜绝「服务端候 A / 客户端候 B」的水合不一致（CLAUDE.md 记录
+    // 过一次 hydration error #418，此处不重蹈）。
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByTestId("nav-grid-seasons")).toBeNull();
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(screen.getByTestId("nav-grid-seasons")).toBeInTheDocument();
+  });
+
+  it("Telegram 环境内不渲染任何新外壳（冻结线）", async () => {
+    vi.doMock("@/lib/tg/ui", () => ({ useIsTelegram: () => true }));
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByTestId("shell-capsule")).toBeNull();
+    expect(screen.queryByTestId("shell-menu")).toBeNull();
   });
 });

@@ -84,18 +84,30 @@ export type HomeClientProps = {
    * 本组件不再自己调用（该函数来自 `@sojan/core`，静态 import 会把整条排盘依赖链
    * 打进 TG 首页客户端 chunk，见 `.superpowers/sdd/2026-08-26-ui-v3-c1-daily/bundle-fix-report.md`）。 */
   solarHou: SolarHouProp;
-  /** 服务端算好的今日日期串，如 `2026.08.26`。 */
-  todayDate: string;
-  /** `now.getDay()`，0=周日…6=周六，配合 `t("calendar.weekDays")` 在客户端取本地化星期文案。 */
-  dayIndex: number;
 };
 
-export default function HomeClient({ solarHou, todayDate, dayIndex }: HomeClientProps) {
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+export default function HomeClient({ solarHou }: HomeClientProps) {
   const inTg = useIsTelegram();
   const router = useRouter();
   const t = useT();
 
-  const weekDay = t("calendar.weekDays").split(",")[dayIndex];
+  /**
+   * 终审必修 1：「今日日期」与「星期」**必须在客户端算**，不接受服务端 props——
+   * `/` 是全静态预渲染路由（见 `page.tsx` 的 `export const revalidate`），
+   * 若这两个值在服务端组件里算，会在构建/ISR 重新生成时刻被烤进 RSC payload，
+   * 且服务端算的是部署机器的 UTC，跨午夜本来就会跟访客本地时间错一档。
+   * 本组件是 `"use client"`，这里的 `new Date()` 在客户端 hydrate 时会重新求值——
+   * 首次 SSR/ISR 输出的文本与客户端 hydrate 后的文本可能不同（跨 ISR 窗口的边界
+   * 时刻），这是「日期必须以访客本地时钟为准」这条要求下**有意为之**的取舍，
+   * React 对文本节点的 hydration mismatch 只会静默换成客户端值，不影响交互。
+   */
+  const now = new Date();
+  const todayDate = `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`;
+  const weekDay = t("calendar.weekDays").split(",")[now.getDay()];
 
   return (
     <main className="mx-auto w-full max-w-[480px] pb-16 lg:max-w-5xl">

@@ -295,6 +295,8 @@ export const zh = {
 
     selfPortraitTitle: "自我画像 · Self-Portrait",
     selfPortraitSubtitle: "由命盘结构与自我自陈合成的内在侧写",
+    tocZiwei: "紫微十二宫",
+    tocReading: "三段式解读",
   },
   calendar: {
     kicker: "流 日",

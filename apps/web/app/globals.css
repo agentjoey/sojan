@@ -8,27 +8,30 @@
    ============================================================ */
 @theme {
   /* —— 断点（Tailwind 4：断点即令牌） —— */
-  /* ⚠️ 复审 Critical C1：此前这里只重新声明了 `xl`（覆写为 1200px），构建产物里
-     `xl:` 的 media 块排在 `md:` 前面；`md:` 类与 `xl:` 类同属 `@layer utilities`、
-     同特异度，源序在后者层叠胜出——于是 ≥1200px 视口下裸 `md:` 类反而压过
-     `xl:` 类（桌面两栏容器塌成 720px）。
-     最初假设是「只声明了 xl 导致它被排到最前」，尝试的修法是把五个断点按
-     sm→md→lg→xl→2xl 升序全部显式声明一遍。**这个假设经构建产物实测证伪**：
-     加上这五行前后，`.next/static/chunks/*.css` 里 `@media (min-width:...)`
-     的输出顺序**完全没变**——`xl(1200px)` 依旧稳定排在 `sm/md/lg` 前面（各改
-     一次都单独 build 并 grep -bo 核对过 offset，两次结果一致）。也就是说
-     Tailwind 4 这个版本里 media 块的输出顺序不由 `@theme` 里 `--breakpoint-*`
-     的声明先后决定，具体排序规则未查证到；下面仍保留五个断点的显式声明
-     （值与 Tailwind 默认一致，纯文档作用，无副作用），但**不要指望它能让
-     `xl:` 排到 `md:` 后面**——真正让 C1 不可能复发的是消费方那一侧：凡是
-     `xl:` 与某个更低断点在同一属性上语义互斥的地方，用 `max-xl:` 而不是裸
-     `md:`/`lg:`（`max-xl:` 是 `@media (width < 1200px)`，在 ≥1200px 根本不
-     匹配，与 `xl:` 谁的源序在前无关），见 `TwoColumn.tsx` 的用法与其上方
-     注释。 */
+  /* ⚠️ 复审 Critical C1（根因已查明）：断点单位不许与其余断点混用。
+     Tailwind 4 **无法跨单位排序** media 块。此前这里把 xl 覆写成 `1200px`，
+     而 sm/md/lg/2xl 全是 rem，结果 `xl(1200px)` 的 media 块被整体排到所有
+     rem 断点**之前**。`md:` 与 `xl:` 类同属 `@layer utilities`、同为单类选择器、
+     同特异度 —— 源序在后者层叠胜出，于是 ≥1200px 视口下裸 `md:` 类反而压过
+     `xl:` 类（桌面两栏容器 width 塌成 720px、padding 归零）。
+
+     两个被证伪的假设，别再走一遍：
+     ① 「只声明了 xl 才导致它排最前」→ 假。把五个断点按 sm→md→lg→xl→2xl 升序
+        全部显式声明，产物顺序**完全没变**，xl 依旧排在最前。声明顺序不决定输出顺序。
+     ② 「只能靠消费方规避」→ 也不必。真正的根因是单位：改成 `75rem`（= 1200px @
+        16px 根字号，与设计包 06-desktop §2 的 1200px 等值）后，产物顺序立刻恢复
+        升序 40 → 48 → 64 → **75** → 96rem，实测已核（`grep -o "@media (min-width:[^)]*)"`）。
+
+     所以：**自定义断点一律用 rem，不要用 px。** 混单位 = 静默的层叠错乱，且
+     class-name 断言在结构上抓不到（本波七条 TwoColumn 测试全绿却全错）。
+
+     消费方那一侧仍保留 `max-xl:` 作双保险：凡 `xl:` 与更低断点在同一属性上语义
+     互斥的地方，用 `max-xl:`（`@media (width < 1200px)`，在 ≥1200px 根本不匹配）
+     而不是裸 `md:`/`lg:` —— 与源序无关，任何排序规则下都正确。见 `TwoColumn.tsx`。 */
   --breakpoint-sm: 40rem;
   --breakpoint-md: 48rem;
   --breakpoint-lg: 64rem;
-  --breakpoint-xl: 1200px; /* 06-desktop §2 要求两栏断点 1200px，覆写 Tailwind 默认 1280px */
+  --breakpoint-xl: 75rem; /* 06-desktop §2 要求两栏断点 1200px，覆写 Tailwind 默认 1280px */
   --breakpoint-2xl: 96rem;
 
   /* —— 纸 / 墨阶 —— */

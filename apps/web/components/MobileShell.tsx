@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { BellLogo } from "@/components/ui";
 import { NAV_CATALOG, isActive } from "@/lib/nav";
@@ -12,6 +12,14 @@ import { useShellContextValue } from "@/components/ShellContext";
 // + iztro 常量表，实测单 chunk 2,055,484 字节）打进每条经 `AppShell` 挂载的路由
 // 客户端包——包括 TG 里根本不渲染 `MobileShell` 的场景（在 `{!tg && …}` 内）。
 // `NavGrid` 在 `open=false` 时本就返回 `null`、不参与首帧，`ssr: false` 安全。
+//
+// 复审二轮再证伪：`next/dynamic` 本质是 `React.lazy`，loader 在**元素首次被
+// 渲染**时触发，与内部 `open` 判断无关。上一轮虽然接了 `dynamic()`，但下面
+// 渲染处曾是无条件的 `<NavGrid open={open} .../>`——组件挂载后这个元素立刻
+// 被渲染一次（哪怕 `open=false`、内部马上 return null），chunk 照样立刻下载，
+// 只是从「打包进首屏」挪成了「hydration 后异步请求」，2MB 该下载还是下载。
+// 真正的修法是让元素本身只在 `open=true` 时才被创建，见下方渲染处的
+// `{open && <NavGrid .../>}`。
 const NavGrid = dynamic(() => import("@/components/NavGrid").then((m) => m.NavGrid), {
   ssr: false,
 });
@@ -32,17 +40,22 @@ function labelKeyForPath(pathname: string): string {
  * 层叠顺序：`NavGrid` 的遮罩 `z-index: 40`，本组件顶栏必须压在其上——
  * 覆盖层打开时胶囊与菜单键仍需可见（菜单键原地变关闭键）。这里用 60。
  *
- * 焦点管理（评审 Critical + 控制器裁定必修，`NavGrid.tsx` 的注释已明确写明
- * 这活留给外壳）：
+ * 焦点管理（评审 Critical + 控制器裁定必修）：
  * - 关闭：菜单键的 `onClick` 与 `NavGrid` 内部 Esc 都收敛到同一个 `close()`——
  *   此前菜单键 `onClick` 是裸 `setOpen((v) => !v)`，不经过 `close()`，导致点击
  *   关闭键这条路径完全不归还焦点。iOS Safari / WebView 点 `<button>` 默认不留
  *   焦点（跟桌面浏览器行为不同），这个组件又叫 MobileShell——移动端正是主场，
- *   所以这不是可以忽略的边角情况。
- * - 打开：聚焦九宫格第一个导航格（而不是对话框容器本身）——`NavGrid` 根节点
- *   没有 `tabIndex`，本任务文件清单不含 `NavGrid.tsx`，改它的可聚焦性不在这次
- *   改动范围内；第一个导航格天然是 `<a href>`，本就可聚焦，键盘用户按 Tab 前
- *   焦点已经在覆盖层内部的真实交互元素上。
+ *   所以这不是可以忽略的边角情况。归还焦点的目标是 `menuRef`，只有这个组件
+ *   持有，所以留在这里。
+ * - 打开：聚焦九宫格第一个导航格（而不是对话框容器本身）——这部分逻辑复审
+ *   二轮起已经**挪进 `NavGrid.tsx` 自己的挂载 effect**，不再放在这里。原先
+ *   放在本组件是因为「`NavGrid` 根节点没有 `tabIndex`，改可聚焦性不在当时的
+ *   改动范围」；C5 把 `<NavGrid open={open} .../>` 改成 `{open && <NavGrid/>}`
+ *   之后，`NavGrid` 的挂载时机本就等价于「刚打开」，聚焦第一格这件事天然属于
+ *   它自己的挂载 effect，不需要外壳用 `MutationObserver` 猜它什么时候出现在
+ *   DOM 里。「焦点管理留给外壳」这条边界其实已经被 `NavGrid.tsx` 里的
+ *   `document` 级 Esc 监听打破——键盘/焦点管理本来就已经在那个组件里，聚焦
+ *   第一格搬过去是保持一致，不是新开先例（详见 `NavGrid.tsx` 顶部注释）。
  * - 如实说明未做的部分：`aria-modal="true"` 通常意味着背景内容对辅助技术是
  *   惰性的，但这里**没有做完整的 Tab 焦点陷阱**——覆盖层打开后一路 Tab 下去，
  *   焦点仍会跑出覆盖层、落到背后页面的链接上。做完整陷阱需要枚举/监听覆盖层
@@ -54,7 +67,6 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
   const { label } = useShellContextValue();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
-  const gridWrapRef = useRef<HTMLDivElement>(null);
 
   // 最终评审 C1（Critical）：App Router 客户端跳转不重挂 root layout，`open`
   // 状态跨路由存活——点九宫格任意格子后路由确实切换了，但覆盖层原地不动，
@@ -79,37 +91,6 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
     // 都必须走这个函数，见上方组件注释「评审 Critical」一节。
     menuRef.current?.focus();
   }
-
-  useEffect(() => {
-    if (!open) return;
-    const container = gridWrapRef.current;
-    if (!container) return;
-    // 无障碍：打开时把焦点移入对话框——聚焦九宫格第一个导航格（选择理由见
-    // 组件顶部注释）。不在 SSR 水合比对范围内：这个 effect 只在 `open` 变为
-    // `true`（用户点击之后）才跑，跟水合无关。
-    // 在 `gridWrapRef` 容器内查询，而不是 `document` 全局查询——查询范围收敛
-    // 到本组件渲染的子树；选择器用语义化的 `a[href]` 而非 `data-testid`，
-    // 生产逻辑不依赖本该只服务测试的属性（`data-testid="nav-grid-cell"` 仍
-    // 保留在 `NavGrid.tsx` 里给测试用，只是这里不再读它）。
-    //
-    // C5 引入 `next/dynamic(ssr:false)` 之后：`open` 变 `true` 的这一刻，`NavGrid`
-    // 的异步 chunk 可能还没 resolve、子树里还没有任何 `<a href>`——直接查询会
-    // 扑空。用 `MutationObserver` 等 chunk 到位后再聚焦一次，找到后立刻断开。
-    const focusFirstCell = () => {
-      const firstCell = container.querySelector<HTMLAnchorElement>("a[href]");
-      if (firstCell) {
-        firstCell.focus();
-        return true;
-      }
-      return false;
-    };
-    if (focusFirstCell()) return;
-    const observer = new MutationObserver(() => {
-      if (focusFirstCell()) observer.disconnect();
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [open]);
 
   return (
     <>
@@ -186,17 +167,24 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
 
       {/*
         水合安全（CLAUDE.md 已有一次 hydration error #418 的教训，此处不重蹈）：
-        `open` 是普通 `useState(false)`，服务端与客户端首帧永远一致地渲染
-        `NavGrid open={false}` → 组件内部 `if (!open) return null`，七十二候那行
-        依赖 `new Date()` 的代码根本不会在首帧（也就是水合校验会比对的那一帧）
-        执行。之后 `open` 变 `true` 全部由用户点击驱动，属于普通客户端态更新，
-        不再经过水合比对，因此结构上不存在「服务端候 A、客户端候 B」的分歧
-        ——不需要额外的「挂载后再渲染」占位包装。验证见
-        `AppShell.test.tsx`「打开前 nav-grid-seasons 不存在」用例。
+        服务端与客户端首帧永远一致地渲染 `open=false` → `{open && <NavGrid/>}`
+        求值为 `false`，`NavGrid` 元素在首帧根本不被创建，七十二候那行依赖
+        `new Date()` 的代码自然不会在首帧（也就是水合校验会比对的那一帧）执行。
+        之后 `open` 变 `true` 全部由用户点击驱动，属于普通客户端态更新，不再
+        经过水合比对，因此结构上不存在「服务端候 A、客户端候 B」的分歧——不
+        需要额外的「挂载后再渲染」占位包装。验证见 `AppShell.test.tsx`「打开前
+        nav-grid-seasons 不存在」用例。
       */}
-      <div ref={gridWrapRef}>
-        <NavGrid open={open} onClose={close} currentPath={currentPath} />
-      </div>
+      {/*
+        复审二轮 C5：这里从「无条件渲染 `<NavGrid open={open} .../>`」改成
+        `{open && <NavGrid .../>}`——前者会让 `NavGrid` 元素在组件挂载后立刻
+        被创建（哪怕 `open=false`），`next/dynamic` 的 loader 在**元素首次被
+        渲染**时就触发，与内部 `if (!open) return null` 无关，2MB 的
+        `@sojan/core` chunk 照样立刻下载。改成条件渲染后，只有真正点开菜单
+        那一刻才创建这个元素，loader 才第一次被触发。见 `AppShell.test.tsx`
+        「未打开时不求值，点开菜单后才求值」的探针用例。
+      */}
+      {open && <NavGrid open={open} onClose={close} currentPath={currentPath} />}
     </>
   );
 }

@@ -445,3 +445,41 @@ describe("UI v3 移动外壳", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+/**
+ * 复审二轮 C5：证伪「`next/dynamic` 懒加载 NavGrid 已经解决了 2MB chunk 打包
+ * 进每条路由」这个结论——`next/dynamic` 本质是 `React.lazy`，loader 在**元素
+ * 首次被渲染**时触发，与内部 `open` 判断无关。上一轮 `MobileShell` 曾无条件
+ * 渲染 `<NavGrid open={open} .../>`，元素在挂载后立刻被渲染一次（哪怕
+ * `open=false`），chunk 照样立刻下载，只是从「打包进首屏」挪成了「hydration
+ * 后异步请求」。修法：`{open && <NavGrid .../>}`，只有真正打开时才创建这个
+ * 元素。这里用 mock 工厂里打标记的探针直接验证：只 render、不点菜单键，标记
+ * 应为假；点开菜单后，标记应变真。
+ */
+describe("复审二轮 C5：NavGrid 模块只在打开菜单时才被求值", () => {
+  it("未打开时不求值，点开菜单后才求值", async () => {
+    let loaded = false;
+    vi.doMock("@/components/NavGrid", () => {
+      loaded = true;
+      return { NavGrid: () => null };
+    });
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    // 只 render，不点菜单键，等一拍确认异步 chunk 没有被求值。
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(loaded).toBe(false);
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(loaded).toBe(true);
+
+    // `vi.doMock` 不随 `afterEach` 的 `vi.resetModules()` 自动撤销，见文件内
+    // 其他 `vi.doMock` 用例的同款注释——显式撤销，避免泄漏进后续测试。
+    vi.doUnmock("@/components/NavGrid");
+  });
+});

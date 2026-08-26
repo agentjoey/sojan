@@ -48,15 +48,25 @@ describe("NavGrid 九宫格导航", () => {
     // 间空隙、或 MobileShell 里作为 dialog 兄弟节点的 ✕），Esc 就静默失效。
     // 旧用例直接 `fireEvent.keyDown(dialog, …)`，事件仍会从 dialog 冒泡到
     // document，所以无论监听器挂在哪里都测得过——测不出真实路径。这里改成
-    // 显式把焦点挪到 dialog 子树之外（`document.body`）再对 `document` 派发
-    // Escape，才是真实场景：焦点不在覆盖层内、监听器却仍是 document 级的。
+    // 显式把焦点挪到 dialog 子树之外再对 `document` 派发 Escape，才是真实场景：
+    // 焦点不在覆盖层内、监听器却仍是 document 级的。
+    //
+    // 复审二轮 C5：挪到 `NavGrid` 自己挂载 effect 里的「打开时聚焦第一格」会
+    // 让 `document.body.focus()` 这个旧写法失真——`<body>` 默认不可聚焦，
+    // `.focus()` 是空操作，而挂载 effect 已经把焦点放到了第一个格子上，
+    // `document.activeElement` 不会变成 `body`。改成一个真实存在、且在
+    // 覆盖层子树之外的可聚焦元素，才是「焦点确实不在子树内」的真实场景。
     const onClose = await renderGrid({});
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    document.body.focus();
-    expect(document.activeElement).toBe(document.body);
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+    expect(dialog.contains(outside)).toBe(false);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+    outside.remove();
   });
 
   it("open=false 时不渲染任何格子", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import type { ZiweiChart, Palace } from "@sojan/core";
 import { ZiweiBoard } from "../ZiweiBoard";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
@@ -132,5 +132,101 @@ describe("EP-east-ui-r2 ZiweiBoard", () => {
     expect(cell.style.borderRight).toBe("1px solid var(--color-line)");
     expect(cell.style.borderBottom).toBe("1px solid var(--color-line)");
     expect(cell.style.borderRadius).toBe("");
+  });
+});
+
+describe("ZiweiBoard：选中宫详情块（6b）", () => {
+  it("默认选中命宫，详情块显示其宫名", () => {
+    renderBoard();
+    const detail = screen.getByTestId("palace-detail");
+    expect(detail).toHaveTextContent("命宫");
+  });
+
+  // I4：spec §8「详情块必须用 Emphasis」——此前七条新测试全部只查文本/role/
+  // tabIndex/图例底色，把 <Emphasis> 换成裸 <div data-testid="palace-detail">
+  // 七条照样全绿，毫无判别力。这里钉住 Emphasis 横向强调的两个特征性样式：
+  // borderLeft 含朱砂、backgroundImage 含 90deg 渐变（同 BaziPillars.test.tsx
+  // 已有的钉法，见其 borderTop 含 cinnabar + backgroundImage 含 180deg 一条）。
+  // mutation 复验：把 Emphasis 换回裸 div，本条必须变红（见报告）。
+  it("详情块必须是 Emphasis：borderLeft 含朱砂、backgroundImage 含 90deg（spec §8）", () => {
+    renderBoard();
+    const detail = screen.getByTestId("palace-detail");
+    expect(detail.style.borderLeft).toContain("var(--color-cinnabar)");
+    expect(detail.style.backgroundImage).toContain("90deg");
+  });
+
+  it("点另一宫切换详情块", () => {
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-财帛"));
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("财帛");
+  });
+
+  // I5：spec §5 要求照抄 BaguaWheel 的既有交互契约——选中态必须是视觉的，
+  // aria-pressed 只是它的无障碍镜像。此前只搬了镜像，棋盘上没有任何视觉选中
+  // 指示。这里钉住：选中宫带朱砂内描边、未选中宫不带。
+  it("选中宫有视觉选中指示（inset 朱砂描边），未选中宫没有（I5）", () => {
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-财帛"));
+    const selectedCell = screen.getByTestId("palace-cell-财帛");
+    const otherCell = screen.getByTestId("palace-cell-兄弟");
+    expect(selectedCell.style.boxShadow).toContain("var(--color-cinnabar)");
+    expect(otherCell.style.boxShadow).not.toContain("var(--color-cinnabar)");
+  });
+
+  // I6：棋盘从「纯展示」变成「十二个可聚焦按钮」后，Tab 序里凭空多 12 站，
+  // 需要 role="group" + aria-label 给出上位语境（同 BaguaWheel 交互化时的既有
+  // 契约）。
+  it("棋盘容器有 role=group 与 aria-label（I6）", () => {
+    renderBoard();
+    const grid = screen.getByTestId("ziwei-grid");
+    expect(grid.getAttribute("role")).toBe("group");
+    expect(grid.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("宫格可键盘触达：Enter 与 Space 都能选中", () => {
+    renderBoard();
+    const cell = screen.getByTestId("palace-cell-财帛");
+    expect(cell.getAttribute("role")).toBe("button");
+    expect(cell.getAttribute("tabindex")).toBe("0");
+    fireEvent.keyDown(cell, { key: "Enter" });
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("财帛");
+  });
+
+  it("空格键也能选中", () => {
+    renderBoard();
+    const cell = screen.getByTestId("palace-cell-疾厄");
+    fireEvent.keyDown(cell, { key: " " });
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("疾厄");
+  });
+
+  it("四化图例：每个签实际渲染出对应五行底色（禄=木/权=土/科=水/忌=火），换裸 <span> 会锁不住", () => {
+    // 评审 Important 2：上一条只查文字，裸 <span>{k}</span> 也能通过。
+    // 这里核对 MutagenTag 真实渲染出的 background 变量，锁定「必须复用 MutagenTag」。
+    renderBoard();
+    const legend = screen.getByTestId("mutagen-legend");
+    const expectedElement: Record<string, string> = { 禄: "wood", 权: "earth", 科: "water", 忌: "fire" };
+    for (const [k, el] of Object.entries(expectedElement)) {
+      const tag = within(legend).getByText(k);
+      expect(tag.style.background).toBe(`var(--color-${el})`);
+    }
+  });
+
+  it("空宫详情块的借星必须真的来自 deriveTriad：疾厄借田宅/命宫/父母，借来的星为紫微、天府", () => {
+    // 评审 Important 1：曾有一条只查「借」这个模板字的弱断言，换成硬编码桩
+    // { isEmpty:true, borrowedFrom:[], stars:[] } 也能过（已删，被本条覆盖）。这里核对
+    // deriveTriad(palaces, "疾厄") 的实跑输出——注意：这是**本 fixture 数组序**的产物，
+    // 不是命理真值（fixture 数组顺序故意打乱，疾厄按环序本应借兄弟宫而非命宫；
+    // 这里断言的借宫名只是 deriveTriad 对着这份打乱 fixture 的确定性输出，用来
+    // 锁定「必须真调用 deriveTriad」，不代表真实命理规则）：
+    //   { stars: ["紫微","天府"], borrowedFrom: ["田宅","命宫","父母"], isEmpty: true }
+    // 断言这些真实的借宫名/借星名，锁定「必须真调用 deriveTriad」（mutation 复验见报告）。
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-疾厄"));
+    const detail = screen.getByTestId("palace-detail");
+    expect(detail).toHaveTextContent("田宅");
+    expect(detail).toHaveTextContent("命宫");
+    expect(detail).toHaveTextContent("父母");
+    expect(detail).toHaveTextContent("紫微");
+    expect(detail).toHaveTextContent("天府");
   });
 });

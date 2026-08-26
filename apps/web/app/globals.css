@@ -7,6 +7,33 @@
    令牌即单一事实源，勿写裸十六进制。
    ============================================================ */
 @theme {
+  /* —— 断点（Tailwind 4：断点即令牌） —— */
+  /* ⚠️ 复审 Critical C1（根因已查明）：断点单位不许与其余断点混用。
+     Tailwind 4 **无法跨单位排序** media 块。此前这里把 xl 覆写成 `1200px`，
+     而 sm/md/lg/2xl 全是 rem，结果 `xl(1200px)` 的 media 块被整体排到所有
+     rem 断点**之前**。`md:` 与 `xl:` 类同属 `@layer utilities`、同为单类选择器、
+     同特异度 —— 源序在后者层叠胜出，于是 ≥1200px 视口下裸 `md:` 类反而压过
+     `xl:` 类（桌面两栏容器 width 塌成 720px、padding 归零）。
+
+     两个被证伪的假设，别再走一遍：
+     ① 「只声明了 xl 才导致它排最前」→ 假。把五个断点按 sm→md→lg→xl→2xl 升序
+        全部显式声明，产物顺序**完全没变**，xl 依旧排在最前。声明顺序不决定输出顺序。
+     ② 「只能靠消费方规避」→ 也不必。真正的根因是单位：改成 `75rem`（= 1200px @
+        16px 根字号，与设计包 06-desktop §2 的 1200px 等值）后，产物顺序立刻恢复
+        升序 40 → 48 → 64 → **75** → 96rem，实测已核（`grep -o "@media (min-width:[^)]*)"`）。
+
+     所以：**自定义断点一律用 rem，不要用 px。** 混单位 = 静默的层叠错乱，且
+     class-name 断言在结构上抓不到（本波七条 TwoColumn 测试全绿却全错）。
+
+     消费方那一侧仍保留 `max-xl:` 作双保险：凡 `xl:` 与更低断点在同一属性上语义
+     互斥的地方，用 `max-xl:`（`@media (width < 1200px)`，在 ≥1200px 根本不匹配）
+     而不是裸 `md:`/`lg:` —— 与源序无关，任何排序规则下都正确。见 `TwoColumn.tsx`。 */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 75rem; /* 06-desktop §2 要求两栏断点 1200px，覆写 Tailwind 默认 1280px */
+  --breakpoint-2xl: 96rem;
+
   /* —— 纸 / 墨阶 —— */
   --color-paper: #f8f6f0; /* App 页面底 · 宣纸暖白（2026-08 当代东方重设计：#f6f5f1 偏冷，调暖一档） */
   --color-panel-strong: #1f1d19;
@@ -115,6 +142,7 @@ body {
 @keyframes zjFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes zjSpinSlow { to { transform: rotate(360deg); } }
 @keyframes zjSpinFast { to { transform: rotate(360deg); } }
+@keyframes zjSpinRev { to { transform: rotate(-360deg); } }
 /* 风铃主体：一阵风吹起后逐次衰减，后半程停歇，避免机械式匀速摇摆。 */
 @keyframes zjBellIdle {
   0%, 14%, 63%, 100% { transform: rotate(0deg); }

@@ -13,20 +13,44 @@ export const zh = {
     signingIn: "登录中…",
     brand: "照见",
     listSeparator: "、",
+    // TodayCard（今日卡）是卷首/运势页共用组件的 UI chrome 文案（终审必修 5：
+    // 此前写死在组件里，绕过了全站 i18n），放在 common 而非 home/calendar
+    // 任一页命名空间下——两处消费方地位相同，不存在归属关系。
+    todayCard: {
+      label: "今 日",
+      expand: "展开今日日签 →",
+      // WindBell 图上的字固定烧死是「谨」，与当日实际判词（{verdict}）可能不同，
+      // alt 文案必须诚实地说清楚这一点（见 WindBell.tsx 顶部注释）。
+      //
+      // ⚠️ 复审 Minor M2：此前措辞是「今日判词另见右栏：{verdict}」——首页没有
+      // 「右栏」这个东西（首页插进去的是空态记号「—」，读屏会念出「今日判词
+      // 另见右栏：—」，自相矛盾）；运势页也只是勉强对，判词其实在卡片**下方**
+      // 的强调块里，不在「右栏」。理想修法是拆两条 key（首页用纯描述图片的
+      // 版本，运势页用带 {verdict} 且措辞为「见下方」的版本），但首页那条已被
+      // `app/__tests__/page.test.tsx`「无档案态用空态记号「—」」这条终审必修 8
+      // 的既有断言钉死为必须含 {verdict} 插值结果——按本波全局约束该文件既有
+      // 断言不许改。所以退一步：去掉「另见右栏」这个虚假的方位声称，改成不含
+      // 方位信息、对两个消费方都成立的措辞，`{verdict}` 插值继续保留（首页仍
+      // 传空态记号「—」，运势页传真实判词）。
+      bellAlt: "风铃图，幡面刻「谨」字（固定字样，非当日判词——当日判词为「{verdict}」）",
+    },
   },
   nav: {
     home: "首页",
     calendar: "运势",
     chart: "命盘",
-    reading: "解读",
-    spirit: "本命",
+    spirit: "问事",
     fengshui: "风水",
     dream: "解梦",
     profiles: "我的",
     account: "账号",
+    start: "起盘",
+    menu: "菜单",
+    close: "关闭",
   },
   account: {
     title: "账号",
+    entry: "账号与登录",
     kicker: "账 户",
     sectionSubscription: "订 阅",
     sectionBinding: "绑 定",
@@ -104,8 +128,21 @@ export const zh = {
       calendar: { title: "今日运势", sub: "流日 · 每日一推" },
       annual: { title: "本年时序", sub: "流年 · 大限四化" },
       chart: { title: "我的命盘", sub: "命理 + 心理解读" },
+      spirit: { title: "本命之灵", sub: "守护灵与年度指引" },
       reading: { title: "起盘建档", sub: "出生信息即时排盘" },
       dream: { title: "解梦", sub: "梦的映照 · 心理解读" },
+    },
+    // 卷首今日卡（TodayCard）的通用（非按档案个性化）文案——首页匿名可见，
+    // 具体到人的判词/润色句/元数据仍在 /calendar 由 LLM 按档案生成。
+    today: {
+      weekday: "周{day}",
+      // 终审必修 8：无档案态不算真判词（展示层零推算），但同一张卡的
+      // meta 已经在说「你还没建档」，若在这里塞一个像判词的字（旧值「观」），
+      // 用户会误以为它是设计包四档（吉/顺/平/谨）之外的第五档。改成明确的
+      // 空态记号——不是「观」的翻译，是「此处无值」的通用符号。
+      emptyVerdict: "—",
+      polish: "先观其时，未必急于行动——完整流日解读，一点即达。",
+      meta: "登记出生信息，解锁你的专属流日解读",
     },
     cards: {
       east: {
@@ -224,6 +261,11 @@ export const zh = {
     fiveElementBureau: "五行局",
     birthMutagens: "生年四化",
     bodyPalaceSuffix: "身",
+
+    palaceDetailStars: "主星：{stars}",
+    palaceDetailEmpty: "本宫无主星，借三方四正（{palaces}）之星：{stars}",
+    mutagenLegendTitle: "四化",
+    ziweiBoardAria: "紫微命盘十二宫，可选择宫位查看详情",
 
     radarAria: "五行雷达图",
     missingCaption: "五行缺{elements}，喜用或在此方向",

@@ -39,11 +39,11 @@ vi.mock("@/components/DarkImage", () => ({
  * 动态 import，否则 `useT()` 拿到的 Context 实例与 Wrapper 提供的对不上、直接抛错。
  * 波1、波2 都栽过这个坑，spirit/fengshui 两处测试的注释里都记着。
  */
-async function renderHome() {
+async function renderHome(locale: "zh" | "en" = "zh") {
   const { default: Page } = await import("../page");
   const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return <I18nProvider locale="zh">{children}</I18nProvider>;
+    return <I18nProvider locale={locale}>{children}</I18nProvider>;
   }
   return render(<Page />, { wrapper: Wrapper });
 }
@@ -185,10 +185,94 @@ describe("TG 首页页头改用 PageHeader（EP-tg-parity）", () => {
     const { container } = await renderHome();
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("照见");
-    expect(screen.getByText("— 卷 首 —")).toBeInTheDocument();
+    // UI v3 页首范式（Task 4）：kicker 不再用「— X —」破折号包裹，改为裸字。
+    expect(screen.getByText("卷 首")).toBeInTheDocument();
     expect(screen.getByText("你的命盘，是一面镜子")).toBeInTheDocument();
     // 结构性断言：PageHeader 渲染的 <header> 标签本身作为判别依据——
     // 文本断言在实现前就可能碰巧通过，只有这条能真正验证「改用了 PageHeader」。
     expect(container.querySelector("header")).not.toBeNull();
+  });
+});
+
+/**
+ * Task 4：卷首 `app/page.tsx` 重建（UI v3，03-screens 5a）——只覆盖 `{!inTg && (…)}`
+ * 那一支。`renderHome()` 是全文件共用的 helper（既服务 TG 分支也服务 web 分支，见上面
+ * 「web 首页目录列表：解梦「梦」（inTg=false 臂）」那组已有测试），本组只需在渲染前把
+ * `tgEnv.inTg` 拨回 `false`（顶层 `beforeEach` 默认 `true`，服务 TG 相关分组）。
+ *
+ * 目录基线断言默认拿到 4 行：顶层 `beforeEach` 把 SPIRIT/FENGSHUI 两个 flag 都 stub 成
+ * "1"、DREAM 未 stub（默认关闭）——卷首目录只消费 SPIRIT（灵）与 DREAM（梦，可选第 5 行）
+ * 两个 flag，FENGSHUI 不在卷首目录范围内（境仍只在 AppShell 侧栏/TG 首页），所以默认态
+ * 下卷首目录恰好是「盘/灵/运/候」4 行。
+ */
+describe("UI v3 卷首（5a）", () => {
+  beforeEach(() => {
+    tgEnv.inTg = false;
+  });
+
+  it("Hero 用 CompassWatermark 而非已删除的 HeroWheel", async () => {
+    const { container } = await renderHome();
+    expect(container.querySelector('[data-testid="compass-ticks"]')).not.toBeNull();
+  });
+
+  it("今日卡在页面上，且卡脚指向 /calendar", async () => {
+    await renderHome();
+    const card = screen.getByTestId("today-card-left");
+    expect(card).toBeInTheDocument();
+    expect(screen.getByText(/展开今日日签/).closest("a")!.getAttribute("href")).toBe("/calendar");
+  });
+
+  it("七十二候标尺的 index 来自 getCurrentSolarHou，不是硬编码", async () => {
+    await renderHome();
+    const label = screen.getByRole("img", { name: /候/ }).getAttribute("aria-label")!;
+    const { getCurrentSolarHou } = await import("@sojan/core");
+    expect(label).toContain(String(getCurrentSolarHou().index));
+  });
+
+  it("目录 4 行，各带朱文方印字符", async () => {
+    await renderHome();
+    expect(screen.getAllByTestId("toc-row")).toHaveLength(4);
+  });
+
+  /**
+   * 终审必修 5：TodayCard 卡头/卡脚此前是组件内写死的中文（「今 日」/
+   * 「展开今日日签 →」），测试一直用 locale="zh" 渲染所以红灯没机会亮。
+   * 换成 en locale 断言这两处确实随 i18n 切换——若哪天有人把它们改回写死
+   * 中文，这条会在 en 分支下直接红。
+   */
+  it("en locale 下卡头/卡脚文案走 i18n，不是写死的中文（终审必修 5）", async () => {
+    await renderHome("en");
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText(/Open today.s reading/)).toBeInTheDocument();
+    expect(screen.queryByText("今 日")).toBeNull();
+    expect(screen.queryByText(/展开今日日签/)).toBeNull();
+  });
+
+  /**
+   * 终审必修 6：卷首这份 TodayCard 传的是星期（不是农历），prop 已改名为
+   * 诚实的 `dateNote`——这里钉住卷首实际显示的是星期文案，不是随便什么值。
+   */
+  it("今日卡的 dateNote 在卷首是星期，不是农历（终审必修 6：prop 改名为诚实的 dateNote）", async () => {
+    await renderHome("zh");
+    const weekDayPattern = /^周[日一二三四五六]$/;
+    const dateLine = screen.getAllByText((_, node) => {
+      const text = node?.textContent ?? "";
+      return /^\d{4}\.\d{2}\.\d{2} · /.test(text) && weekDayPattern.test(text.split(" · ")[1] ?? "");
+    });
+    expect(dateLine.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 终审必修 8：无档案态不该有一个像判词的字（旧值「观」）跟卡片 meta 的
+   * 「你还没建档」互相拆台，也不该被用户/读屏软件误当成设计包四档之外的
+   * 第五档。改成明确的空态记号「—」——钉住风铃 alt 文案里确实是这个记号，
+   * 不是「观」/"Watch"。
+   */
+  it("无档案态用空态记号「—」，不是像判词的「观」（终审必修 8）", async () => {
+    await renderHome("zh");
+    const bell = screen.getByTestId("wind-bell");
+    const alt = bell.querySelector("img")!.getAttribute("alt") ?? "";
+    expect(alt).toContain("—");
+    expect(alt).not.toContain("观");
   });
 });

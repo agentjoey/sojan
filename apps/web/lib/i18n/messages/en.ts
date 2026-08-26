@@ -15,20 +15,36 @@ export const en: Messages = {
     signingIn: "Signing in…",
     brand: "Sojan",
     listSeparator: ", ",
+    todayCard: {
+      label: "Today",
+      expand: "Open today's reading →",
+      // 复审 Minor M3：这里此前是繁体「謹」，与图上和 zh 文案的简体「谨」不一致——
+      // alt 是在陈述图上究竟写了哪个字，措辞必须诚实，改成简体。
+      // 复审 Minor M2：此前措辞声称「see today's verdict on the right」，首页
+      // 没有这个「right」——理想修法是拆两条 key，但首页那条已被
+      // `app/__tests__/page.test.tsx` 终审必修 8 的既有断言钉死为必须含
+      // {verdict} 插值结果（本波全局约束：该文件既有断言不许改），故去掉方位
+      // 声称，改成对两个消费方都成立的措辞，理由见 zh.ts 同一处注释。
+      bellAlt:
+        "Wind bell illustration with the character “谨” (Caution) fixed on the banner (not today's actual verdict — today's verdict is “{verdict}”)",
+    },
   },
   nav: {
     home: "Home",
     calendar: "Fortune",
     chart: "Chart",
-    reading: "Reading",
-    spirit: "Spirit",
+    spirit: "Ask",
     fengshui: "Feng Shui",
     dream: "Dream",
     profiles: "Me",
     account: "Account",
+    start: "New Chart",
+    menu: "Menu",
+    close: "Close",
   },
   account: {
     title: "Account",
+    entry: "Account & Sign-in",
     kicker: "Account",
     sectionSubscription: "Subscription",
     sectionBinding: "Bindings",
@@ -106,8 +122,15 @@ export const en: Messages = {
       calendar: { title: "Daily fortune", sub: "Daily flow · one push a day" },
       annual: { title: "Yearly cycle", sub: "Annual themes · 大限四化 (Four Transforms)" },
       chart: { title: "My chart", sub: "命理 (Mingli) + psychological reading" },
+      spirit: { title: "Guardian Spirit", sub: "Guardian spirit & yearly guidance" },
       reading: { title: "Cast chart", sub: "Birth info instant chart" },
       dream: { title: "Dreams", sub: "Dream mirror · psychological reflection" },
+    },
+    today: {
+      weekday: "{day}",
+      emptyVerdict: "—",
+      polish: "Observe the moment before you act — your full daily reading is one tap away.",
+      meta: "Add your birth info to unlock your personalized daily reading",
     },
     cards: {
       east: {
@@ -231,6 +254,11 @@ export const en: Messages = {
     fiveElementBureau: "五行局 (Five Element Bureau)",
     birthMutagens: "生年四化 (Natal Four Transforms)",
     bodyPalaceSuffix: "身 (Body)",
+
+    palaceDetailStars: "主星 (Major Stars): {stars}",
+    palaceDetailEmpty: "This palace has no major stars — stars are borrowed from its 三方四正 (Triad) ({palaces}): {stars}",
+    mutagenLegendTitle: "四化 (Four Transforms)",
+    ziweiBoardAria: "紫微命盘 (Purple Star Chart), twelve palaces, select a palace to view details",
 
     radarAria: "五行雷达图 (Five Elements Radar)",
     missingCaption: "五行 (Five Elements) lacks {elements}; your favorable direction may lie here.",

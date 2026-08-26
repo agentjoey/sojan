@@ -2,6 +2,7 @@
 
 import type { BaziChart, Pillar } from "@sojan/core";
 import { useT } from "@/lib/i18n/I18nProvider";
+import { Emphasis } from "@/components/ui";
 
 // 五行计数小芯片的固定顺序：木火土金水
 const WUXING_ORDER: { countKey: string; elementKey: string; i18nKey: string }[] = [
@@ -20,11 +21,10 @@ function PillarColumn({ col }: { col: ColumnDef }) {
   const tenGod = isDay ? t("chart.dayMaster") : pillar.tenGodStem ?? "—";
   const hidden = pillar.hiddenStems.length > 0 ? pillar.hiddenStems.join(" ") : "—";
 
-  return (
-    <div
-      data-testid={`pillar-col-${key}`}
-      className="flex min-w-[64px] flex-1 flex-col items-center gap-1.5 py-4"
-    >
+  const columnClassName = "flex min-w-[64px] flex-1 flex-col items-center gap-1.5 py-4";
+
+  const content = (
+    <>
       {/* 十神 / 日主（muted 小字） */}
       <div className="text-muted text-[11px]">{tenGod}</div>
       {/* 天干：宋体大字 */}
@@ -66,6 +66,31 @@ function PillarColumn({ col }: { col: ColumnDef }) {
           </span>
         )}
       </div>
+    </>
+  );
+
+  // 日柱：全站统一竖向强调手法（Emphasis axis="vertical"）。方章「主」是身份标记
+  // （日主），与 Emphasis 表达的「当前/重点」语义不同，两者并存、互不替代。
+  // Emphasis 自带的 "pt-3 -mt-3.5" 是为纵向堆叠内容设计的上溢强调手法，套进
+  // 四柱这种等高栅格列会把该列的上边缘顶起、破坏四列对齐——用 !mt-0 / !pt-4
+  // （Tailwind important 前缀，具确定性、不依赖生成 CSS 的内部书写顺序）把该列
+  // 的外边距/上内边距钉回与其余三列一致，只保留 Emphasis 的朱砂 border-top +
+  // 渐变底色两个真正承载「强调」语义的视觉效果。不修改 Emphasis 本身。
+  if (isDay) {
+    return (
+      <Emphasis
+        axis="vertical"
+        data-testid={`pillar-col-${key}`}
+        className={`${columnClassName} !mt-0 !pt-4`}
+      >
+        {content}
+      </Emphasis>
+    );
+  }
+
+  return (
+    <div data-testid={`pillar-col-${key}`} className={columnClassName}>
+      {content}
     </div>
   );
 }

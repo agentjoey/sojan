@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * 页头（当代东方 v3）：中文眉标「— X X —」+ 宋体标题 + 注解副标 + 细线。
- * 全站统一入口，取代此前三套并存的页头规格。装饰性拉丁 kicker 不再使用。
+ * 页头（UI v3）：朱砂短横 + 眉标（10.5px/.42em，无破折号包裹）+ 宋体大标题 + 说明行。
+ * 全站统一入口。桌面两栏布局的 border-bottom 分隔线归 06-desktop §3，不在此实现。
  */
 export function PageHeader({
   kicker,
@@ -19,19 +19,23 @@ export function PageHeader({
     <header>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>
-            — {kicker} —
-          </p>
-          <h1 className="mt-3 font-serif text-[28px] font-bold leading-[1.25]">{title}</h1>
+          <div
+            data-testid="header-rule"
+            aria-hidden="true"
+            style={{ width: 22, height: 2, background: "var(--color-cinnabar)", marginBottom: 14 }}
+          />
+          <p style={{ fontSize: "10.5px", letterSpacing: "0.42em", color: "var(--color-muted)" }}>{kicker}</p>
+          <h1 className="mt-3 font-serif font-bold leading-[1.2]" style={{ fontSize: 32 }}>
+            {title}
+          </h1>
           {annotation && (
-            <p className="mt-2 text-[12px]" style={{ color: "var(--color-muted)" }}>
+            <p className="mt-2" style={{ fontSize: "11.5px", color: "var(--color-muted)" }}>
               {annotation}
             </p>
           )}
         </div>
         {action && <div className="flex shrink-0 items-center gap-2 pt-8">{action}</div>}
       </div>
-      <div className="mt-6 h-px" style={{ background: "var(--color-line)" }} aria-hidden />
     </header>
   );
 }

@@ -96,18 +96,19 @@ export default function ProfilesPage() {
         kicker={t("profiles.kicker")}
         title={t("profiles.title")}
         action={
-          <>
-            <Link
-              href="/account"
-              className="px-4 py-2.5 text-[14px] text-ink-2 transition-colors"
-              style={{ background: "var(--color-paper)", border: "1px solid var(--color-line)", borderRadius: "var(--radius-button)" }}
-            >
-              {t("nav.account")}
-            </Link>
-            <Link href="/reading" className="px-5 py-2.5 text-[14px]" style={{ background: "var(--color-cinnabar)", color: "var(--color-paper)", borderRadius: "var(--radius-button)" }}>{t("profiles.create")}</Link>
-          </>
+          <Link href="/reading" className="px-5 py-2.5 text-[14px]" style={{ background: "var(--color-cinnabar)", color: "var(--color-paper)", borderRadius: "var(--radius-button)" }}>{t("profiles.create")}</Link>
         }
       />
+
+      <Link
+        data-testid="account-entry"
+        href="/account"
+        className="flex items-center justify-between py-4"
+        style={{ borderTop: "1px solid var(--color-line)", borderBottom: "1px solid var(--color-line)" }}
+      >
+        <span className="font-serif text-[17px]">{t("account.entry")}</span>
+        <span style={{ color: "var(--color-muted)" }}>→</span>
+      </Link>
 
       <div className="mt-8">
       {loading ? (

@@ -6,14 +6,17 @@ import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { dailyFortuneAction, dailyPolishAction, dailyBehaviorAction, ziweiHoroscopeAction } from "@/app/actions";
 import { matchFortuneImage, MOOD_LABEL } from "@/lib/fortune-images";
-import { GanzhiBadge } from "@/components/ui";
+import { Emphasis, GanzhiBadge } from "@/components/ui";
 import { ScoreRing } from "@/components/ScoreRing";
 import { CastingOverlay } from "@/components/CastingOverlay";
 import { FortuneFrame } from "@/components/FortuneFrame";
 import { PageHeader } from "@/components/PageHeader";
+import { TodayCard } from "@/components/TodayCard";
+import { SeasonRuler } from "@/components/charts/SeasonRuler";
+import { TwoColumn } from "@/components/TwoColumn";
 import { AskToday } from "./AskToday";
 import { useT } from "@/lib/i18n/I18nProvider";
-import type { DailyFortune, ZiweiHoroscope } from "@sojan/core";
+import { getCurrentSolarHou, type DailyFortune, type ZiweiHoroscope } from "@sojan/core";
 
 // 按 (档案,日期,kind) 缓存 LLM 结果到 localStorage，避免重复调用。
 // ⚠️ 键前缀 `zhaojian.` 刻意保留旧品牌名、不随 2026-08-25 更名 Sojan 而改（owner 决策）：
@@ -32,6 +35,28 @@ function gradeOf(overall: number): "auspicious" | "smooth" | "neutral" | "cautio
   if (overall >= 6) return "smooth";
   if (overall >= 4) return "neutral";
   return "cautious";
+}
+
+/**
+ * 判词强调块字号（终审必修 4）：`calendar.grade.*` 中文只有单字（吉/顺/平/谨），
+ * 但 `detectLocale()` 对任何非中文浏览器默认返回 `en`——而英文是首发市场的默认
+ * 路径，不是极端分支。英文值形如 `"吉 (Auspicious)"`（最长 14 字符），用固定
+ * `text-[64px] leading-none` 在左列（桌面 392px 宽）会溢出裁切、在移动端也会
+ * 挤成两三行贴死。这里按字符数分档：中文单字沿用原设计的大字号，长值降字号、
+ * 放宽行高、允许换行——纯展示层字号逻辑，不做任何「按语言判断」的推算分支
+ * （长度是显示层已有的字符串属性，不是从命盘再算一遍）。
+ *
+ * ⚠️ 复审 Minor M1：这里此前是三档（≤2 / 3–6 / 其余），但 `calendar.grade.*`
+ * 目前只有 zh 的 吉/顺/平/谨（长度均为 1）与 en 的
+ * "吉 (Auspicious)"/"顺 (Smooth)"/"平 (Steady)"/"谨 (Cautious)"（长度
+ * 14/10/10/12）这 8 个值——中间那档（3–6）对现有全部值都不可达，是个测不到、
+ * 也用不到的死分支。收成两档：CJK 单字（≤2）沿用大字号，其余（含未来更长的
+ * locale 文案）统一走「降字号 + 放宽行高 + 允许换行」这一档——`break-words`
+ * 本就是为兜住任意长度设计的，不需要中间那档来过渡。
+ */
+function verdictTextClass(len: number): string {
+  if (len <= 2) return "text-[40px] leading-none xl:text-[64px]";
+  return "break-words text-[22px] leading-snug xl:text-[32px]";
 }
 
 type Behavior = { do: string[]; dont: string[] };
@@ -67,6 +92,10 @@ export default function CalendarPage() {
   const [dark, setDark] = useState(false);
   const [fortuneImgError, setFortuneImgError] = useState(false);
   const selYear = selected.slice(0, 4);
+
+  // 七十二候：与卷首各自取值时机不同（本页有按日期的 localStorage 缓存），故各自现算一次
+  // （`TodayCard`/`SeasonRuler` 均不自己调 `getCurrentSolarHou()`，见两组件文档）。
+  const solarHou = getCurrentSolarHou();
 
   useEffect(() => {
     const el = document.documentElement;
@@ -149,28 +178,28 @@ export default function CalendarPage() {
 
   const days = weekDays(today);
 
-  return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8">
-      {casting && <CastingOverlay title={t("calendar.calculating")} hint={t("common.casting")} mode="brief" />}
+  // 宜忌两组文案：优先心理行为版（LLM），降级确定性趋吉避祸——与此前行为一致，未改数据流。
+  const yiTitle = behavior ? t("calendar.todayYi") : t("calendar.auspiciousYi");
+  const jiTitle = behavior ? t("calendar.todayJi") : t("calendar.cautionJi");
+  const yiItems = behavior?.do?.length ? behavior.do : fortune?.auspicious ?? [];
+  const jiItems = behavior?.dont?.length ? behavior.dont : fortune?.caution ?? [];
+
+  const img = fortune ? matchFortuneImage(fortune.relation, selected) : undefined;
+  const g = fortune ? gradeOf(fortune.scores.overall) : "neutral";
+  const verdictText = t("calendar.grade." + g);
+  const useDarkFile = dark && !!img?.darkFile && !fortuneImgError;
+  const imgSrc = useDarkFile ? img?.darkFile : img?.file;
+
+  const header = (
+    <>
       <PageHeader
         kicker={t("calendar.kicker")}
         title={t("calendar.title")}
         annotation={`${profile.nickname} · ${t("calendar.dayMasterLabel")} ${profile.chart.bazi.dayMaster}（${profile.chart.bazi.dayMasterElement}）`}
       />
-      <div className="mb-6" />
 
-      {/* 本年/本限 时序上下文（大背景 → 今日） */}
-      {horoscope && (
-        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[var(--radius-card)] px-4 py-3" style={{ background: "var(--color-surface)", border: "1px solid var(--color-line)" }}>
-          <span className="text-[13px] text-ink-2">{t("calendar.decadal")} <b className="font-semibold">{horoscope.decadal.stem}{horoscope.decadal.branch}</b></span>
-          <span className="text-[13px] text-ink-2">{selYear} {t("calendar.yearly")} <b className="font-semibold">{horoscope.yearly.stem}{horoscope.yearly.branch}</b></span>
-          <span className="text-[12px] text-muted">{t("calendar.yearlyJi")} <b className="text-cinnabar">{horoscope.yearly.mutagens.忌}</b>（{t("calendar.thisYearLesson")}）· {t("calendar.yearlyLu")} <b className="text-wood">{horoscope.yearly.mutagens.禄}</b>（{t("calendar.favorable")}）</span>
-          <Link href="/chart" className="ml-auto shrink-0 text-[12px] text-gold underline underline-offset-4">{t("calendar.toTimeline")}</Link>
-        </div>
-      )}
-
-      {/* 本周日历条 */}
-      <div className="mb-6 grid grid-cols-7 gap-1.5">
+      {/* 本周日历条：桌面 7 格铺满内容列宽（06-desktop §5），移动同一份实现按比例缩窄 */}
+      <div className="mt-6 grid grid-cols-7 gap-1.5 xl:gap-2">
         {days.map((d) => {
           const ds = ymd(d);
           const isSel = ds === selected;
@@ -179,7 +208,7 @@ export default function CalendarPage() {
             <button
               key={ds}
               onClick={() => setSelected(ds)}
-              className="flex flex-col items-center py-2 transition-all"
+              className="flex flex-col items-center py-2 transition-colors xl:py-2.5"
               style={{
                 borderRadius: "var(--radius-card)",
                 background: isSel ? "var(--color-ink)" : "var(--color-surface)",
@@ -194,131 +223,201 @@ export default function CalendarPage() {
         })}
       </div>
 
-      {loading || !fortune ? (
-        <div className="py-10 text-[14px] text-muted" style={{ borderTop: "1px solid var(--color-line)" }}>{t("calendar.calculating")}</div>
-      ) : (
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          {/* 今日日签：判词 + 花窗裱画 + 评分环（纸底仪式，深色 hero 已随 v3 废除） */}
-          {(() => {
-            const img = matchFortuneImage(fortune.relation, selected);
-            const g = gradeOf(fortune.scores.overall);
-            const useDarkFile = dark && !!img?.darkFile && !fortuneImgError;
-            const imgSrc = useDarkFile ? img.darkFile! : img?.file;
-            return (
-              <div className="zj-rise lg:col-span-2">
-                {/* 主视觉：判词大字当代黄历版（对齐设计稿）。评分环不再是引导视觉——
-                    它降级挪到下方「五维」小节当量化佐证，判词才是这张日签的第一眼。
-                    判词沿用既有四档（吉/顺/平/谨），未新增老黄历值神/吉时/冲词汇。 */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="text-[13px] text-muted">
-                    {selected.replaceAll("-", ".")}
-                    {fortune.lunarDate ? ` · ${fortune.lunarDate}` : ""}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <GanzhiBadge char={fortune.dayGanZhi[0]!} size={36} />
-                    <GanzhiBadge char={fortune.dayGanZhi[1]!} size={36} />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="font-serif text-[64px] font-bold leading-none">{t("calendar.grade." + g)}</div>
-                  <div className="mt-2.5 text-[13px]" style={{ color: "var(--color-muted)" }}>
-                    {t("calendar.todayVerdict")}
-                    <span className="mx-1.5">·</span>
-                    {MOOD_LABEL[fortune.relation]}
-                  </div>
-                </div>
-                {img && (
-                  <div className="mx-auto mt-8 max-w-[340px]">
-                    <FortuneFrame src={imgSrc!} alt={img.alt} seed={selected} />
-                    {/* 深色变体 404 兜底探测：display:none 的 img 仍会发请求，但 loading="lazy"
-                        在没有布局盒时永不触发——所以这里绝不能加 lazy（C1 评审）。 */}
-                    <img src={imgSrc} alt="" aria-hidden className="hidden" onError={() => { if (useDarkFile) setFortuneImgError(true); }} />
-                  </div>
-                )}
-                {polish && (
-                  <p className="mx-auto mt-8 max-w-[480px] text-center font-serif text-[16px] leading-[1.9]" style={{ color: "var(--color-ink)" }}>{polish}</p>
-                )}
-                {(fortune.favorableToday || fortune.interactions.length > 0) && (
-                  <div className="mt-5 flex flex-wrap justify-center gap-1.5">
-                    {fortune.favorableToday && <span className="px-2.5 py-0.5 text-[11px]" style={{ borderRadius: "var(--radius-chip)", border: "1px solid var(--color-cinnabar)", color: "var(--color-cinnabar)" }}>{t("calendar.favorableToday")}</span>}
-                    {fortune.interactions.map((it, i) => (
-                      <span key={i} className="px-2.5 py-0.5 text-[11px]" style={{ borderRadius: "var(--radius-chip)", background: "var(--color-tint)", color: "var(--color-muted)" }} title={it.note}>{t("calendar.interaction", { kind: it.kind, withPillar: it.withPillar })}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1" && profile && fortune && (
-            <AskToday profile={profile} fortune={fortune} dateStr={selected} />
-          )}
-
-          {/* 五维评分（细线计量，去卡片） */}
-          <div style={{ borderTop: "1px solid var(--color-line)" }}>
-            <div className="flex items-center justify-between pt-5">
-              <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.dimsTitle")}</div>
-              <ScoreRing
-                score={fortune.scores.overall}
-                max={10}
-                size={40}
-                accent="var(--color-cinnabar)"
-                showLabel={false}
-                label={t("calendar.scoreLabel", { grade: t("calendar.grade." + gradeOf(fortune.scores.overall)), today: t("calendar.today") })}
-              />
-            </div>
-            <div className="mt-4 space-y-3">
-              {DIMS.map((key) => (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="w-8 text-[13px] text-ink">{t("calendar.dims." + key)}</span>
-                  <div className="h-[3px] flex-1" style={{ background: "var(--color-line)" }}>
-                    <div className="h-full" style={{ width: `${fortune.scores[key] * 10}%`, background: "var(--color-ink)" }} />
-                  </div>
-                  <span className="font-latin w-5 text-right text-[13px] text-muted">{fortune.scores[key]}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 今日宜忌：小方标记 + 细线分行（优先心理行为版，降级确定性趋吉避祸） */}
-          <div className="grid gap-8 sm:grid-cols-2" style={{ borderTop: "1px solid var(--color-line)" }}>
-            <div className="pt-5">
-              <h3 className="flex items-center gap-2 font-serif text-[16px] font-semibold">
-                <span className="inline-block h-2 w-2" style={{ background: "var(--color-wood)", borderRadius: 2 }} aria-hidden />
-                {behavior ? t("calendar.todayYi") : t("calendar.auspiciousYi")}
-              </h3>
-              <ul className="mt-3 space-y-2 text-[14px] text-ink-2">
-                {(behavior?.do?.length ? behavior.do : fortune.auspicious).map((item, i) => <li key={i}>{item}</li>)}
-              </ul>
-            </div>
-            <div className="pt-5">
-              <h3 className="flex items-center gap-2 font-serif text-[16px] font-semibold">
-                <span className="inline-block h-2 w-2" style={{ background: "var(--color-cinnabar)", borderRadius: 2 }} aria-hidden />
-                {behavior ? t("calendar.todayJi") : t("calendar.cautionJi")}
-              </h3>
-              <ul className="mt-3 space-y-2 text-[14px] text-ink-2">
-                {(behavior?.dont?.length ? behavior.dont : fortune.caution).map((item, i) => <li key={i}>{item}</li>)}
-              </ul>
-            </div>
-          </div>
-
-          {fortune.almanacYi.length + fortune.almanacJi.length > 0 && (
-            <div className="pt-5" style={{ borderTop: "1px solid var(--color-line)" }}>
-              <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.almanac")}</div>
-              <div className="mt-3 text-[13px] text-ink-2"><span style={{ color: "var(--color-wood)" }}>{t("calendar.yi")}</span>　{fortune.almanacYi.join("、") || t("calendar.none")}</div>
-              <div className="mt-1.5 text-[13px] text-ink-2"><span style={{ color: "var(--color-cinnabar)" }}>{t("calendar.ji")}</span>　{fortune.almanacJi.join("、") || t("calendar.none")}</div>
-            </div>
-          )}
+      {/* 本年/本限 时序上下文（大背景 → 今日） */}
+      {horoscope && (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[var(--radius-card)] px-4 py-3" style={{ background: "var(--color-surface)", border: "1px solid var(--color-line)" }}>
+          <span className="text-[13px] text-ink-2">{t("calendar.decadal")} <b className="font-semibold">{horoscope.decadal.stem}{horoscope.decadal.branch}</b></span>
+          <span className="text-[13px] text-ink-2">{selYear} {t("calendar.yearly")} <b className="font-semibold">{horoscope.yearly.stem}{horoscope.yearly.branch}</b></span>
+          <span className="text-[12px] text-muted">{t("calendar.yearlyJi")} <b className="text-cinnabar">{horoscope.yearly.mutagens.忌}</b>（{t("calendar.thisYearLesson")}）· {t("calendar.yearlyLu")} <b className="text-wood">{horoscope.yearly.mutagens.禄}</b>（{t("calendar.favorable")}）</span>
+          <Link href="/chart" className="ml-auto shrink-0 text-[12px] text-gold underline underline-offset-4">{t("calendar.toTimeline")}</Link>
         </div>
       )}
 
-      <p className="mt-8 text-[12px] leading-relaxed text-muted">
-        {t("calendar.disclaimer")}
-      </p>
+      {/* 免责声明：合规文案（CLAUDE.md「心理占星 ≠ 临床心理…强制免责声明」），
+          必须与 loading/fortune 状态无关地常显——放进 header（页级，不参与
+          loading 门槛），而不是 right（loading 时整体为 null）。此前误放进
+          right 导致 loading 期间免责声明连同五维/宜忌/候标尺一起消失，是纯
+          回归，评审已判 Important；测试见 page.test.tsx「loading 态下免责
+          声明仍然可见」。 */}
+      <p className="mt-6 text-[12px] leading-relaxed text-muted">{t("calendar.disclaimer")}</p>
+    </>
+  );
+
+  // 桌面左列（392px）：日期 + 干支徽 + 今日卡（与卷首同一组件）+ 判词强调块。
+  // 移动端单列时同一份内容排在最前——信息顺序与桌面 8a 一致（日期干支 → 今日卡 → 判词）。
+  const left =
+    loading || !fortune ? (
+      <div className="py-10 text-[14px] text-muted" style={{ borderTop: "1px solid var(--color-line)" }}>{t("calendar.calculating")}</div>
+    ) : (
+      <div className="zj-rise">
+        <div className="flex items-start justify-between gap-4">
+          <div className="text-[13px] text-muted">
+            {selected.replaceAll("-", ".")}
+            {fortune.lunarDate ? ` · ${fortune.lunarDate}` : ""}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <GanzhiBadge char={fortune.dayGanZhi[0]!} size="md" />
+            <GanzhiBadge char={fortune.dayGanZhi[1]!} size="md" />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <TodayCard
+            label={t("common.todayCard.label")}
+            date={selected.replaceAll("-", ".")}
+            dateNote={fortune.lunarDate || ""}
+            term={solarHou.hou}
+            wuHou={solarHou.wuHou}
+            polish={polish ?? t("calendar.todayVerdict")}
+            meta={`${fortune.dayGanZhi} · ${MOOD_LABEL[fortune.relation]}`}
+            bellAlt={t("common.todayCard.bellAlt", { verdict: verdictText })}
+            // 终审必修 7：卡脚 href 不传——运势页复用本组件时，卡脚此前写死
+            // href="/calendar" 指向当前页本身，点了原地不动，是死链。卡脚是
+            // 给卷首写的「展开今日日签」入口，复用到 /calendar 上时该消失。
+          />
+        </div>
+
+        {/* 判词强调块：全站唯一的强调手法（Emphasis），取代旧的裸判词大字 */}
+        <Emphasis className="mt-6">
+          <div data-testid="verdict-emphasis" className={`font-serif font-bold ${verdictTextClass(verdictText.length)}`}>{verdictText}</div>
+          <div className="mt-2.5 text-[13px]" style={{ color: "var(--color-muted)" }}>
+            {t("calendar.todayVerdict")}
+            <span className="mx-1.5">·</span>
+            {MOOD_LABEL[fortune.relation]}
+          </div>
+          {polish && (
+            <p className="mt-5 font-serif text-[16px] leading-[1.9]" style={{ color: "var(--color-ink)" }}>{polish}</p>
+          )}
+        </Emphasis>
+
+        {(fortune.favorableToday || fortune.interactions.length > 0) && (
+          <div className="mt-5 flex flex-wrap gap-1.5">
+            {fortune.favorableToday && <span className="px-2.5 py-0.5 text-[11px]" style={{ borderRadius: "var(--radius-chip)", border: "1px solid var(--color-cinnabar)", color: "var(--color-cinnabar)" }}>{t("calendar.favorableToday")}</span>}
+            {fortune.interactions.map((it, i) => (
+              <span key={i} className="px-2.5 py-0.5 text-[11px]" style={{ borderRadius: "var(--radius-chip)", background: "var(--color-tint)", color: "var(--color-muted)" }} title={it.note}>{t("calendar.interaction", { kind: it.kind, withPillar: it.withPillar })}</span>
+            ))}
+          </div>
+        )}
+
+        {/* 水墨配图：桌面 8a 稿无此位置（信息更密、更编辑式），移动端保留——
+            既有能力（EP-cal-img，20 张人工筛选图 + curate skill），设计包未说废弃，
+            与「黄历桌面不出、移动保留」是同一条取舍线（见任务报告/ledger）。
+            ⚠️ 已知副作用（非疏忽，如实记录）：`xl:hidden` 只是不显示，节点仍会挂载，
+            桌面视口下这张图与下面的深色兜底探测图仍会各发一次网络请求——这是「响应式
+            只能用 Tailwind 断点类、不许 matchMedia/JS 判视口」这条约束的必然代价（要
+            完全不发请求就得在 JS 里判断视口再决定渲不渲染，那正是被禁止的做法）。桌面
+            用户因此会有一点不可见的图片流量，规模是 20 张图里的 1 张，可接受。 */}
+        {img && (
+          <div className="mx-auto mt-8 max-w-[340px] xl:hidden">
+            <FortuneFrame src={imgSrc!} alt={img.alt} seed={selected} />
+            {/* 深色变体 404 兜底探测：display:none 的 img 仍会发请求，但 loading="lazy"
+                在没有布局盒时永不触发——所以这里绝不能加 lazy（C1 评审）。 */}
+            <img src={imgSrc} alt="" aria-hidden className="hidden" onError={() => { if (useDarkFile) setFortuneImgError(true); }} />
+          </div>
+        )}
+      </div>
+    );
+
+  // 桌面右列：五维 / 宜忌两栏 / 候标尺——桌面不出黄历（06-desktop §3 信息密度取舍）。
+  // 免责声明已挪到 header（见上，页级常显，不随 loading 消失）。
+  // 移动端单列时同一份内容紧随左列之后，额外保留黄历（既有已上线能力，删了是功能回退）。
+  const right =
+    loading || !fortune ? null : (
+      <div className="zj-rise space-y-8">
+        {process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1" && profile && fortune && (
+          <AskToday profile={profile} fortune={fortune} dateStr={selected} />
+        )}
+
+        {/* 五维评分（细线计量，去卡片） */}
+        <div>
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.dimsTitle")}</div>
+            <ScoreRing
+              score={fortune.scores.overall}
+              max={10}
+              size={40}
+              accent="var(--color-cinnabar)"
+              showLabel={false}
+              label={t("calendar.scoreLabel", { grade: verdictText, today: t("calendar.today") })}
+            />
+          </div>
+          <div className="mt-4 space-y-3">
+            {DIMS.map((key) => (
+              <div key={key} className="flex items-center gap-3">
+                <span className="w-8 text-[13px] text-ink">{t("calendar.dims." + key)}</span>
+                <div className="h-[3px] flex-1" style={{ background: "var(--color-line)" }}>
+                  <div className="h-full" style={{ width: `${fortune.scores[key] * 10}%`, background: "var(--color-ink)" }} />
+                </div>
+                <span className="font-latin w-5 text-right text-[13px] text-muted">{fortune.scores[key]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 今日宜忌：桌面两栏细线对齐，移动端单栏细线分行（不做两栏，见 brief 裁定）。
+            ⚠️ 这里是本文件里唯一没有走「单容器 + xl:hidden」模式、而是两个容器各自
+            渲染一份 YiJiColumn 的地方——不是疏漏。测试钉住的是 `yiji-grid` 元素本身的
+            内联 `gridTemplateColumns: "1fr 1fr"`，而移动端必须是单栏；若改成单容器+
+            响应式类，desktop 容器就不能再对「任意宽度」恒为内联两栏（那正是 TwoColumn
+            自己的契约要刻意避免的写法），字面上的「1fr 1fr」断言与「移动端单栏」这两个
+            要求没法用同一个容器同时满足，所以两份 YiJiColumn 是必要的重复，非误用。 */}
+        <div data-testid="yiji-grid" className="hidden xl:grid" style={{ gridTemplateColumns: "1fr 1fr", columnGap: 40 }}>
+          <YiJiColumn title={yiTitle} items={yiItems} dotColor="var(--color-wood)" />
+          <YiJiColumn title={jiTitle} items={jiItems} dotColor="var(--color-cinnabar)" />
+        </div>
+        <div className="grid gap-8 xl:hidden">
+          <YiJiColumn title={yiTitle} items={yiItems} dotColor="var(--color-wood)" />
+          <YiJiColumn title={jiTitle} items={jiItems} dotColor="var(--color-cinnabar)" />
+        </div>
+
+        {/* 七十二候标尺：index 来自 getCurrentSolarHou，不硬编码 */}
+        <SeasonRuler index={solarHou.index} label={solarHou.hou} />
+
+        {/* 黄历：移动端保留（控制器裁定），桌面不出 */}
+        {fortune.almanacYi.length + fortune.almanacJi.length > 0 && (
+          <div data-testid="huangli" className="xl:hidden">
+            <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.almanac")}</div>
+            <div className="mt-3 text-[13px] text-ink-2"><span style={{ color: "var(--color-wood)" }}>{t("calendar.yi")}</span>　{fortune.almanacYi.join("、") || t("calendar.none")}</div>
+            <div className="mt-1.5 text-[13px] text-ink-2"><span style={{ color: "var(--color-cinnabar)" }}>{t("calendar.ji")}</span>　{fortune.almanacJi.join("、") || t("calendar.none")}</div>
+          </div>
+        )}
+
+      </div>
+    );
+
+  return (
+    <main>
+      {casting && <CastingOverlay title={t("calendar.calculating")} hint={t("common.casting")} mode="brief" />}
+      <TwoColumn leftWidth={392} header={header} left={left} right={right} />
     </main>
   );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <main className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">{children}</main>;
+}
+
+/**
+ * 宜忌单栏（表头 8px 方点 + serif 16px 标题 + 右侧条数 Cormorant 12px，
+ * `border-bottom: 1px solid ink`；逐条 `padding: 13px 0; border-bottom: 1px solid line`）。
+ * 桌面两栏、移动单栏各渲染一份（各自的可见性由外层 `xl:` 类控制，
+ * jsdom 无布局测不了实际显隐，断言打在类名上），本组件本身不做断点判断。
+ */
+function YiJiColumn({ title, items, dotColor }: { title: string; items: string[]; dotColor: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between pb-2" style={{ borderBottom: "1px solid var(--color-ink)" }}>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2" style={{ background: dotColor, borderRadius: 2 }} aria-hidden />
+          <h3 className="font-serif text-[16px] font-semibold">{title}</h3>
+        </div>
+        <span className="font-latin text-[12px] text-muted">{items.length}</span>
+      </div>
+      <div>
+        {items.map((item, i) => (
+          <div key={i} className="text-[14px] text-ink-2" style={{ padding: "13px 0", borderBottom: "1px solid var(--color-line)" }}>{item}</div>
+        ))}
+      </div>
+    </div>
+  );
 }

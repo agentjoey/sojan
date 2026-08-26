@@ -1682,7 +1682,11 @@ describe("评审后续 #4/#6：主视觉顺序反转 + 一句话基调", () => {
     // 页头（评审后续 #4：claude 判断的可行方案——只在有居所可看时才倒，不是全局倒置）
     expect(screen.getByText("居所的方位")).toBeInTheDocument();
     expect(screen.getByText("坐北朝南 · 坎宅")).toBeInTheDocument();
-    expect(screen.queryByText("境")).toBeNull(); // 通用标题被居所标题取代，不是并存
+    // UI v3 页首范式（Task 4）后 kicker 不再用「— 境 —」破折号包裹，而是裸字「境」——
+    // 但 kicker 本就与 title 同名（fengshui.kicker === fengshui.title === "境"），且两种
+    // 状态下 kicker 都固定渲染「境」，与本断言想验证的「通用*标题*未与居所标题并存」
+    // 无关。故把断言收窄到 h1（标题），不再用全局 queryByText("境")。
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe("境");
 
     const dwellingHeading = screen.getByText("房屋八方");
     const tagline = screen.getByText(TAGLINE);

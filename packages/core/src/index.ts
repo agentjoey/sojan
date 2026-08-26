@@ -54,6 +54,8 @@ export { normalizeBirth } from "./normalize";
 export type { NormalizedBirth } from "./normalize";
 export { computeDailyFortune } from "./daily/index";
 export type { DailyFortune, Relation } from "./daily/index";
+export { getCurrentSolarHou } from "./daily/season";
+export type { SolarHou } from "./daily/season";
 
 export { verifyInitData } from "./tg/initData";
 export type { TgUser, VerifyResult } from "./tg/initData";

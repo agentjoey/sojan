@@ -55,7 +55,7 @@ export function AskToday({ profile, fortune, dateStr }: { profile: Profile; fort
 
   if (paywall) {
     return (
-      <Card topAccent={spirit.dominantElement}>
+      <Card>
         <Paywall reason="quota" />
       </Card>
     );
@@ -64,7 +64,7 @@ export function AskToday({ profile, fortune, dateStr }: { profile: Profile; fort
   if (!loading && greeting === null) return null;
 
   return (
-    <Card topAccent={spirit.dominantElement}>
+    <Card>
       <div className="mb-3 flex items-center gap-3">
         <SpiritSigil element={spirit.dominantElement} size={40} />
         <div className="min-w-0">

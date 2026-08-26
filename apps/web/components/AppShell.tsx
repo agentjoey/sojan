@@ -7,35 +7,18 @@ import { BellLogo, cn } from "@/components/ui";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { isTelegram } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
+import { enabled, isActive, RAIL_ORDER } from "@/lib/nav";
+import { ShellProvider } from "@/components/ShellContext";
+import { MobileShell } from "@/components/MobileShell";
 
-const NAV = [
-  { href: "/", char: "照", key: "nav.home" },
-  { href: "/calendar", char: "运", key: "nav.calendar" },
-  { href: "/chart", char: "盘", key: "nav.reading" },
-  ...(process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"
-    ? [{ href: "/spirit", char: "灵", key: "nav.spirit" }]
-    : []),
-  ...(process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1"
-    ? [{ href: "/fengshui", char: "境", key: "nav.fengshui" }]
-    : []),
-  ...(process.env.NEXT_PUBLIC_DREAM_ENABLED === "1"
-    ? [{ href: "/dream", char: "梦", key: "nav.dream" }]
-    : []),
-  { href: "/profiles", char: "我", key: "nav.profiles" },
-  // EP-account-login：全站此前没有直接的登录/账号入口——/account 唯一的路径是先进
-  // /profiles、再点页头里嵌的一条文字链接。不受任何 flag 门控（/account 本身不是
-  // flag 功能），常驻显示。
-  { href: "/account", char: "账", key: "nav.account" },
-];
-
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
-}
+// Task 2：项集改为 RAIL_ORDER（运/盘/灵/境/梦/起/我）。「照」由顶部铜铃承担、不占项；
+// 「账」已并入「我的」（/profiles），不再作为独立导航项常驻。
+const RAIL = enabled(RAIL_ORDER);
 
 // spec §10：导航项内边距只在「≥6 项」时收紧（52px→48px 触控目标，仍高于 44px 下限）。
-// 两个 flag 都关闭时 NAV.length=4，绝不能被这条收紧规则波及——那会是本分支对自己
-// 「flag 关闭时产品行为完全不变」这条约束的字面违反（最终评审 Blocking 4）。
-const NAV_COMPACT = NAV.length >= 6;
+// 三个 flag 都关闭时 RAIL.length=4（运/盘/起/我），绝不能被这条收紧规则波及——那会是
+// 本分支对自己「flag 关闭时产品行为完全不变」这条约束的字面违反（最终评审 Blocking 4）。
+const NAV_COMPACT = RAIL.length >= 6;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
@@ -56,46 +39,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className={tg ? "min-h-screen" : "min-h-screen md:pl-[82px]"}>
-      {!tg && (
-        <>
-          {/* 桌面：左侧素白图标栏 */}
-          <nav
-            className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
-            style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
-          >
-            <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
-              <BellLogo size={30} motion="ring" ringKey={bellRing} />
-            </Link>
-            {NAV.slice(1).map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.key)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
-            ))}
-          </nav>
+    <ShellProvider>
+      <div className={tg ? "min-h-screen" : "min-h-screen md:pl-[82px]"}>
+        {!tg && (
+          <>
+            {/* 桌面：左侧素白图标栏 */}
+            <nav
+              className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
+              style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
+            >
+              <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
+                <BellLogo size={30} motion="ring" ringKey={bellRing} />
+              </Link>
+              {RAIL.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  char={item.char}
+                  label={t(item.labelKey)}
+                  active={isActive(pathname, item.href)}
+                  compact={NAV_COMPACT}
+                  style={item.id === "profiles" ? { marginTop: "auto" } : undefined}
+                />
+              ))}
+            </nav>
 
-          {/* 移动：底部素白图标栏 */}
-          <nav
-            className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-around pt-2.5 md:hidden"
-            style={{
-              background: "var(--color-paper)",
-              borderTop: "1px solid var(--color-line)",
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
-            }}
-          >
-            {NAV.map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.key)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
-            ))}
-          </nav>
-        </>
-      )}
+            {/* 移动：Task 6——顶部语境胶囊 + 菜单键 + 九宫格覆盖层，取代旧底栏。 */}
+            <MobileShell currentPath={pathname} />
+          </>
+        )}
 
-      <div className={tg ? "" : "pb-24 md:pb-0"}>{children}</div>
-    </div>
+        <div className={tg ? "" : "pb-0"}>{children}</div>
+      </div>
+    </ShellProvider>
   );
 }
 
-function NavItem({ href, char, label, active, compact }: { href: string; char: string; label: string; active: boolean; compact: boolean }) {
+function NavItem({
+  href,
+  char,
+  label,
+  active,
+  compact,
+  style,
+}: {
+  href: string;
+  char: string;
+  label: string;
+  active: boolean;
+  compact: boolean;
+  style?: React.CSSProperties;
+}) {
   return (
-    <Link href={href} className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")} aria-label={label}>
+    <Link
+      href={href}
+      data-testid="nav-item"
+      className={cn(
+        "zj-nav flex flex-col items-center gap-1 py-1.5 zj-wheel-focus",
+        compact ? "px-1.5" : "px-2",
+      )}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      style={style}
+    >
       <span
         key={active ? "on" : "off"}
         className="inline-flex items-center justify-center font-semibold"

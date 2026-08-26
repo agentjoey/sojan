@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { zh } from "@/lib/i18n/messages/zh";
 import { en } from "@/lib/i18n/messages/en";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+let currentPath = "/";
+vi.mock("next/navigation", () => ({ usePathname: () => currentPath }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
+  currentPath = "/";
 });
 
 describe("EP-dream 导航「梦」flag 门控", () => {
@@ -97,9 +99,11 @@ function hasClassToken(className: string, token: string): boolean {
 }
 
 describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控（而非无条件生效）", () => {
-  // EP-account-login 加了一条不受 flag 门控的常驻「账」项，NAV 基数从 4 变成 5——
-  // 下面三条用例的具体 flag 组合据此重新校过，边界语义（<6 用 px-2，≥6 用 px-1.5）不变。
-  it("三个 flag 都关闭时（NAV.length=5：照/运/盘/我/账，仍 <6）导航项用 px-2，不收紧", async () => {
+  // Task 2 改项集：RAIL_ORDER = 运/盘/灵/境/梦/起/我（含 profiles、不含 home/account），
+  // 「照」由铜铃承担、「账」并入「我的」不再单独占位——基数从旧版的 [照/运/盘/我/账]=5
+  // 变成新版 [运/盘/起/我]=4。下面三条用例的具体 flag 组合据此重新校过，
+  // 边界语义（<6 用 px-2，≥6 用 px-1.5）不变。
+  it("三个 flag 都关闭时（NAV.length=4：运/盘/起/我，仍 <6）导航项用 px-2，不收紧", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
@@ -111,19 +115,19 @@ describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控�
     }
   });
 
-  it("只开一个 flag 时（NAV.length=6：+境，触到 ≥6 门槛）导航项收紧为 px-1.5", async () => {
+  it("只开境时（NAV.length=5：运/盘/境/起/我，仍 <6）导航项仍不收紧，用 px-2", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
     const classNames = await renderShellAndGetNavItemClassNames();
     expect(classNames.length).toBeGreaterThan(0);
     for (const cn of classNames) {
-      expect(hasClassToken(cn, "px-1.5")).toBe(true);
-      expect(hasClassToken(cn, "px-2")).toBe(false);
+      expect(hasClassToken(cn, "px-2")).toBe(true);
+      expect(hasClassToken(cn, "px-1.5")).toBe(false);
     }
   });
 
-  it("风水 + 灵都开启、梦关闭时（NAV.length=7）导航项仍收紧为 px-1.5", async () => {
+  it("境 + 灵都开启、梦关闭时（NAV.length=6：运/盘/灵/境/起/我，触到 ≥6 门槛）导航项收紧为 px-1.5", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
@@ -133,6 +137,54 @@ describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控�
       expect(hasClassToken(cn, "px-1.5")).toBe(true);
       expect(hasClassToken(cn, "px-2")).toBe(false);
     }
+  });
+});
+
+describe("UI v3：竖栏项集（7 项，「我的」沉底，无「照」无「账」）", () => {
+  it("全 flag 开启时竖栏 7 项，顺序为 运/盘/灵/境/梦/起/我", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "1");
+    // 裁定 R3：RAIL_ORDER 定义在 lib/nav.ts（而非 AppShell.tsx），避免后续任务
+    // NavGrid 组件与 AppShell 之间的循环依赖。
+    const { RAIL_ORDER } = await import("@/lib/nav");
+    expect(RAIL_ORDER).toEqual(["calendar", "chart", "spirit", "fengshui", "dream", "reading", "profiles"]);
+  });
+
+  it("导航项集不含首页与账号（照＝铜铃、账已并入我的）", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const hrefs = screen.getAllByTestId("nav-item").map((el) => el.getAttribute("href"));
+    // 竖栏与底栏此刻都渲染，故每个 href 会出现两次；用 Set 比对项集本身。
+    expect(new Set(hrefs)).toEqual(new Set(["/calendar", "/chart", "/spirit", "/reading", "/profiles"]));
+    expect(hrefs).not.toContain("/account");
+    // 铜铃仍是首页链接，且它不是导航项——所以上面的项集里没有 "/"
+    expect(screen.getByLabelText("首页").getAttribute("href")).toBe("/");
+  });
+
+  it("「盘」的标签是「命盘」而不是「解读」", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getAllByLabelText("命盘").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("解读")).toBeNull();
+  });
+
+  it("「起盘」入口存在且指向 /reading", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const links = screen.getAllByLabelText("起盘");
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]!.getAttribute("href")).toBe("/reading");
   });
 });
 
@@ -221,5 +273,307 @@ describe("EP-account2-fix：AppShell 对 zj_tg_hint 会话续期（fire-and-forg
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // 等一拍让 reject 链跑完：若未 catch，测试进程会收到 unhandled rejection
     await new Promise((r) => setTimeout(r, 10));
+  });
+});
+
+describe("UI v3 移动外壳", () => {
+  it("底栏已删除（全站不再有 fixed bottom 导航）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const { container } = render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(container.querySelector("nav.fixed.bottom-0")).toBeNull();
+  });
+
+  it("语境胶囊默认取当前路由的 nav 标签，且链到 /profiles", async () => {
+    // 裁定 R4：本文件顶层已把 next/navigation 的路由 mock 改成读取模块级可变
+    // 变量 `currentPath`（见文件头 vi.mock），切路由直接赋值即可，不用 vi.doMock
+    // ——两者混用会导致模块解析出两份不同的 mock 实例，路由读不到新值。
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/profiles");
+    expect(capsule).toHaveTextContent("命盘");
+  });
+
+  it("页面声明语境词时优先用声明值", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { useShellContext } = await import("../ShellContext");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    function Page() {
+      useShellContext("圣筊");
+      return <div />;
+    }
+    render(<AppShell><Page /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-capsule")).toHaveTextContent("圣筊");
+  });
+
+  it("菜单键打开九宫格；覆盖层里同位换成关闭键，尺寸不变", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    // 最终评审 C5：`NavGrid` 改成 `next/dynamic(ssr:false)` 懒加载后，覆盖层不再
+    // 是同步挂载——`findBy*` 会轮询等待异步 chunk resolve 后的重渲染。
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    const close = screen.getByTestId("shell-menu");
+    expect(close.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(close);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("关闭后焦点归还菜单键（Esc 路径）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const menu = screen.getByTestId("shell-menu");
+    fireEvent.click(menu);
+    await screen.findByRole("dialog");
+    // 最终评审 C3：Esc 监听已从 dialog 根 `onKeyDown`（靠冒泡、易被非可聚焦元素
+    // 吞掉）改成 `open` 时挂在 `document` 上的真实监听——测试要对 `document`
+    // 派发事件，才是测的真实路径，而不是绕过冒泡直接打在 dialog 上。
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.activeElement).toBe(menu);
+  });
+
+  // 评审 Critical：此前菜单键 onClick 直接 setOpen(v => !v)，不经过 close()，
+  // 点击关闭这条路径根本不归还焦点——iOS Safari/WebView 点 <button> 默认不留
+  // 焦点（跟桌面浏览器不同），MobileShell 移动端正是主场，这不是边角情况。
+  // 两条关闭路径（本用例 + 上面的 Esc 用例）现在都收敛到同一个 close()。
+  it("关闭后焦点归还菜单键（点关闭键路径）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const menu = screen.getByTestId("shell-menu");
+    fireEvent.click(menu);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    // 关闭键此刻就是 shell-menu 本身（原地切换图形，元素不变）。
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("打开时焦点移入对话框（九宫格第一个导航格）", async () => {
+    // 控制器裁定必修：NavGrid 声明 aria-modal="true"，若打开后焦点仍留在菜单键
+    // 上、Tab 又能跑到背后页面，aria-modal 就是一句假声明。选择聚焦第一个
+    // 导航格（而不是对话框容器本身）——理由见 MobileShell.tsx 顶部注释。
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    const [firstCell] = await screen.findAllByTestId("nav-grid-cell");
+    expect(document.activeElement).toBe(firstCell);
+  });
+
+  it("SSR 水合安全：打开前七十二候节点不存在，只在用户点开菜单后才挂载", async () => {
+    // 验证选择的方案（打开前整体不求值，见 MobileShell.tsx 注释）：`open` 初始为
+    // false，服务端与客户端首帧渲染一致地跳过 NavGrid 内部依赖 new Date() 的
+    // 七十二候节点，杜绝「服务端候 A / 客户端候 B」的水合不一致（CLAUDE.md 记录
+    // 过一次 hydration error #418，此处不重蹈）。
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByTestId("nav-grid-seasons")).toBeNull();
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByTestId("nav-grid-seasons")).toBeInTheDocument();
+  });
+
+  it("Telegram 环境内不渲染任何新外壳（冻结线）", async () => {
+    vi.doMock("@/lib/tg/ui", () => ({ useIsTelegram: () => true }));
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.queryByTestId("shell-capsule")).toBeNull();
+    expect(screen.queryByTestId("shell-menu")).toBeNull();
+    // `vi.doMock` 不随 `afterEach` 的 `vi.resetModules()` 自动撤销——不清理会
+    // 让 tg=true 泄漏进本文件后续测试（本轮新增 R1 用例即因此在追加时炸穿）。
+    vi.doUnmock("@/lib/tg/ui");
+  });
+
+  /**
+   * 补 R1：「移动端如何回到首页」此前全仓零测试覆盖——三次栽跟头的那条不变量
+   * （建好但不可达）只靠一个三元表达式撑着。同时钉住最终评审 C1：`MobileShell`
+   * 挂在 root layout，App Router 客户端跳转不重挂它，`open` 状态此前跨路由存活，
+   * 点任意格子后路由确实切了、覆盖层却原地不动。
+   */
+  it("端到端：覆盖层打开时胶囊回首页，路由变化后覆盖层自动关闭（R1 + C1）", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    const { rerender } = render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    // R1 的判据：覆盖层打开时胶囊必须显示品牌词「照见」并链到 `/`——九宫格
+    // 6 项不含首页，胶囊又被 D6 指去了「我的」，这条胶囊是移动端唯一回卷首的路径。
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/");
+    expect(capsule).toHaveTextContent("照见");
+
+    // 点九宫格任意一格，模拟真实导航。jsdom 里 next/link 点击不驱动本文件顶部
+    // mock 的 `usePathname`，所以用「改写 currentPath + rerender」模拟 App
+    // Router 跳转后 `usePathname()` 返回新值——这正是 C1 的 bug 现场：路由已切、
+    // `open` 状态却因为不重挂 layout 而跨路由存活。
+    fireEvent.click(screen.getAllByTestId("nav-grid-cell")[0]!);
+    currentPath = "/calendar";
+    rerender(<AppShell><div /></AppShell>);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  /**
+   * 随手项 3：C1 的复位只按 pathname 变化触发——同一路由内点击、pathname 不变
+   * 时覆盖层不关。两个真实场景：打开菜单后点了当前页那一格；在首页打开覆盖层
+   * 后点「照见」胶囊回首页（R1 自己的场景）。这里在格子与胶囊的 `onClick` 上
+   * 各补一个兜底关闭，用例分别钉住。
+   */
+  it("随手项 3：点开菜单后点当前页那一格，覆盖层关闭（同路由兜底）", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    const cells = screen.getAllByTestId("nav-grid-cell");
+    const currentCell = cells.find((c) => c.getAttribute("href") === "/chart");
+    expect(currentCell).toBeDefined();
+    fireEvent.click(currentCell!);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("随手项 3：在首页打开覆盖层后点「照见」胶囊，覆盖层关闭（同路由兜底，R1 场景）", async () => {
+    currentPath = "/";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/");
+    fireEvent.click(capsule);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+/**
+ * 复审二轮 C5：证伪「`next/dynamic` 懒加载 NavGrid 已经解决了 2MB chunk 打包
+ * 进每条路由」这个结论——`next/dynamic` 本质是 `React.lazy`，loader 在**元素
+ * 首次被渲染**时触发，与内部 `open` 判断无关。上一轮 `MobileShell` 曾无条件
+ * 渲染 `<NavGrid open={open} .../>`，元素在挂载后立刻被渲染一次（哪怕
+ * `open=false`），chunk 照样立刻下载，只是从「打包进首屏」挪成了「hydration
+ * 后异步请求」。修法：`{open && <NavGrid .../>}`，只有真正打开时才创建这个
+ * 元素。这里用 mock 工厂里打标记的探针直接验证：只 render、不点菜单键，标记
+ * 应为假；点开菜单后，标记应变真。
+ */
+describe("复审二轮 C5：NavGrid 模块只在打开菜单时才被求值", () => {
+  it("未打开时不求值，点开菜单后才求值", async () => {
+    let loaded = false;
+    vi.doMock("@/components/NavGrid", () => {
+      loaded = true;
+      return { NavGrid: () => null };
+    });
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    // 只 render，不点菜单键，等一拍确认异步 chunk 没有被求值。
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(loaded).toBe(false);
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(loaded).toBe(true);
+
+    // `vi.doMock` 不随 `afterEach` 的 `vi.resetModules()` 自动撤销，见文件内
+    // 其他 `vi.doMock` 用例的同款注释——显式撤销，避免泄漏进后续测试。
+    vi.doUnmock("@/components/NavGrid");
+  });
+});
+
+/**
+ * 复审二轮 C4：上一轮给语境胶囊、菜单键、九宫格格子、竖栏 NavItem 四处都加了
+ * `.zj-wheel-focus`，但复审做 mutation 实测发现——摘掉胶囊、菜单键、竖栏这
+ * 三处的 class，全量测试仍然绿；只有九宫格格子那处有护栏（`NavGrid.test.tsx`
+ * 「九宫格格子挂 zj-wheel-focus」）。这里补齐另外三处 + 竖栏当前项的
+ * `aria-current="page"`（同样此前没有护栏）。
+ */
+describe("复审二轮 C4：四处焦点环护栏补全", () => {
+  it("语境胶囊带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-capsule")).toHaveClass("zj-wheel-focus");
+  });
+
+  it("菜单键带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getByTestId("shell-menu")).toHaveClass("zj-wheel-focus");
+  });
+
+  it("竖栏 NavItem 带 zj-wheel-focus", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const items = screen.getAllByTestId("nav-item");
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item).toHaveClass("zj-wheel-focus");
+    }
+  });
+
+  it("竖栏当前项带 aria-current=page", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const current = screen.getByLabelText("命盘");
+    expect(current.getAttribute("aria-current")).toBe("page");
   });
 });

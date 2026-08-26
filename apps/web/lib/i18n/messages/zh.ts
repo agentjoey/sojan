@@ -18,7 +18,6 @@ export const zh = {
     home: "首页",
     calendar: "运势",
     chart: "命盘",
-    reading: "解读",
     spirit: "问事",
     fengshui: "风水",
     dream: "解梦",

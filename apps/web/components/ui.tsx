@@ -300,8 +300,8 @@ export function GanzhiBadge({
 }: {
   char: string;
   /**
-   * 日主双描边。⚠️ 这里的 box-shadow 是**描边**（inset 双层轮廓线），不是投影，
-   * 与「零阴影」不冲突，勿误删。
+   * 日主双描边。⚠️ 这里的 box-shadow 是**描边**（两层向外扩张的轮廓线，纸色
+   * 间隔 + 朱砂外圈），不是投影，与「零阴影」不冲突，勿误删。
    */
   highlight?: boolean;
   size?: keyof typeof GANZHI_SIZE;

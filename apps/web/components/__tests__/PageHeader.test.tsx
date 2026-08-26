@@ -20,6 +20,11 @@ describe("PageHeader（UI v3 页首范式）", () => {
     expect(rule!.getAttribute("aria-hidden")).toBe("true");
     expect((rule as HTMLElement).style.background).toContain("var(--color-cinnabar)");
     expect((rule as HTMLElement).style.width).toBe("22px");
+    // 顺序断言：短横必须在眉标之前——若被挪到眉标之后，上面几条断言仍会绿。
+    const kicker = screen.getByText("解 梦");
+    // DOCUMENT_POSITION_FOLLOWING (4)：kicker 排在 rule 之后。
+    const position = rule!.compareDocumentPosition(kicker);
+    expect(Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   });
 
   it("标题仍是 h1，说明行 11.5px", () => {

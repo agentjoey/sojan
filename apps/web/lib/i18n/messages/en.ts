@@ -20,7 +20,6 @@ export const en: Messages = {
     home: "Home",
     calendar: "Fortune",
     chart: "Chart",
-    reading: "Reading",
     spirit: "Ask",
     fengshui: "Feng Shui",
     dream: "Dream",

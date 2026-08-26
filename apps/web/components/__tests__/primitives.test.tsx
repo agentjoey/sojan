@@ -33,7 +33,10 @@ describe("Chip / PillChip", () => {
 
   it("PillChip 是全圆角细线小件", () => {
     render(<PillChip data-testid="p">属鸡</PillChip>);
-    expect(screen.getByTestId("p").style.borderRadius).toBe("9999px");
+    const el = screen.getByTestId("p");
+    expect(el.style.borderRadius).toBe("9999px");
+    expect(el.style.border).toBe("1px solid var(--color-line)");
+    expect(el.style.color).toBe("var(--color-ink-2)");
   });
 });
 
@@ -53,6 +56,8 @@ describe("Button variant=action：一屏最多一个的唯一动作", () => {
     render(<Button variant="action">解 这 个 梦</Button>);
     const el = screen.getByRole("button");
     expect(el.className).toContain("w-full");
+    expect(el.className).toContain("bg-[var(--color-cinnabar)]");
+    expect(el.className).toContain("text-[var(--color-paper)]");
     expect(el.style.letterSpacing).toBe("0.16em");
   });
 });

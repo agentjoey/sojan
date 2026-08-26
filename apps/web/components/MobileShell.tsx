@@ -46,6 +46,7 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
   const { label } = useShellContextValue();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const gridWrapRef = useRef<HTMLDivElement>(null);
 
   const contextLabel = label ?? t(labelKeyForPath(currentPath));
 
@@ -61,7 +62,11 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
     // 无障碍：打开时把焦点移入对话框——聚焦九宫格第一个导航格（选择理由见
     // 组件顶部注释）。不在 SSR 水合比对范围内：这个 effect 只在 `open` 变为
     // `true`（用户点击之后）才跑，跟水合无关。
-    const firstCell = document.querySelector<HTMLAnchorElement>('[data-testid="nav-grid-cell"]');
+    // 在 `gridWrapRef` 容器内查询，而不是 `document` 全局查询——查询范围收敛
+    // 到本组件渲染的子树；选择器用语义化的 `a[href]` 而非 `data-testid`，
+    // 生产逻辑不依赖本该只服务测试的属性（`data-testid="nav-grid-cell"` 仍
+    // 保留在 `NavGrid.tsx` 里给测试用，只是这里不再读它）。
+    const firstCell = gridWrapRef.current?.querySelector<HTMLAnchorElement>("a[href]");
     firstCell?.focus();
   }, [open]);
 
@@ -147,7 +152,9 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
         ——不需要额外的「挂载后再渲染」占位包装。验证见
         `AppShell.test.tsx`「打开前 nav-grid-seasons 不存在」用例。
       */}
-      <NavGrid open={open} onClose={close} currentPath={currentPath} />
+      <div ref={gridWrapRef}>
+        <NavGrid open={open} onClose={close} currentPath={currentPath} />
+      </div>
     </>
   );
 }

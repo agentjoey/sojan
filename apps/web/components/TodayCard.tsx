@@ -28,6 +28,16 @@ import { WindBell } from "./WindBell";
  * 所以退一步把 prop 改成诚实的名字：`dateNote`——「日期旁边的补充说明」，
  * 卷首传星期、运势页传农历，各自消费方心里有数，字面上不再暗示两处同义。
  */
+/**
+ * ⚠️ I3（复审 Important）：`href`/`expandLabel` 此前是两个各自独立的可选
+ * 字段——传 `href` 不传 `expandLabel`（或反过来）会渲染出一个 `<a href>`
+ * 但文本为空：读屏报一个无名链接，视觉上是分隔线下一条空白行。这恰好是
+ * I2(c) 那条死链回归测不出来的同一种失效形态（两个缺陷会互相掩护）。
+ * 改成判别联合：要么两者都不传（不渲染卡脚），要么两者都传——「只传一个」
+ * 在类型层面就不可能构造出来，不必靠测试或运行时兜底。
+ */
+type TodayCardFooter = { href: string; expandLabel: string } | { href?: never; expandLabel?: never };
+
 export function TodayCard({
   label,
   date,
@@ -49,14 +59,9 @@ export function TodayCard({
   wuHou: string;
   polish: string;
   meta: string;
-  /** 卡脚链接，可选（终审必修 7）：运势页复用本组件时卡脚会指向当前页、
-   * 点了原地不动，是死链——不传 `href` 时卡脚整体不渲染。 */
-  href?: string;
-  /** 卡脚文案（如「展开今日日签 →"），只在 `href` 存在时使用/渲染。 */
-  expandLabel?: string;
   /** 风铃图的 alt 文案，调用方经 i18n 传入并插值 `verdict`（见 WindBell.tsx）。 */
   bellAlt: string;
-}) {
+} & TodayCardFooter) {
   return (
     <div
       data-testid="today-card"

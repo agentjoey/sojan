@@ -7,6 +7,11 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 # 需任务细节：cat .agent/sprints/sprint-001.md
 ```
 
+## Language & Output Style
+- **自然流畅的中文**：所有交互和解释请使用地道、自然的现代简体中文，彻底消除“机器翻译腔”和欧化长句。
+- **保留技术术语**：常用编程术语（如 Git commit, rebase, PR, state, props, lifecycle, hook, payload 等）一律保留英文，严禁生硬直译。
+- **简明扼要**：解释逻辑时直奔主题，多用结构化要点（Bullet points），避免冗长拖沓的寒暄与废话。
+
 ## Project Overview
 东方命理（八字 + 紫微斗数）× 西方心理占星（利兹·格林学派）双引擎个人成长 App。
 用户输入出生信息 → 自动排盘 → **命理分析 + 心理分析 + 成长建议**。
@@ -56,6 +61,7 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 - **风水两套八方不得互推**：「本命八方」由命卦定、「房屋八方」由宅卦定，同一方位在两表里经常是不同的星。`verifyDirectionConsistency` 按分句→整句→块三层解析归属，**无法归属则弃权**而不是拿其中一张表去判另一张的陈述。
 - **八宅结构：命卦吉方 ∩ 宅卦吉方 只可能是 4 或 0**（同东/西四命组则四个全留、异组则一个不留）。推论：物件顾问「强版」与弱版的推荐方位**逐字节相同**，唯一差异是 `dwellingNote`。别再基于「强版给出不同方位」做设计。
 - **中文方位名互相嵌套**：北 ⊂ 东北，东/南/西 ⊂ 东南/西南/西北。任何按方位名做的字符串匹配或测试查询**必须精确匹配**（正则锚定 / `{ exact: true }`）。本仓库已咬过三次。
+- **Tailwind 4 断点：自定义断点一律用 rem，混单位会静默错乱层叠**。Tailwind 4 无法跨单位排序 media 块——把 `--breakpoint-xl` 覆写成 `1200px`（其余断点是 rem）会让 xl 的 media 块被整体排到**所有 rem 断点之前**；`md:` 与 `xl:` 同属 `@layer utilities`、同特异度，源序在后者胜出，于是 **≥1200px 时裸 `md:` 类反而压过 `xl:` 类**。本仓库因此让桌面两栏容器 width 从 1120px 塌成 720px、padding 归零，而**七条 class-name 断言全绿**（断言只查类名存在，结构上抓不到级联顺序）。修法：写成 `75rem`（= 1200px @16px），产物顺序即恢复升序。⚠️ 两个被证伪的假设别再走：「只声明 xl 才排最前」（升序声明五个断点无效）、「只能靠消费方规避」（根因是单位不是顺序）。消费方仍建议对语义互斥的属性用 `max-xl:` 作双保险。
 - **`packages/core/tsconfig.json` 的 `include` 只有 `["src"]`** → `core/test/` 不过类型检查，写在那里的类型断言是**惰性的**。`packages/llm` 的测试在 `src/` 里，是被检查的。
 
 ## Dev Commands

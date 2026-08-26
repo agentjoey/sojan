@@ -52,11 +52,11 @@ vi.mock("@/app/actions", () => ({
   ziweiHoroscopeAction: (...a: unknown[]) => ziweiHoroscopeActionMock(...a),
 }));
 
-async function renderCalendar() {
+async function renderCalendar(locale: "zh" | "en" = "zh") {
   const { default: Page } = await import("../page");
   const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return <I18nProvider locale="zh">{children}</I18nProvider>;
+    return <I18nProvider locale={locale}>{children}</I18nProvider>;
   }
   let result!: ReturnType<typeof render>;
   await act(async () => {
@@ -131,5 +131,31 @@ describe("UI v3 运势（8a）", () => {
     expect(screen.getByText("每日运势为流日命理的启发性参照，非吉凶预言。请结合现实理性判断。")).toBeInTheDocument();
     // 收尾：把挂起的 action 结算掉，避免污染后续测试（未被 act 包裹的 setState 警告）
     await act(async () => { resolveFortune(fortune); });
+  });
+
+  /**
+   * 终审必修 4：判词强调块字号必须按 verdict 长度分档，否则英文长值
+   * （`calendar.grade.*` 形如 "顺 (Smooth)"/"吉 (Auspicious)"，最长 14 字符）
+   * 在桌面左列（392px）以 `text-[64px] leading-none` 渲染会溢出裁切——
+   * `detectLocale()` 对非中文浏览器默认返回 en，英文是首发市场默认路径，
+   * 不是边角情况。jsdom 测不了真实溢出/换行，这里断言字号/行高相关的类名
+   * 随 verdict 长度切换到「小字号 + 允许换行」这一档。
+   */
+  it("英文判词（长值）用小字号 + 允许换行的类名档，不再是固定 64px/leading-none（必修 4）", async () => {
+    await renderCalendar("en"); // fortune.scores.overall=7 → grade "smooth" → en 值 "顺 (Smooth)"，10 字符
+    const emphasis = await screen.findByTestId("verdict-emphasis");
+    expect(emphasis.textContent).toBe("顺 (Smooth)");
+    expect(emphasis.className).toContain("break-words");
+    expect(emphasis.className).not.toContain("leading-none");
+    expect(emphasis.className).not.toContain("text-[64px]");
+  });
+
+  it("中文单字判词仍沿用原设计的大字号（不因必修 4 的修复被误伤）", async () => {
+    await renderCalendar("zh"); // grade "smooth" → zh 值 "顺"，1 字符
+    const emphasis = await screen.findByTestId("verdict-emphasis");
+    expect(emphasis.textContent).toBe("顺");
+    expect(emphasis.className).toContain("text-[40px]");
+    expect(emphasis.className).toContain("leading-none");
+    expect(emphasis.className).toContain("xl:text-[64px]");
   });
 });

@@ -37,6 +37,21 @@ function gradeOf(overall: number): "auspicious" | "smooth" | "neutral" | "cautio
   return "cautious";
 }
 
+/**
+ * 判词强调块字号（终审必修 4）：`calendar.grade.*` 中文只有单字（吉/顺/平/谨），
+ * 但 `detectLocale()` 对任何非中文浏览器默认返回 `en`——而英文是首发市场的默认
+ * 路径，不是极端分支。英文值形如 `"吉 (Auspicious)"`（最长 14 字符），用固定
+ * `text-[64px] leading-none` 在左列（桌面 392px 宽）会溢出裁切、在移动端也会
+ * 挤成两三行贴死。这里按字符数分档：中文单字沿用原设计的大字号，长值降字号、
+ * 放宽行高、允许换行——纯展示层字号逻辑，不做任何「按语言判断」的推算分支
+ * （长度是显示层已有的字符串属性，不是从命盘再算一遍）。
+ */
+function verdictTextClass(len: number): string {
+  if (len <= 2) return "text-[40px] leading-none xl:text-[64px]";
+  if (len <= 6) return "text-[30px] leading-tight xl:text-[44px]";
+  return "break-words text-[22px] leading-snug xl:text-[32px]";
+}
+
 type Behavior = { do: string[]; dont: string[] };
 
 function ymd(d: Date): string {
@@ -164,6 +179,7 @@ export default function CalendarPage() {
 
   const img = fortune ? matchFortuneImage(fortune.relation, selected) : undefined;
   const g = fortune ? gradeOf(fortune.scores.overall) : "neutral";
+  const verdictText = t("calendar.grade." + g);
   const useDarkFile = dark && !!img?.darkFile && !fortuneImgError;
   const imgSrc = useDarkFile ? img?.darkFile : img?.file;
 
@@ -242,7 +258,7 @@ export default function CalendarPage() {
           <TodayCard
             date={selected.replaceAll("-", ".")}
             lunar={fortune.lunarDate || ""}
-            verdict={t("calendar.grade." + g)}
+            verdict={verdictText}
             term={solarHou.hou}
             wuHou={solarHou.wuHou}
             polish={polish ?? t("calendar.todayVerdict")}
@@ -253,7 +269,7 @@ export default function CalendarPage() {
 
         {/* 判词强调块：全站唯一的强调手法（Emphasis），取代旧的裸判词大字 */}
         <Emphasis className="mt-6">
-          <div className="font-serif text-[40px] font-bold leading-none xl:text-[64px]">{t("calendar.grade." + g)}</div>
+          <div data-testid="verdict-emphasis" className={`font-serif font-bold ${verdictTextClass(verdictText.length)}`}>{verdictText}</div>
           <div className="mt-2.5 text-[13px]" style={{ color: "var(--color-muted)" }}>
             {t("calendar.todayVerdict")}
             <span className="mx-1.5">·</span>
@@ -312,7 +328,7 @@ export default function CalendarPage() {
               size={40}
               accent="var(--color-cinnabar)"
               showLabel={false}
-              label={t("calendar.scoreLabel", { grade: t("calendar.grade." + g), today: t("calendar.today") })}
+              label={t("calendar.scoreLabel", { grade: verdictText, today: t("calendar.today") })}
             />
           </div>
           <div className="mt-4 space-y-3">

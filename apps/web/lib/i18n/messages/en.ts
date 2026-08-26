@@ -235,6 +235,10 @@ export const en: Messages = {
     birthMutagens: "生年四化 (Natal Four Transforms)",
     bodyPalaceSuffix: "身 (Body)",
 
+    palaceDetailStars: "主星 (Major Stars): {stars}",
+    palaceDetailEmpty: "本宫无主星 (empty palace) — borrowing from its 三方四正 ({palaces}): {stars}",
+    mutagenLegendTitle: "四化 (Four Transforms)",
+
     radarAria: "五行雷达图 (Five Elements Radar)",
     missingCaption: "五行 (Five Elements) lacks {elements}; your favorable direction may lie here.",
     weakCaption: "{elements} is relatively weak; you may focus here.",

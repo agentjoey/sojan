@@ -228,6 +228,10 @@ export const zh = {
     birthMutagens: "生年四化",
     bodyPalaceSuffix: "身",
 
+    palaceDetailStars: "主星：{stars}",
+    palaceDetailEmpty: "本宫无主星，借三方四正（{palaces}）之星：{stars}",
+    mutagenLegendTitle: "四化",
+
     radarAria: "五行雷达图",
     missingCaption: "五行缺{elements}，喜用或在此方向",
     weakCaption: "{elements}偏弱，或可于此处着力",

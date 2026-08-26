@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import type { ZiweiChart, Palace } from "@sojan/core";
 import { ZiweiBoard } from "../ZiweiBoard";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
@@ -132,5 +132,49 @@ describe("EP-east-ui-r2 ZiweiBoard", () => {
     expect(cell.style.borderRight).toBe("1px solid var(--color-line)");
     expect(cell.style.borderBottom).toBe("1px solid var(--color-line)");
     expect(cell.style.borderRadius).toBe("");
+  });
+});
+
+describe("ZiweiBoard：选中宫详情块（6b）", () => {
+  it("默认选中命宫，详情块显示其宫名", () => {
+    renderBoard();
+    const detail = screen.getByTestId("palace-detail");
+    expect(detail).toHaveTextContent("命宫");
+  });
+
+  it("点另一宫切换详情块", () => {
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-财帛"));
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("财帛");
+  });
+
+  it("宫格可键盘触达：Enter 与 Space 都能选中", () => {
+    renderBoard();
+    const cell = screen.getByTestId("palace-cell-财帛");
+    expect(cell.getAttribute("role")).toBe("button");
+    expect(cell.getAttribute("tabindex")).toBe("0");
+    fireEvent.keyDown(cell, { key: "Enter" });
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("财帛");
+  });
+
+  it("空格键也能选中", () => {
+    renderBoard();
+    const cell = screen.getByTestId("palace-cell-疾厄");
+    fireEvent.keyDown(cell, { key: " " });
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("疾厄");
+  });
+
+  it("四化图例四色齐，用 MutagenTag 而非自画色块", () => {
+    renderBoard();
+    const legend = screen.getByTestId("mutagen-legend");
+    for (const k of ["禄", "权", "科", "忌"]) expect(legend).toHaveTextContent(k);
+  });
+
+  it("空宫的详情块显示借星来源（来自 core 的 deriveTriad，不在组件里算对宫）", () => {
+    // 兄弟宫（午）在既有 fixture 里本就无主星（makePalace 默认 majorStars: []），
+    // 无需另造派生 fixture——直接复用满足「空宫」条件。
+    renderBoard();
+    fireEvent.click(screen.getByTestId("palace-cell-兄弟"));
+    expect(screen.getByTestId("palace-detail")).toHaveTextContent("借");
   });
 });

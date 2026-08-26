@@ -94,6 +94,35 @@ describe("UI v3 运势（8a）", () => {
     expect(await screen.findByTestId("today-card-left")).toBeInTheDocument();
   });
 
+  /**
+   * 终审必修 7：卷首那份 TodayCard 卡脚指向 /calendar 是有效跳转，但运势页
+   * 复用同一组件时若照样传 href="/calendar"，卡脚就变成指向当前页自身的
+   * 死链——点了原地不动。运势页不该渲染这个卡脚。
+   */
+  it("运势页的今日卡不渲染卡脚（此前 href 指向自身是死链，终审必修 7）", async () => {
+    await renderCalendar();
+    await screen.findByTestId("today-card-left");
+    // TodayCard 卡脚是唯一的 <a>，若不渲染则整页应当没有任何指向 /calendar 的链接
+    // （页面其余部分不会有链接指回自己）。
+    expect(screen.queryByText(/展开今日日签/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /calendar/i })).toBeNull();
+  });
+
+  /**
+   * 终审必修 6：运势页这份 TodayCard 的 dateNote 是农历（`fortune.lunarDate`），
+   * 与卷首传星期是两回事——prop 已改名为诚实的 `dateNote`，这里钉住运势页
+   * 传的确实是农历文案，不是随手复用了星期格式。
+   */
+  it("运势页今日卡的 dateNote 是农历（终审必修 6）", async () => {
+    await renderCalendar();
+    await screen.findByTestId("today-card-left");
+    // TodayCard 卡头渲染 `{date} · {dateNote}`——运势页传的 dateNote 是
+    // fortune.lunarDate（如「六月初一」），不是星期。
+    expect(
+      screen.getAllByText((_, node) => (node?.textContent ?? "").includes("· 六月初一")).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("宜忌是两栏 grid，不是 ul 散排", async () => {
     await renderCalendar();
     const yiji = await screen.findByTestId("yiji-grid");

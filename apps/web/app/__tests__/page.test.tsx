@@ -39,11 +39,11 @@ vi.mock("@/components/DarkImage", () => ({
  * 动态 import，否则 `useT()` 拿到的 Context 实例与 Wrapper 提供的对不上、直接抛错。
  * 波1、波2 都栽过这个坑，spirit/fengshui 两处测试的注释里都记着。
  */
-async function renderHome() {
+async function renderHome(locale: "zh" | "en" = "zh") {
   const { default: Page } = await import("../page");
   const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return <I18nProvider locale="zh">{children}</I18nProvider>;
+    return <I18nProvider locale={locale}>{children}</I18nProvider>;
   }
   return render(<Page />, { wrapper: Wrapper });
 }
@@ -232,5 +232,47 @@ describe("UI v3 卷首（5a）", () => {
   it("目录 4 行，各带朱文方印字符", async () => {
     await renderHome();
     expect(screen.getAllByTestId("toc-row")).toHaveLength(4);
+  });
+
+  /**
+   * 终审必修 5：TodayCard 卡头/卡脚此前是组件内写死的中文（「今 日」/
+   * 「展开今日日签 →」），测试一直用 locale="zh" 渲染所以红灯没机会亮。
+   * 换成 en locale 断言这两处确实随 i18n 切换——若哪天有人把它们改回写死
+   * 中文，这条会在 en 分支下直接红。
+   */
+  it("en locale 下卡头/卡脚文案走 i18n，不是写死的中文（终审必修 5）", async () => {
+    await renderHome("en");
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText(/Open today.s reading/)).toBeInTheDocument();
+    expect(screen.queryByText("今 日")).toBeNull();
+    expect(screen.queryByText(/展开今日日签/)).toBeNull();
+  });
+
+  /**
+   * 终审必修 6：卷首这份 TodayCard 传的是星期（不是农历），prop 已改名为
+   * 诚实的 `dateNote`——这里钉住卷首实际显示的是星期文案，不是随便什么值。
+   */
+  it("今日卡的 dateNote 在卷首是星期，不是农历（终审必修 6：prop 改名为诚实的 dateNote）", async () => {
+    await renderHome("zh");
+    const weekDayPattern = /^周[日一二三四五六]$/;
+    const dateLine = screen.getAllByText((_, node) => {
+      const text = node?.textContent ?? "";
+      return /^\d{4}\.\d{2}\.\d{2} · /.test(text) && weekDayPattern.test(text.split(" · ")[1] ?? "");
+    });
+    expect(dateLine.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 终审必修 8：无档案态不该有一个像判词的字（旧值「观」）跟卡片 meta 的
+   * 「你还没建档」互相拆台，也不该被用户/读屏软件误当成设计包四档之外的
+   * 第五档。改成明确的空态记号「—」——钉住风铃 alt 文案里确实是这个记号，
+   * 不是「观」/"Watch"。
+   */
+  it("无档案态用空态记号「—」，不是像判词的「观」（终审必修 8）", async () => {
+    await renderHome("zh");
+    const bell = screen.getByTestId("wind-bell");
+    const alt = bell.querySelector("img")!.getAttribute("alt") ?? "";
+    expect(alt).toContain("—");
+    expect(alt).not.toContain("观");
   });
 });

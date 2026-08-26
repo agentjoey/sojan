@@ -13,6 +13,16 @@ export const zh = {
     signingIn: "登录中…",
     brand: "照见",
     listSeparator: "、",
+    // TodayCard（今日卡）是卷首/运势页共用组件的 UI chrome 文案（终审必修 5：
+    // 此前写死在组件里，绕过了全站 i18n），放在 common 而非 home/calendar
+    // 任一页命名空间下——两处消费方地位相同，不存在归属关系。
+    todayCard: {
+      label: "今 日",
+      expand: "展开今日日签 →",
+      // WindBell 图上的字固定烧死是「谨」，与当日实际判词（{verdict}）可能不同，
+      // alt 文案必须诚实地说清楚这一点（见 WindBell.tsx 顶部注释）。
+      bellAlt: "风铃图，幡面刻「谨」字（固定字样，非当日判词）；今日判词另见右栏：{verdict}",
+    },
   },
   nav: {
     home: "首页",
@@ -115,7 +125,11 @@ export const zh = {
     // 具体到人的判词/润色句/元数据仍在 /calendar 由 LLM 按档案生成。
     today: {
       weekday: "周{day}",
-      verdict: "观",
+      // 终审必修 8：无档案态不算真判词（展示层零推算），但同一张卡的
+      // meta 已经在说「你还没建档」，若在这里塞一个像判词的字（旧值「观」），
+      // 用户会误以为它是设计包四档（吉/顺/平/谨）之外的第五档。改成明确的
+      // 空态记号——不是「观」的翻译，是「此处无值」的通用符号。
+      emptyVerdict: "—",
       polish: "先观其时，未必急于行动——完整流日解读，一点即达。",
       meta: "登记出生信息，解锁你的专属流日解读",
     },

@@ -15,6 +15,12 @@ export const en: Messages = {
     signingIn: "Signing in…",
     brand: "Sojan",
     listSeparator: ", ",
+    todayCard: {
+      label: "Today",
+      expand: "Open today's reading →",
+      bellAlt:
+        "Wind bell illustration with the character “謹” (Caution) fixed on the banner (not today's actual verdict); see today's verdict on the right: {verdict}",
+    },
   },
   nav: {
     home: "Home",
@@ -115,7 +121,7 @@ export const en: Messages = {
     },
     today: {
       weekday: "{day}",
-      verdict: "Watch",
+      emptyVerdict: "—",
       polish: "Observe the moment before you act — your full daily reading is one tap away.",
       meta: "Add your birth info to unlock your personalized daily reading",
     },

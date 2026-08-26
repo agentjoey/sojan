@@ -149,14 +149,18 @@ export default function HomeClient({ solarHou }: HomeClientProps) {
           {/* ===== 今日卡（TodayCard，03-screens 5a §2；卡脚指向 /calendar） ===== */}
           <div className="zj-rise relative mt-14 px-7 lg:mx-auto lg:mt-20 lg:max-w-4xl lg:px-16" style={{ animationDelay: ".4s" }}>
             <TodayCard
+              label={t("common.todayCard.label")}
               date={todayDate}
-              lunar={t("home.today.weekday", { day: weekDay })}
-              verdict={t("home.today.verdict")}
+              dateNote={t("home.today.weekday", { day: weekDay })}
               term={solarHou.hou}
               wuHou={solarHou.wuHou}
               polish={t("home.today.polish")}
               meta={t("home.today.meta")}
               href="/calendar"
+              expandLabel={t("common.todayCard.expand")}
+              // 无档案态没有真实判词可算（展示层零推算）——用明确的空态记号
+              // 插值进 alt 文案，不拿一个像判词的字冒充第五档（终审必修 8）。
+              bellAlt={t("common.todayCard.bellAlt", { verdict: t("home.today.emptyVerdict") })}
             />
           </div>
 

@@ -256,14 +256,17 @@ export default function CalendarPage() {
 
         <div className="mt-5">
           <TodayCard
+            label={t("common.todayCard.label")}
             date={selected.replaceAll("-", ".")}
-            lunar={fortune.lunarDate || ""}
-            verdict={verdictText}
+            dateNote={fortune.lunarDate || ""}
             term={solarHou.hou}
             wuHou={solarHou.wuHou}
             polish={polish ?? t("calendar.todayVerdict")}
             meta={`${fortune.dayGanZhi} · ${MOOD_LABEL[fortune.relation]}`}
-            href="/calendar"
+            bellAlt={t("common.todayCard.bellAlt", { verdict: verdictText })}
+            // 终审必修 7：卡脚 href 不传——运势页复用本组件时，卡脚此前写死
+            // href="/calendar" 指向当前页本身，点了原地不动，是死链。卡脚是
+            // 给卷首写的「展开今日日签」入口，复用到 /calendar 上时该消失。
           />
         </div>
 

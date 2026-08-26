@@ -103,14 +103,22 @@ describe("HomeClient：今日日期/星期（终审必修 1，收口版）", () 
           act(() => {
             hydrateRoot(container, jsx);
           });
+          // ⚠️ I2(a)（复审 Important）：React 把 hydration mismatch 的诊断信息
+          // 以**单个 Error 对象**传给 console.error（不是纯字符串参数），此前
+          // `typeof a === "string"` 恒为 false，`mismatchLogged` 恒为 false，
+          // 这条断言是同义反复——mutation 复验见下方注释。`asText` 把 Error/
+          // 字符串/其他任意值统一转成可正则匹配的文本。
+          const asText = (a: unknown): string =>
+            a instanceof Error ? a.message : typeof a === "string" ? a : String(a);
           const mismatchLogged = consoleError.mock.calls.some((args) =>
-            args.some((a) => typeof a === "string" && /hydrat/i.test(a)),
+            args.some((a) => /hydrat/i.test(asText(a))),
           );
           expect(mismatchLogged).toBe(false);
           // act() 内部会把 hydrate 之后的 useEffect 也同步 flush 掉，所以这里已经是
-          // effect 纠偏后的下一帧——正确顺序应是「先跟服务端 HTML 一致地 hydrate
-          // （上面 mismatchLogged 断言证明了这一点），再用访客本地时钟（hydrateClock）
-          // 覆盖」，最终文本是 hydrateClock 对应的日期，不再是 prop 的 2000.01.01。
+          // effect 纠偏后的下一帧——最终文本是 hydrateClock 对应的日期，不再是
+          // prop 的 2000.01.01（是否真的「先无 mismatch 地 hydrate、再被 effect
+          // 覆盖」由上面 mismatchLogged 断言 + 本用例开头 `expect(html).toContain
+          // ("2000.01.01")` 共同保证，不是这一条单独证明的）。
           expect(container.textContent).toContain("2026.08.26");
           expect(container.textContent).not.toContain("2000.01.01");
         } finally {

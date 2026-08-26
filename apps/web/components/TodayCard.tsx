@@ -59,6 +59,7 @@ export function TodayCard({
 }) {
   return (
     <div
+      data-testid="today-card"
       style={{
         background: "var(--color-surface)",
         border: "1px solid var(--color-line)",

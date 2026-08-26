@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, within } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart, getCurrentSolarHou, type DailyFortune } from "@sojan/core";
 
 /**
@@ -98,29 +98,34 @@ describe("UI v3 运势（8a）", () => {
    * 终审必修 7：卷首那份 TodayCard 卡脚指向 /calendar 是有效跳转，但运势页
    * 复用同一组件时若照样传 href="/calendar"，卡脚就变成指向当前页自身的
    * 死链——点了原地不动。运势页不该渲染这个卡脚。
+   *
+   * ⚠️ 复审 I2(c)：此前 `queryByRole("link", { name: /calendar/i })` 恒为
+   * null——link 的 accessible name 是文本内容（「展开今日日签 →」），不是
+   * href，这条断言不可能匹配任何东西，测不出「死链回来了」。且断言范围是
+   * 整个文档，运势页别处本就可能有其他 `<a>`（如页头/导航），不能证明「今日
+   * 卡自己没有卡脚」。改成在 `today-card` 范围内断言没有任何 `<a>`。
    */
   it("运势页的今日卡不渲染卡脚（此前 href 指向自身是死链，终审必修 7）", async () => {
     await renderCalendar();
-    await screen.findByTestId("today-card-left");
-    // TodayCard 卡脚是唯一的 <a>，若不渲染则整页应当没有任何指向 /calendar 的链接
-    // （页面其余部分不会有链接指回自己）。
-    expect(screen.queryByText(/展开今日日签/)).toBeNull();
-    expect(screen.queryByRole("link", { name: /calendar/i })).toBeNull();
+    const card = await screen.findByTestId("today-card");
+    expect(within(card).queryByRole("link")).toBeNull();
   });
 
   /**
    * 终审必修 6：运势页这份 TodayCard 的 dateNote 是农历（`fortune.lunarDate`），
    * 与卷首传星期是两回事——prop 已改名为诚实的 `dateNote`，这里钉住运势页
    * 传的确实是农历文案，不是随手复用了星期格式。
+   *
+   * ⚠️ 复审 I2(b)：此前在整个文档范围内找「· 六月初一」，但 `page.tsx` 在
+   * TodayCard **上方**已经单独渲染了同一段 `{selected} · {fortune.lunarDate}`
+   * 文本（左列日期行）——把 `dateNote` 整个从 TodayCard 删掉，这条照样绿。
+   * 改成把断言收在 `today-card` 范围内，且用 `$` 锚定行尾，确认这段文本确实
+   * 落在卡片自己的 `{date} · {dateNote}` 那一行。
    */
   it("运势页今日卡的 dateNote 是农历（终审必修 6）", async () => {
     await renderCalendar();
-    await screen.findByTestId("today-card-left");
-    // TodayCard 卡头渲染 `{date} · {dateNote}`——运势页传的 dateNote 是
-    // fortune.lunarDate（如「六月初一」），不是星期。
-    expect(
-      screen.getAllByText((_, node) => (node?.textContent ?? "").includes("· 六月初一")).length,
-    ).toBeGreaterThan(0);
+    const card = await screen.findByTestId("today-card");
+    expect(within(card).getByText(/· 六月初一$/)).toBeInTheDocument();
   });
 
   it("宜忌是两栏 grid，不是 ul 散排", async () => {

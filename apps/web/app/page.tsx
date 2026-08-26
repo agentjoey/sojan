@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { Group, Cell } from "@/components/tg/native";
 import { useT } from "@/lib/i18n/I18nProvider";
+import { isNavEnabled } from "@/lib/nav";
 
 const ENTRIES = [
   { href: "/calendar", key: "calendar" as const },
@@ -30,6 +31,9 @@ const CARDS = [{ id: "east" as const }, { id: "west" as const }, { id: "resonanc
  *
  * 注：`accent` 与 `起` 同为 `--color-earth`——土是居所/方位的五行，语义上对，
  * 但两行同色；若日后调色板扩充，这里值得给「境」一个独立色。
+ *
+ * flag 门控判断统一取自 `lib/nav.ts` 的 `isNavEnabled`（单一事实源）——这里的
+ * `icon`/`accent`/`key`/`path` 仍是本文件自己的事，不受该模块影响。
  */
 const TG_ENTRIES = [
   { icon: "运", accent: "var(--color-cinnabar)", key: "calendar" as const, path: "/calendar" },
@@ -43,11 +47,11 @@ const TG_ENTRIES = [
   // `.agent/BACKLOG.md` 的 EP-jiao-tg。**加回来时别忘了同时恢复这里的
   // NEXT_PUBLIC_SPIRIT_ENABLED 门控**——两处（这里 + AppShell.NAV）条件必须一致
   // （CLAUDE.md 记的教训）；本文件顶部这条历史注释也留着，因为它是另一半同形状的坑。
-  ...(process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1"
+  ...(isNavEnabled("fengshui")
     ? [{ icon: "境", accent: "var(--color-earth)", key: "fengshui" as const, path: "/fengshui" }]
     : []),
   { icon: "起", accent: "var(--color-earth)", key: "reading" as const, path: "/reading" },
-  ...(process.env.NEXT_PUBLIC_DREAM_ENABLED === "1"
+  ...(isNavEnabled("dream")
     ? [{ icon: "梦", accent: "var(--color-water)", key: "dream" as const, path: "/dream" }]
     : []),
   { icon: "档", accent: "var(--color-wood)", key: "profiles" as const, path: "/profiles" },

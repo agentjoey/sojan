@@ -7,26 +7,17 @@ import { BellLogo, cn } from "@/components/ui";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { isTelegram } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
+import { enabled, RAIL_ORDER } from "@/lib/nav";
 
-const NAV = [
-  { href: "/", char: "照", key: "nav.home" },
-  { href: "/calendar", char: "运", key: "nav.calendar" },
-  { href: "/chart", char: "盘", key: "nav.reading" },
-  ...(process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"
-    ? [{ href: "/spirit", char: "灵", key: "nav.spirit" }]
-    : []),
-  ...(process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1"
-    ? [{ href: "/fengshui", char: "境", key: "nav.fengshui" }]
-    : []),
-  ...(process.env.NEXT_PUBLIC_DREAM_ENABLED === "1"
-    ? [{ href: "/dream", char: "梦", key: "nav.dream" }]
-    : []),
-  { href: "/profiles", char: "我", key: "nav.profiles" },
-  // EP-account-login：全站此前没有直接的登录/账号入口——/account 唯一的路径是先进
-  // /profiles、再点页头里嵌的一条文字链接。不受任何 flag 门控（/account 本身不是
-  // flag 功能），常驻显示。
-  { href: "/account", char: "账", key: "nav.account" },
-];
+/** 竖栏与底栏当前的项集（Task 2 会改成新项集）。「照」不在目录里，由铜铃承担。 */
+const NAV = enabled(RAIL_ORDER);
+
+// 「照」（首页）不在 lib/nav 的目录里，由铜铃承担；「账」不受任何 flag 门控
+// （EP-account-login：/account 本身不是 flag 功能，常驻显示）。两者仍需出现在
+// 移动底栏 / 桌面竖栏里，本任务保留最小的本地补全。
+const HOME_ITEM = { id: "home" as const, href: "/", char: "照", labelKey: "nav.home" };
+const ACCOUNT_ITEM = { id: "account" as const, href: "/account", char: "账", labelKey: "nav.account" };
+const BOTTOM_NAV = [HOME_ITEM, ...NAV, ACCOUNT_ITEM];
 
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -35,7 +26,8 @@ function isActive(pathname: string, href: string): boolean {
 // spec §10：导航项内边距只在「≥6 项」时收紧（52px→48px 触控目标，仍高于 44px 下限）。
 // 两个 flag 都关闭时 NAV.length=4，绝不能被这条收紧规则波及——那会是本分支对自己
 // 「flag 关闭时产品行为完全不变」这条约束的字面违反（最终评审 Blocking 4）。
-const NAV_COMPACT = NAV.length >= 6;
+// BOTTOM_NAV 含「照」与「账」，与改动前 NAV（同样含照与账）语义等价，故门槛沿用同一常量。
+const NAV_COMPACT = BOTTOM_NAV.length >= 6;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
@@ -67,8 +59,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
               <BellLogo size={30} motion="ring" ringKey={bellRing} />
             </Link>
-            {NAV.slice(1).map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.key)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
+            {[...NAV, ACCOUNT_ITEM].map((item) => (
+              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.labelKey)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
             ))}
           </nav>
 
@@ -81,8 +73,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
             }}
           >
-            {NAV.map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.key)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
+            {BOTTOM_NAV.map((item) => (
+              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.labelKey)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
             ))}
           </nav>
         </>

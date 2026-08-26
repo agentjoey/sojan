@@ -8,6 +8,7 @@ export { deriveStrength } from "./bazi/strength";
 export type { StrengthEvidence } from "./bazi/strength";
 export { deriveUsefulElements } from "./bazi/useful-elements";
 export type { UsefulElements } from "./bazi/useful-elements";
+export { deriveNayinZodiac } from "./bazi/nayin";
 export { deriveTriad } from "./ziwei/triad";
 export type { Triad } from "./ziwei/triad";
 export { computeZiweiHoroscope } from "./ziwei/horoscope";

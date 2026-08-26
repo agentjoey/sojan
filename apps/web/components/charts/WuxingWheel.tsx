@@ -20,17 +20,24 @@
  * 本组件纯展示、无可交互子元素，根 `<svg>` 用 `role="img"` 是对的
  * （ARIA 1.2：`role="img"` 的子树对辅助技术不可见，可交互元素不能嵌在里面——
  * `BaguaWheel` 可交互时因此换成 `role="group"`，但本组件没有这个问题）。
+ *
+ * `dayMasterElement` 收**中文**串（木/火/土/金/水），与 core `BaziChart.dayMasterElement`
+ * 同键空间（见 `packages/core/src/utils/elements.ts` 的 `STEM_ELEMENT`，值即中文）——
+ * 内部用 `ui.tsx` 已有的 `WUXING_LABEL_TO_KEY` 归一到英文键再比对扇区，调用方不必
+ * 手写一次转换（这正是被取代的 `WuxingRadar` 内部消化掉、本组件此前漏掉的一步）。
+ * 不再单独导出 `WuxingElement` 类型：它与 `ui.tsx` 已导出的 `Element` 逐字相同，
+ * 组件内部仍需要的英文键类型直接从 `ui.tsx` import。
  */
 
-const ORDER = [
+import { WUXING_LABEL_TO_KEY, type Element } from "@/components/ui";
+
+const ORDER: { element: Element; cn: string }[] = [
   { element: "wood", cn: "木" },
   { element: "fire", cn: "火" },
   { element: "earth", cn: "土" },
   { element: "metal", cn: "金" },
   { element: "water", cn: "水" },
-] as const;
-
-export type WuxingElement = (typeof ORDER)[number]["element"];
+];
 
 /** 十天干，环上等分排布的固定字面量顺序——纯展示常量，不是推算。 */
 const STEMS = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
@@ -49,12 +56,15 @@ function pt(angleDeg: number, r: number) {
   return [CX + r * Math.cos(a), CY + r * Math.sin(a)] as const;
 }
 
-/** 整块扇形（从圆心出发）。中心圆随后覆盖上去形成环心。 */
+/**
+ * 整块扇形（从圆心出发）。中心圆随后覆盖上去形成环心。
+ * `sweep` 固定为 `STEP`(=72)，恒 <180，large-arc-flag 恒为 0——本组件
+ * 没有可变 sweep 的调用路径，故不做分支，直接写死大弧标志位。
+ */
 function sectorPath(start: number, sweep: number, r: number): string {
   const [x1, y1] = pt(start, r);
   const [x2, y2] = pt(start + sweep, r);
-  const large = sweep > 180 ? 1 : 0;
-  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
 }
 
 /**
@@ -74,13 +84,18 @@ export interface WuxingWheelProps {
   counts: Record<string, number>;
   /** 日主天干，中心大字与十天干环高亮项。 */
   dayMasterStem: string;
-  /** 日主所属五行，决定哪一扇带朱砂描边。由调用方判定，本组件不算。 */
-  dayMasterElement: WuxingElement;
+  /**
+   * 日主所属五行，决定哪一扇带朱砂描边。**收中文单字**（木/火/土/金/水），
+   * 与 core `BaziChart.dayMasterElement` 同键空间，调用方无需手转英文。
+   * 由调用方判定，本组件不算。
+   */
+  dayMasterElement: string;
   size?: number;
 }
 
 export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 280 }: WuxingWheelProps) {
   const maxCount = Math.max(0, ...ORDER.map(({ cn }) => counts[cn] ?? 0));
+  const dayMasterKey: Element | undefined = WUXING_LABEL_TO_KEY[dayMasterElement];
 
   const summary = ORDER.map(({ cn }) => `${cn} ${counts[cn] ?? 0}`).join("、");
   const ariaLabel = `五行盘：${summary}；日主 ${dayMasterStem}`;
@@ -89,7 +104,7 @@ export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 28
     <svg viewBox="0 0 320 320" width={size} height={size} role="img" aria-label={ariaLabel}>
       {ORDER.map(({ element, cn }, i) => {
         const start = START + i * STEP;
-        const isDayMaster = element === dayMasterElement;
+        const isDayMaster = element === dayMasterKey;
         const count = counts[cn] ?? 0;
         const opacity = sectorOpacity(count, maxCount);
         const d = sectorPath(start, STEP, R_SECTOR);
@@ -112,14 +127,22 @@ export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 28
         );
       })}
 
-      {/* 十天干环：等分排布，日主天干朱砂，其余 muted。 */}
+      {/* 十天干环：等分排布，日主天干朱砂，其余 muted。
+          起始角与步长刻意不与扇区同构（−108 起、每 36°）：若从 −90 起（与扇区
+          −126 起点相差 36 的一半），十天干里的五个阴干会精确落在两扇交界线上
+          （终审已实算：乙/丁/己/辛/癸分别骑在木火/火土/土金/金水/水木界上）。
+          −108 + i·36 令每个天干都落在其五行扇区 [start, start+72] 的开区间内
+          （已验算：十干越界数 = 0）。 */}
       {STEMS.map((stem, i) => {
-        const angle = (360 / STEMS.length) * i - 90;
+        const angle = -108 + i * 36;
         const [x, y] = pt(angle, R_RING);
         const isDayMasterStem = stem === dayMasterStem;
         return (
           <text
             key={stem}
+            data-testid="wuxing-stem"
+            data-stem={stem}
+            data-angle={angle}
             x={x}
             y={y}
             textAnchor="middle"

@@ -1,4 +1,4 @@
-import { WindBanner } from "./WindBanner";
+import { WindBell } from "./WindBell";
 
 /**
  * 今日卡（UI v3，03-screens 5a §2）：卷首与运势页共用同一份实现——
@@ -59,7 +59,7 @@ export function TodayCard({
           data-testid="today-card-left"
           style={{ width: "124px", borderRight: "1px solid var(--color-line)", paddingRight: 16 }}
         >
-          <WindBanner verdict={verdict} />
+          <WindBell verdict={verdict} />
         </div>
         <div className="min-w-0 flex-1">
           <p style={{ fontSize: 11, letterSpacing: "0.28em", color: "var(--color-muted)" }}>{term}</p>

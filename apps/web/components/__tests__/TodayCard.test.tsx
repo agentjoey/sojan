@@ -37,11 +37,11 @@ describe("TodayCard", () => {
     expect(left.style.borderRight).toContain("var(--color-line)");
   });
 
-  it("风幡是占位（素材未到位，必须一眼可辨）", () => {
+  it("风铃是占位（素材未到位，必须一眼可辨）", () => {
     render(<TodayCard {...props} />);
-    const banner = screen.getByTestId("wind-banner");
-    expect(banner.getAttribute("data-placeholder")).toBe("wind-banner");
-    expect(banner).toHaveTextContent("谨");
+    const bell = screen.getByTestId("wind-bell");
+    expect(bell.getAttribute("data-placeholder")).toBe("wind-bell");
+    expect(bell).toHaveTextContent("谨");
   });
 
   it("卡脚链接由 href 给出", () => {

@@ -24,7 +24,7 @@
 |---|---|---|
 | 1 | `TwoColumn` 桌面「左定右动」两栏骨架 | 新建 |
 | 2 | `TodayCard` 今日卡（卷首与运势共用） | 新建 |
-| 3 | `WindBanner` 风幡**占位**组件 | 新建（占位） |
+| 3 | `WindBell` 风铃**占位**组件 | 新建（占位） |
 | 4 | `CompassWatermark` 五层转盘水印 + `zjSpinRev` keyframes | 新建（取代 `HeroWheel`） |
 | 5 | `app/page.tsx` 卷首重建（5a） | 重建 |
 | 6 | `app/calendar/page.tsx` 运势重建（桌面 8a；移动版推导） | 重建 |
@@ -32,7 +32,7 @@
 **不做：**
 - 其余 6 屏（C2/C3/C4）。
 - 排盘过场 5s 七拍（D 块）。
-- **风幡真实素材**——见 §7，本波只出占位。
+- **风铃真实素材**——见 §7，本波只出占位。
 
 ## 3. 桌面骨架（06-desktop §2/§3）
 
@@ -114,7 +114,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ```
 卡头：`今 日`（朱砂眉标） | 日期 + 农历（Cormorant 13px）
-左栏 124px，border-right 1px line：风幡图撑满，幡面写当日判词
+左栏 124px，border-right 1px line：风铃图撑满，幡面写当日判词
 右栏：候名「处暑 · 初候」(11px/.28em) → 物候名 serif 23px/700 朱砂 → 1px 细线
       → 润色一句 serif 14.5px → 元数据行（`庚申 · 官杀当值` / `五维 3/10`）
 卡脚：`展开今日日签 →`（指向 /calendar）
@@ -124,13 +124,13 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ⚠️ 候名与物候名从 B 块的 `getCurrentSolarHou()` 取，**不要另算**。
 
-## 7. 风幡：本波只出占位
+## 7. 风铃：本波只出占位
 
-`WindBanner` 组件接口按最终形态设计（`<WindBanner verdict="谨" />`），但**渲染占位**：一块符合设计语言的细线区域 + 判词大字，不试图模仿幡面。
+`WindBell`（原误称「风幡」——这是风铃的另一张图，不是风幡）组件接口按最终形态设计（`<WindBell verdict="谨" />`），但**渲染占位**：一块符合设计语言的细线区域 + 判词大字，不试图模仿幡面。
 
 理由见 backlog `EP-uiv3-banner`：设计包两张素材都烧着字、`windbell-source` 连 alpha 通道都没有，**没有可用的无字透明底图**；不 P 图伪造素材、不用手绘矢量凑数（`EP-jiao` 掷筊那轮已验证手绘到不了参考图水准，owner 判「效果太差，质感粗糙，放弃」）。
 
-拿到素材后只需换 `WindBanner` 内部实现，调用方不动。**占位必须一眼看得出是占位**，不要做成「像是完成品的次品」——那会让人误以为这就是最终效果。
+拿到素材后只需换 `WindBell` 内部实现，调用方不动。**占位必须一眼看得出是占位**，不要做成「像是完成品的次品」——那会让人误以为这就是最终效果。
 
 ## 8. 测试策略
 
@@ -140,7 +140,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 - **断点行为**：768/1200/1600 三档用 Tailwind 响应式类，断言类名而非视口——jsdom 测不了媒体查询生效。
 - **`TodayCard` 双消费方**：卷首与运势渲染的是**同一个组件**，补一条断言防止日后各自复制一份。
 - **`CompassWatermark`**：五层各自的动画名与时长、正反方向。⚠️ 别断言 SVG path。
-- **`WindBanner` 占位**：断言它渲染的是占位而非成品（例如带 `data-placeholder`），避免日后素材到位时忘了替换。
+- **`WindBell` 占位**：断言它渲染的是占位而非成品（例如带 `data-placeholder`），避免日后素材到位时忘了替换。
 - **B 块组件的接线**：`SeasonRuler` 的 `index` 来自 `getCurrentSolarHou()`，断言接线而非硬编码。
 - 关键改动做 **mutation 复验**。
 - ⚠️ 本波若动 `packages/core` 要跑三个包。
@@ -154,7 +154,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 - [ ] 桌面运势**不出黄历**，移动运势**保留黄历**
 - [ ] 宜忌桌面两栏逐行对齐（非 `<ul>` 散排）
 - [ ] 候名/物候名来自 `getCurrentSolarHou()`，非硬编码
-- [ ] `WindBanner` 是**一眼可辨的占位**，接口按最终形态设计
+- [ ] `WindBell` 是**一眼可辨的占位**，接口按最终形态设计
 - [ ] hover 只改 `border-color`/箭头色，**无投影、无位移、无放大**
 - [ ] 没有第二种强调手法；无新增裸十六进制；`--shadow-*` 仍全 `none`
 - [ ] 三包测试全绿；tsc/lint 不新增；关键改动 mutation 复验通过
@@ -162,6 +162,6 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ## 10. 待定
 
-1. **风幡素材**（backlog `EP-uiv3-banner`）——等 owner。
+1. **风铃素材**（backlog `EP-uiv3-banner`）——等 owner。
 2. **移动版运势的版式**由 claude 推导（owner 授权），若日后 owner 补稿以稿为准。
 3. `HeroWheel` 是否还有别处消费方——实施时查证。

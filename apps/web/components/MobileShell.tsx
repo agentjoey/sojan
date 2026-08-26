@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { BellLogo } from "@/components/ui";
-import { NavGrid } from "@/components/NavGrid";
 import { NAV_CATALOG, isActive } from "@/lib/nav";
 import { useShellContextValue } from "@/components/ShellContext";
+
+// 最终评审 C5：`NavGrid` 静态 import 会把它连带的 `@sojan/core`（lunar-typescript
+// + iztro 常量表，实测单 chunk 2,055,484 字节）打进每条经 `AppShell` 挂载的路由
+// 客户端包——包括 TG 里根本不渲染 `MobileShell` 的场景（在 `{!tg && …}` 内）。
+// `NavGrid` 在 `open=false` 时本就返回 `null`、不参与首帧，`ssr: false` 安全。
+const NavGrid = dynamic(() => import("@/components/NavGrid").then((m) => m.NavGrid), {
+  ssr: false,
+});
 
 /** 当前路由在 `NAV_CATALOG` 里对应的 `labelKey`，找不到就回退首页。 */
 function labelKeyForPath(pathname: string): string {
@@ -48,6 +56,21 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
   const menuRef = useRef<HTMLButtonElement>(null);
   const gridWrapRef = useRef<HTMLDivElement>(null);
 
+  // 最终评审 C1（Critical）：App Router 客户端跳转不重挂 root layout，`open`
+  // 状态跨路由存活——点九宫格任意格子后路由确实切换了，但覆盖层原地不动，
+  // 只是当前项高亮换了一格。这是 react.dev「渲染期按 prop 变化调整 state」
+  // 的标准写法（存一份 `prevPath` 在 state 里，渲染期比对、不一致就同步纠正），
+  // 特意不用 `useEffect`——`react-hooks/set-state-in-effect` 会警告 effect 里
+  // 无条件调用 setState，且渲染期纠正比 effect 早一轮、不会先闪一帧旧覆盖层。
+  // ⚠️ 不能调 `close()`——`close()` 里 `menuRef.current?.focus()` 会在每次
+  // 路由跳转后都抢走焦点（例如跳去 /calendar 后焦点应留在页面本身，不该被
+  // 拽回菜单键），这里直接 `setOpen(false)`。
+  const [prevPath, setPrevPath] = useState(currentPath);
+  if (currentPath !== prevPath) {
+    setPrevPath(currentPath);
+    setOpen(false);
+  }
+
   const contextLabel = label ?? t(labelKeyForPath(currentPath));
 
   function close() {
@@ -59,6 +82,8 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
 
   useEffect(() => {
     if (!open) return;
+    const container = gridWrapRef.current;
+    if (!container) return;
     // 无障碍：打开时把焦点移入对话框——聚焦九宫格第一个导航格（选择理由见
     // 组件顶部注释）。不在 SSR 水合比对范围内：这个 effect 只在 `open` 变为
     // `true`（用户点击之后）才跑，跟水合无关。
@@ -66,8 +91,24 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
     // 到本组件渲染的子树；选择器用语义化的 `a[href]` 而非 `data-testid`，
     // 生产逻辑不依赖本该只服务测试的属性（`data-testid="nav-grid-cell"` 仍
     // 保留在 `NavGrid.tsx` 里给测试用，只是这里不再读它）。
-    const firstCell = gridWrapRef.current?.querySelector<HTMLAnchorElement>("a[href]");
-    firstCell?.focus();
+    //
+    // C5 引入 `next/dynamic(ssr:false)` 之后：`open` 变 `true` 的这一刻，`NavGrid`
+    // 的异步 chunk 可能还没 resolve、子树里还没有任何 `<a href>`——直接查询会
+    // 扑空。用 `MutationObserver` 等 chunk 到位后再聚焦一次，找到后立刻断开。
+    const focusFirstCell = () => {
+      const firstCell = container.querySelector<HTMLAnchorElement>("a[href]");
+      if (firstCell) {
+        firstCell.focus();
+        return true;
+      }
+      return false;
+    };
+    if (focusFirstCell()) return;
+    const observer = new MutationObserver(() => {
+      if (focusFirstCell()) observer.disconnect();
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [open]);
 
   return (
@@ -91,7 +132,7 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
         <Link
           data-testid="shell-capsule"
           href={open ? "/" : "/profiles"}
-          className="font-serif inline-flex items-center gap-1.5"
+          className="font-serif inline-flex items-center gap-1.5 zj-wheel-focus"
           style={{
             padding: "7px 14px 7px 11px",
             borderRadius: 9999,
@@ -110,6 +151,7 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
           ref={menuRef}
           type="button"
           data-testid="shell-menu"
+          className="zj-wheel-focus"
           aria-expanded={open}
           aria-label={open ? t("nav.close") : t("nav.menu")}
           onClick={() => (open ? close() : setOpen(true))}

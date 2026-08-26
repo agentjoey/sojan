@@ -7,15 +7,11 @@ import { BellLogo, cn } from "@/components/ui";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { isTelegram } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
-import { enabled, RAIL_ORDER } from "@/lib/nav";
+import { enabled, isActive, RAIL_ORDER } from "@/lib/nav";
 
 // Task 2：项集改为 RAIL_ORDER（运/盘/灵/境/梦/起/我）。「照」由顶部铜铃承担、不占项；
 // 「账」已并入「我的」（/profiles），不再作为独立导航项常驻。
 const RAIL = enabled(RAIL_ORDER);
-
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
-}
 
 // spec §10：导航项内边距只在「≥6 项」时收紧（52px→48px 触控目标，仍高于 44px 下限）。
 // 三个 flag 都关闭时 RAIL.length=4（运/盘/起/我），绝不能被这条收紧规则波及——那会是

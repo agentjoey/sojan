@@ -48,6 +48,14 @@ export function isNavEnabled(id: NavId): boolean {
   return flag ? FLAGS[flag] : true;
 }
 
+/**
+ * 「当前项」判定的唯一实现——原先在 `AppShell.tsx` 里私有定义，Task 5 的
+ * `NavGrid` 也要同一套语义，故提到这里供两处共用（避免两份实现悄悄漂移）。
+ */
+export function isActive(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
 export type NavItem = NavCatalogEntry & { id: NavId };
 
 /** 按给定顺序过滤出已启用项，保序。 */

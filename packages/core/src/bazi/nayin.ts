@@ -6,7 +6,8 @@ import { LunarUtil } from "lunar-typescript";
  * 设计包 5b 的三枚 chip 要「纳音 / 生肖 / 年龄」，而这两项都不在
  * `BaziChartSchema` 里。按 CLAUDE.md 的既定约定，派生事实在 facts 层从既有
  * `UnifiedChart` 算，**不改冻结结构**——因此这里只吃一个已经存在于任何时期
- * 冻结命盘里的年柱字符串（`chart.bazi.pillars.year.ganzhi`），新旧命盘通吃、零迁移。
+ * 冻结命盘里的年柱字符串（`PillarSchema` 没有 `.ganzhi` 字段，由调用方拼出
+ * `chart.bazi.pillars.year.stem + .branch`），新旧命盘通吃、零迁移。
  *
  * ⚠️ `ZiweiChartSchema` 里那个 `zodiac` 字段是**西洋盘的 tropical/sidereal 设置**，
  * 与生肖无关，别误用。

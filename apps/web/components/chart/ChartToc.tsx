@@ -13,6 +13,10 @@ const ROWS = [
  * 故改为页内锚点两行，版式复用卷首目录行。
  * ⚠️ 目标区块的 id（`ziwei-board` / `reading-tabs`）由 `app/chart/page.tsx` 提供，
  * 改这里的 href 必须同步改那边的 id，否则锚点静默失效。
+ *
+ * hover 风格与卷首目录行对齐（`app/HomeClient.tsx` 的 `data-testid="toc-row"`）：
+ * 唯一变化是箭头由 muted 转 ink（`group`/`group-hover:text-ink`），不加投影/位移/放大
+ * （设计包 `06-desktop` §4 明令强调手法与 hover 都要克制）。
  */
 export function ChartToc() {
   const t = useT();
@@ -23,11 +27,11 @@ export function ChartToc() {
           key={href}
           href={href}
           data-testid="chart-toc-row"
-          className="flex items-center justify-between py-4 transition-colors duration-200"
+          className="group flex items-center justify-between py-4 transition-colors duration-200"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
           <span className="font-serif text-[19px]">{t(key)}</span>
-          <span style={{ color: "var(--color-muted)" }}>→</span>
+          <span className="text-muted transition-colors group-hover:text-ink">→</span>
         </a>
       ))}
     </nav>

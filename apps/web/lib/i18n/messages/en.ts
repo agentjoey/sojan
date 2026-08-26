@@ -203,6 +203,7 @@ export const en: Messages = {
     title: "命盘 (Chart)",
     kicker: "Birth Chart",
     wuxingTitle: "Wuxing · Five Elements",
+    wuxingCaption: "Element distribution; day master at center",
     loadingProfile: "Loading profile…",
     noProfile: "No chart profile yet.",
     goCast: "去起盘 (Cast chart) →",

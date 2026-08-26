@@ -25,6 +25,9 @@ type Luck = { startAge: number; startYear: number; pillar: string };
 export function LuckPillars({ bazi }: { bazi: UnifiedChart["bazi"] }) {
   const t = useT();
   const list = (bazi.luckPillars ?? []) as Luck[];
+  // 与下方 idx<0 守卫（对空数组必然生效）逐字重复，为提前退出与可读性保留，
+  // 不是可删的死代码——黑盒测试杀不死这行，但删掉会让读者误以为空数组会往
+  // 下走到 idx 逻辑里再算一遍。
   if (list.length === 0) return null;
 
   const thisYear = new Date().getFullYear();

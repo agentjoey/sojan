@@ -1,7 +1,7 @@
 /**
- * 五行盘 WuxingWheel（EP-ui-v3 子项目 B Task 1）——纯展示可视化，将来取代
- * `WuxingRadar`（换线不在本轮：`WuxingRadar` 仍被 `app/chart/page.tsx:215` 使用，
- * 本文件不改它）。
+ * 五行盘 WuxingWheel（EP-ui-v3 子项目 B Task 1）——纯展示可视化。子项目 C2-1
+ * Task 5 已把 `app/chart/page.tsx` 换线到本组件，取代原来的 `WuxingRadar`；
+ * 换线后 `WuxingRadar` 再无消费方，已随本任务一并删除。
  *
  * 几何锁定自设计包 `02-components.md` §5，与 `BaguaWheel` 同坐标系
  * （viewBox 320×320，圆心 160,160），便于将来并置：
@@ -101,7 +101,7 @@ export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 28
   const ariaLabel = `五行盘：${summary}；日主 ${dayMasterStem}`;
 
   return (
-    <svg viewBox="0 0 320 320" width={size} height={size} role="img" aria-label={ariaLabel}>
+    <svg data-testid="wuxing-wheel" viewBox="0 0 320 320" width={size} height={size} role="img" aria-label={ariaLabel}>
       {ORDER.map(({ element, cn }, i) => {
         const start = START + i * STEP;
         const isDayMaster = element === dayMasterKey;

@@ -211,6 +211,7 @@ export const zh = {
     title: "命盘",
     kicker: "命 盘",
     wuxingTitle: "五 行",
+    wuxingCaption: "五行分布见盘，日主居中",
     loadingProfile: "正在读取档案…",
     noProfile: "尚无命盘档案。",
     goCast: "去起盘",

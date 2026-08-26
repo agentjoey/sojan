@@ -9,14 +9,18 @@ export function PageHeader({
   title,
   annotation,
   action,
+  as: Tag = "header",
 }: {
   kicker: string;
   title: ReactNode;
   annotation?: ReactNode;
   action?: ReactNode;
+  /** 放进 `TwoColumn` 的 header 槽时传 "div"——那边已经有一层 <header>，
+   *  嵌套 <header> 是无效 HTML 且对读屏是两个 banner。 */
+  as?: "header" | "div";
 }) {
   return (
-    <header>
+    <Tag>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div
@@ -36,6 +40,6 @@ export function PageHeader({
         </div>
         {action && <div className="flex shrink-0 items-center gap-2 pt-8">{action}</div>}
       </div>
-    </header>
+    </Tag>
   );
 }

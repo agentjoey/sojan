@@ -151,16 +151,19 @@ describe("UI v3：竖栏项集（7 项，「我的」沉底，无「照」无「
     expect(RAIL_ORDER).toEqual(["calendar", "chart", "spirit", "fengshui", "dream", "reading", "profiles"]);
   });
 
-  it("导航不再含「首页」与「账号」两项（照＝铜铃，账已并入我的）", async () => {
+  it("导航项集不含首页与账号（照＝铜铃、账已并入我的）", async () => {
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
     const { AppShell } = await import("../AppShell");
     const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
     render(<AppShell><div /></AppShell>, {
       wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
     });
-    expect(screen.getAllByLabelText("运势").length).toBeGreaterThan(0); // 先证明导航真的渲染了
-    expect(screen.queryByLabelText("首页")).toBeNull();
-    expect(screen.queryByLabelText("账号")).toBeNull();
+    const hrefs = screen.getAllByTestId("nav-item").map((el) => el.getAttribute("href"));
+    // 竖栏与底栏此刻都渲染，故每个 href 会出现两次；用 Set 比对项集本身。
+    expect(new Set(hrefs)).toEqual(new Set(["/calendar", "/chart", "/spirit", "/reading", "/profiles"]));
+    expect(hrefs).not.toContain("/account");
+    // 铜铃仍是首页链接，且它不是导航项——所以上面的项集里没有 "/"
+    expect(screen.getByLabelText("首页").getAttribute("href")).toBe("/");
   });
 
   it("「盘」的标签是「命盘」而不是「解读」", async () => {

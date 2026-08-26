@@ -49,10 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
             style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
           >
-            {/* 「照」不再是独立导航项（并入铜铃），aria-label 改用品牌名而非 nav.home——
-                nav.home 的字面值「首页」仍保留给别处（Step 3 裁定），但不应再出现在这里，
-                否则「导航不再含‘首页’」这条断言会被这枚铜铃自己撞穿。 */}
-            <Link href="/" className="mb-5" aria-label={t("common.brand")} onClick={() => setBellRing((n) => n + 1)}>
+            <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
               <BellLogo size={30} motion="ring" ringKey={bellRing} />
             </Link>
             {RAIL.map((item) => (
@@ -105,7 +102,13 @@ function NavItem({
   style?: React.CSSProperties;
 }) {
   return (
-    <Link href={href} className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")} aria-label={label} style={style}>
+    <Link
+      href={href}
+      data-testid="nav-item"
+      className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")}
+      aria-label={label}
+      style={style}
+    >
       <span
         key={active ? "on" : "off"}
         className="inline-flex items-center justify-center font-semibold"

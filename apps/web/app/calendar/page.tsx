@@ -193,6 +193,7 @@ export default function CalendarPage() {
   const header = (
     <>
       <PageHeader
+        as="div"
         kicker={t("calendar.kicker")}
         title={t("calendar.title")}
         annotation={`${profile.nickname} · ${t("calendar.dayMasterLabel")} ${profile.chart.bazi.dayMaster}（${profile.chart.bazi.dayMasterElement}）`}

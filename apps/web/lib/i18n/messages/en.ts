@@ -203,6 +203,7 @@ export const en: Messages = {
     title: "命盘 (Chart)",
     kicker: "Birth Chart",
     wuxingTitle: "Wuxing · Five Elements",
+    wuxingCaption: "Element distribution; day master at center",
     loadingProfile: "Loading profile…",
     noProfile: "No chart profile yet.",
     goCast: "去起盘 (Cast chart) →",
@@ -248,6 +249,19 @@ export const en: Messages = {
     strengthWeak: "身弱 (Weak)",
     strengthBalanced: "中和 (Balanced)",
     strengthUnknown: "—",
+    dayMasterLine: "Day Master {stem}{element}",
+    strengthTagStrong: "[Strong]",
+    strengthTagWeak: "[Weak]",
+    strengthTagBalanced: "[Balanced]",
+    zodiacChip: "Year of the {animal}",
+    ageChip: "Age {age}",
+
+    luckTitle: "Luck Cycles",
+    luckPrev: "Previous",
+    luckCurrent: "Current",
+    luckNext: "Next",
+    luckRange: "from age {startAge} · {startYear}",
+    flowYearTitle: "Annual",
 
     soulPalace: "命宫 (Life Palace)",
     bodyPalace: "身宫 (Body Palace)",
@@ -275,6 +289,8 @@ export const en: Messages = {
 
     selfPortraitTitle: "自我画像 (Self-Portrait)",
     selfPortraitSubtitle: "An inner profile synthesized from chart structure and self-reported traits.",
+    tocZiwei: "Twelve Palaces",
+    tocReading: "Three-Part Reading",
   },
   calendar: {
     kicker: "Daily Fortune",

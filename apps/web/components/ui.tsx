@@ -188,20 +188,25 @@ export function Chip({
 /**
  * 胶囊 chip（生肖 / 纳音 / 年龄 / 流年）：radius 9999px / 1px 细线 / 11.5px。
  * `style` 同样 `Omit` 掉（终审必修 6，理由见 `Emphasis` 上方注释）。
+ *
+ * `emphasis`（与 `Chip` 的既有 API 对齐）：当前流年这类「需要强调但仍是
+ * chip 形态」的项，描边+文字换成朱砂色——**不是** `Emphasis` 组件那种整块
+ * 强调手法，是同一枚 chip 自身的状态色，两者不冲突。
  */
 export function PillChip({
+  emphasis = false,
   className,
   children,
   ...rest
-}: Omit<React.HTMLAttributes<HTMLSpanElement>, "style">) {
+}: { emphasis?: boolean } & Omit<React.HTMLAttributes<HTMLSpanElement>, "style">) {
   return (
     <span
       className={cn("inline-flex items-center text-[11.5px]", className)}
       style={{
         padding: "5px 12px",
         borderRadius: "9999px",
-        border: "1px solid var(--color-line)",
-        color: "var(--color-ink-2)",
+        border: emphasis ? "1px solid var(--color-cinnabar)" : "1px solid var(--color-line)",
+        color: emphasis ? "var(--color-cinnabar)" : "var(--color-ink-2)",
       }}
       {...rest}
     >

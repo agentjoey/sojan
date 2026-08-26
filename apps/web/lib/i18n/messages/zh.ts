@@ -211,6 +211,7 @@ export const zh = {
     title: "命盘",
     kicker: "命 盘",
     wuxingTitle: "五 行",
+    wuxingCaption: "五行分布见盘，日主居中",
     loadingProfile: "正在读取档案…",
     noProfile: "尚无命盘档案。",
     goCast: "去起盘",
@@ -255,6 +256,19 @@ export const zh = {
     strengthWeak: "身弱",
     strengthBalanced: "中和",
     strengthUnknown: "—",
+    dayMasterLine: "{stem}{element}日主",
+    strengthTagStrong: "【偏强型】",
+    strengthTagWeak: "【偏弱型】",
+    strengthTagBalanced: "【中和型】",
+    zodiacChip: "属{animal}",
+    ageChip: "{age} 岁",
+
+    luckTitle: "大运",
+    luckPrev: "前一运",
+    luckCurrent: "现行",
+    luckNext: "下一运",
+    luckRange: "{startAge} 岁起 · {startYear}",
+    flowYearTitle: "流年",
 
     soulPalace: "命宫",
     bodyPalace: "身宫",
@@ -282,6 +296,8 @@ export const zh = {
 
     selfPortraitTitle: "自我画像 · Self-Portrait",
     selfPortraitSubtitle: "由命盘结构与自我自陈合成的内在侧写",
+    tocZiwei: "紫微十二宫",
+    tocReading: "三段式解读",
   },
   calendar: {
     kicker: "流 日",

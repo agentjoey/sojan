@@ -32,4 +32,11 @@ describe("PageHeader（UI v3 页首范式）", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("说说你的梦");
     expect(screen.getByText("梦是潜意识的信").style.fontSize).toBe("11.5px");
   });
+
+  // M4：`as` 默认值改成 "div" 会让 8 个既有页面静默丢掉 <header> landmark，
+  // 此前只靠 grep 确认、没有测试守。省略 `as` 时必须落地为 <header>。
+  it("省略 `as` 时默认渲染为 <header>（防默认值被静默改成非 landmark 标签）", () => {
+    const { container } = render(<PageHeader kicker="解 梦" title="说说你的梦" />);
+    expect(container.querySelector("header")).not.toBeNull();
+  });
 });

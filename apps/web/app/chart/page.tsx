@@ -7,15 +7,19 @@ import { hasTgSession, isTelegram, tgGetProfile, tgGetQuestionnaire } from "@/li
 import type { QuestionnaireAnswers } from "@sojan/core";
 import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { timelineAction } from "@/app/actions";
-import { Card, BellLogo } from "@/components/ui";
+import { Card, BellLogo, cn } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 import { Markdown } from "@/components/Markdown";
 import { ReadingTabs } from "@/components/ReadingTabs";
 import { BaziPillars } from "@/components/charts/BaziPillars";
 import { ZiweiBoard } from "@/components/charts/ZiweiBoard";
-import { WuxingRadar } from "@/components/charts/WuxingRadar";
+import { WuxingWheel } from "@/components/charts/WuxingWheel";
 import { NatalWheel } from "@/components/charts/NatalWheel";
+import { TwoColumn } from "@/components/TwoColumn";
+import { ChartIdentity } from "@/components/chart/ChartIdentity";
+import { LuckPillars } from "@/components/chart/LuckPillars";
+import { ChartToc } from "@/components/chart/ChartToc";
 import { SelfPortrait } from "./SelfPortrait";
 
 type Section = { key: string; title: string; body: string; accent?: "fire" | "water" | "metal" };
@@ -176,49 +180,113 @@ export default function ChartPage() {
   const chart = profile.chart;
   const sections = reading ? splitSections(reading) : [];
 
-  return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
-      <PageHeader
-        kicker={t("chart.kicker")}
-        title={<>{profile.nickname} · {t("chart.title")}</>}
-        annotation={chart.normalizedSolarTime}
-        action={
-          <>
-            {isTelegram() && (
-              <button
-                onClick={() => {
-                  const username = process.env.NEXT_PUBLIC_TG_BOT_USERNAME || "analyst_helen_bot";
-                  window.Telegram?.WebApp?.openTelegramLink?.(
-                    "https://t.me/share/url?url=" +
-                      encodeURIComponent(`https://t.me/${username}?startapp=sojan`) +
-                      "&text=" +
-                      encodeURIComponent(t("chart.shareText"))
-                  );
-                }}
-                className="text-[13px] text-cinnabar underline underline-offset-4"
-              >
-                {t("chart.share")}
-              </button>
-            )}
-            <Link href="/calendar" className="text-[13px] text-gold underline underline-offset-4">{t("chart.todayFortune")}</Link>
-          </>
-        }
-      />
+  // 页头：放进 TwoColumn 的 header 槽，`as="div"` 避免与 TwoColumn 自己的
+  // <header> 嵌套（PageHeader 默认仍是 <header>，其余消费方不受影响）。
+  const header = (
+    <PageHeader
+      as="div"
+      kicker={t("chart.kicker")}
+      title={<>{profile.nickname} · {t("chart.title")}</>}
+      annotation={chart.normalizedSolarTime}
+      action={
+        <>
+          {isTelegram() && (
+            <button
+              onClick={() => {
+                const username = process.env.NEXT_PUBLIC_TG_BOT_USERNAME || "analyst_helen_bot";
+                window.Telegram?.WebApp?.openTelegramLink?.(
+                  "https://t.me/share/url?url=" +
+                    encodeURIComponent(`https://t.me/${username}?startapp=sojan`) +
+                    "&text=" +
+                    encodeURIComponent(t("chart.shareText"))
+                );
+              }}
+              className="text-[13px] text-cinnabar underline underline-offset-4"
+            >
+              {t("chart.share")}
+            </button>
+          )}
+          <Link href="/calendar" className="text-[13px] text-gold underline underline-offset-4">{t("chart.todayFortune")}</Link>
+        </>
+      }
+    />
+  );
+
+  // 左列（设计包 5b）：盘与不动事实——日主行/chip → 五行盘 → 四柱 → 大运/流年 → 目录。
+  const left = (
+    <>
+      <ChartIdentity chart={chart} />
+
+      {/* 五行 */}
+      <ChartBlock label={t("chart.wuxingTitle")}>
+        <WuxingWheel
+          counts={chart.bazi.fiveElementCounts}
+          dayMasterStem={chart.bazi.dayMaster}
+          dayMasterElement={chart.bazi.dayMasterElement}
+        />
+        <p className="mt-3 text-[11.5px]" style={{ color: "var(--color-muted)" }}>{t("chart.wuxingCaption")}</p>
+      </ChartBlock>
 
       {/* 四柱 */}
       <ChartBlock label={t("chart.baziTitle")}>
         <BaziPillars bazi={chart.bazi} />
       </ChartBlock>
 
-      {/* 五行 */}
-      <ChartBlock label={t("chart.wuxingTitle")}>
-        <WuxingRadar counts={chart.bazi.fiveElementCounts} />
-      </ChartBlock>
+      <LuckPillars bazi={chart.bazi} />
+
+      <ChartToc />
+    </>
+  );
+
+  // 右列（本波只重排、不重建，右列版式仍是 ChartBlock——见 spec §2.2）：
+  // 解读 → 紫微棋盘 → 西方盘 → 自我画像 → 时序。解读排在紫微之前是刻意裁定
+  // （与 5b 入口条字面顺序相反），别「顺手改回来」。
+  const right = (
+    <>
+      {/* 三段式解读 */}
+      <section id="reading-tabs" data-testid="reading-tabs-anchor">
+        {/* 右列第一块：桌面上与左列頭部对齐，去掉自己的上边距/分隔线/上内边距
+            （I3）——移动端单列态紧接在 ChartToc 之后，那条线仍是有意义的分隔，
+            必须断点门控，不能无条件去掉。 */}
+        <ChartBlock label={t("chart.readingTitle")} className="xl:mt-0 xl:border-t-0 xl:pt-0">
+          {!inTg && !reading && !streaming && (
+            <button
+              onClick={generate}
+              className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"
+              style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-card)", color: "var(--color-on-ink)" }}
+            >
+              <span>
+                <span className="block text-[17px] font-semibold">{t("chart.generateReading")}</span>
+                <span className="mt-1 block text-[13px] opacity-85">{t("chart.generateReadingSub")}</span>
+              </span>
+              <span className="text-[22px] transition-transform duration-200 group-hover:translate-x-1">✦</span>
+            </button>
+          )}
+          {/* EP-motion：首字前的空等此前只有一条纯文字+闪烁光标；换成品牌风铃常驻摆动
+              （复用 CastingOverlay 同款 idle 语义），首字一到就被 ReadingTabs 的流式打字机
+              接管——这段不用全屏 CastingOverlay，因为上方八字/紫微/西方盘已经渲染在页面里，
+              全屏遮罩会让用户失去已经看到的内容。 */}
+          {streaming && !reading && (
+            <Card>
+              <p className="flex items-center gap-2 text-[14px] text-muted">
+                <BellLogo size={18} />
+                {t("chart.generating")}
+              </p>
+            </Card>
+          )}
+          {err && (
+            <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{err}</div>
+          )}
+          {reading && <ReadingTabs sections={sections} chart={chart} streaming={streaming} />}
+        </ChartBlock>
+      </section>
 
       {/* 紫微 */}
-      <ChartBlock label={t("chart.ziweiTitle")}>
-        <ZiweiBoard ziwei={chart.ziwei} />
-      </ChartBlock>
+      <section id="ziwei-board" data-testid="ziwei-board-anchor">
+        <ChartBlock label={t("chart.ziweiTitle")}>
+          <ZiweiBoard ziwei={chart.ziwei} />
+        </ChartBlock>
+      </section>
 
       {/* 西方本命盘（降级隐藏） */}
       <ChartBlock label={t("chart.westernTitle")}>
@@ -235,39 +303,6 @@ export default function ChartPage() {
         <SelfPortrait chart={chart} questionnaire={qAnswers ?? undefined} />
       </ChartBlock>
 
-      {/* 三段式解读 */}
-      <ChartBlock label={t("chart.readingTitle")}>
-        {!inTg && !reading && !streaming && (
-          <button
-            onClick={generate}
-            className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"
-            style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-card)", color: "var(--color-on-ink)" }}
-          >
-            <span>
-              <span className="block text-[17px] font-semibold">{t("chart.generateReading")}</span>
-              <span className="mt-1 block text-[13px] opacity-85">{t("chart.generateReadingSub")}</span>
-            </span>
-            <span className="text-[22px] transition-transform duration-200 group-hover:translate-x-1">✦</span>
-          </button>
-        )}
-        {/* EP-motion：首字前的空等此前只有一条纯文字+闪烁光标；换成品牌风铃常驻摆动
-            （复用 CastingOverlay 同款 idle 语义），首字一到就被 ReadingTabs 的流式打字机
-            接管——这段不用全屏 CastingOverlay，因为上方八字/紫微/西方盘已经渲染在页面里，
-            全屏遮罩会让用户失去已经看到的内容。 */}
-        {streaming && !reading && (
-          <Card>
-            <p className="flex items-center gap-2 text-[14px] text-muted">
-              <BellLogo size={18} />
-              {t("chart.generating")}
-            </p>
-          </Card>
-        )}
-        {err && (
-          <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{err}</div>
-        )}
-        {reading && <ReadingTabs sections={sections} chart={chart} streaming={streaming} />}
-      </ChartBlock>
-
       {timeline && (
         <ChartBlock label={t("chart.timelineTitle")}>
           <Card>
@@ -277,17 +312,29 @@ export default function ChartPage() {
         </ChartBlock>
       )}
 
-      <p className="mt-10 text-[12px] leading-relaxed text-muted">
+      {/* 免责声明（I1）：挪进右列末尾（叙述末尾），而非 TwoColumn 外层——
+          外层挂它会在 xl 断点把 document 撑高出约 116px，破坏「页面不滚、
+          两列各自滚」的两栏模型（`/calendar` 无此问题，它把免责句放进了
+          header 槽）。移动端单列态 DOM 顺序本就在最后，不受影响。 */}
+      <p className="mt-10 pb-10 text-[12px] leading-relaxed text-muted">
         {t("chart.pageDisclaimer")}
       </p>
+    </>
+  );
+
+  return (
+    <main>
+      <TwoColumn leftWidth={440} header={header} left={left} right={right} />
     </main>
   );
 }
 
-// 图表区块：小标签 + 直接落纸底，区块间 1px 细线分隔（取代旧 Section 的朱砂破折号 + Card 包装）
-function ChartBlock({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+// 图表区块：小标签 + 直接落纸底，区块间 1px 细线分隔（取代旧 Section 的朱砂破折号 + Card 包装）。
+// borderTop 改用 Tailwind 类而非内联 style（I3）——内联优先级恒高于类，
+// 调用方传入的 `xl:border-t-0` 等断点类压不掉内联 style，此坑本仓已踩过一次。
+function ChartBlock({ label, children, className }: { label: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--color-line)" }}>
+    <section className={cn("mt-10 border-t border-[var(--color-line)] pt-8", className)}>
       <h2 className="mb-6 text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>{label}</h2>
       {children}
     </section>

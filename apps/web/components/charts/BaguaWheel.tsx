@@ -7,7 +7,7 @@ import { DIRECTIONS, DIRECTION_GUA, DIRECTION_LABEL, type Direction, type Direct
  * 确定性数据驱动，来自 core 查表结果，不依赖 LLM，
  * 保证「LLM 挂了页面不白」——本组件独立成立，无需任何叙述文本。
  *
- * 与 ZiweiBoard / NatalWheel / WuxingRadar 同为 components/charts/ 下的可视化，
+ * 与 ZiweiBoard / NatalWheel / WuxingWheel 同为 components/charts/ 下的可视化，
  * 配色一律走 CSS 变量令牌，不硬编码颜色值（项目在 TG 暗色主题上栽过硬编码色值的跟头）。
  *
  * EP-east-ui-r2（S5 细环卦字版，对齐已确认的 Pencil 设计稿）：

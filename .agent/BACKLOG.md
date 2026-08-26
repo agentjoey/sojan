@@ -71,6 +71,16 @@
 
   **仍待 owner 提供**：吉/顺/平三档对应的风铃图（尺寸/透明通道同 `windbell-jin.png`，字分别烧「吉」「顺」「平」）。拿到后把 `WindBell` 内部改成 `verdict → 图片文件名` 的映射即可，调用方接口不必再变。在此之前，四档判词全部展示同一张「谨」图（已知限制，非 bug）。
 
+- [ ] **[EP-uiv3-c2-1-defer] UI v3 C2-1 终审延后项（8 条，均不阻塞）** —— 2026-08-27，C2-1 已完成并过终审，这些是明确判为「留到 C2-2」的
+  1. `PillChip.emphasis` 原语级测试只有假侧（同文件 `Chip` 用 `rerender` 测了真假两侧）；真侧目前靠 `LuckPillars.test.tsx` 间接覆盖。
+  2. 三处**不可达守卫**未加注释：`packages/core/src/bazi/nayin.ts` 的 `zhiIndex < 1` 与 `!zodiac`（能过 `LunarUtil.NAYIN[gz]` 的必是 60 甲子成员）、`ChartIdentity.tsx` 的 `Number.isFinite(birthYear)` 假侧（`normalize.ts` 保证格式）。`LuckPillars.tsx` 已立了「刻意保留的防御、黑盒测不到」的注释先例，照做即可——**免得后人当死码删、或当漏测硬凑用例**。
+  3. `app/chart/page.tsx` 的 `<section id="reading-tabs">` 里直接套 `ChartBlock` 的 `<section>`（合法但冗余，可把 id 直接给 `ChartBlock`）；`ChartToc` 的 `<nav>` 缺 `aria-label`，与 `AppShell` 侧栏 `<nav>` 并存时读屏会报两个未命名 navigation。
+  4. `app/chart/page.tsx` 解读按钮的 `group-hover:translate-x-1` **违反「hover 只改 border-color 与箭头色，不得投影/位移/放大」**（`06-desktop` §4）。是从旧页逐字搬来的、位于右列，归 C2-2 收拾。
+  5. `LuckPillars.test.tsx` 只断 `pillar` 干支，**未断 label 与 range**——`luckPrev/luckCurrent/luckNext` 三个标签互换、或 `luckRange` 插值坏成字面 `{startAge}`，全部用例照绿。
+  6. `ui.tsx` 的 `Chip`（非 `PillChip`）的 `emphasis` prop 全仓无消费方（既存，非 C2-1 引入）。`3c` 的承重事实 chips 大概率会用上，届时再决定删/用。
+  7. **puppeteer 三档断点产物未入库**：C2-1 的 402/900/1280 结论只有实施者口述。终审已从**构建产物 CSS** 独立复核过「无桌面样式泄漏到 <1200px」，但布局节奏那一档（终审的 I1–I4）正是 puppeteer 本该抓到、jsdom 抓不到的——下波把截图与结论一并写进 ledger。
+  8. **R9**：`app/chart/__tests__/page.test.tsx` 的时序缓存断言排在 `findByText` 之后，注释掉时序 JSX 会先让 `findByText` 红、走不到缓存那行，**故该断言未被独立 mutation 证明**（它本身有区分力——改缓存键就会红——只是证据没隔离它）。把 `localStorage` 断言移到 `findByText` **之前**，或拆成独立用例即可。
+
 - [ ] **[EP-uiv3-c1-defer] UI v3 C1 终审的两条延后项**（2026-08-26，C1 已合 main，这两条**不阻塞**）
   ① **首页风铃 alt 在无档案态是病句** → 归 **C4**（C4 本就要动 i18n）。现文案单条 key 带 `{verdict}` 插值，首页无档案时插进去的是空态记号「—」，读屏读出「……当日判词为「—」」，而首页压根没有「判词」这个概念。复审建议拆成两条 key（首页用只描述图片的 `bellAltPlain`），但会破坏 `app/__tests__/page.test.tsx` 里必修 8 新加的「—」断言，而该文件受 TG 冻结约束，故本轮只去掉了更严重的虚假方位声称（「另见右栏」——判词其实在卡**下方**）。
   ② **首页的日期与候来自两个不同时钟** → 归 **C2**（C2 本就要动 core 侧）。`solarHou` 留服务端（UTC + ISR 1h）、`today` 在客户端算（访客本地），跨日窗口内两者可能不属于同一天。**已量化**：UTC+8 访客约 **6.6%/年**（8/24 跨日窗口 × 1/5.07 天候边界）可能看到候标签错一档。治本需 core 新增一份**不含重依赖**的候边界表 API——现有 `getCurrentSolarHou()` 来自 `@sojan/core` 单一 barrel，直接搬到客户端会把 ~2MB 排盘依赖链打进 `/` 路由（那正是 `614e4fc` 专门修掉的）。

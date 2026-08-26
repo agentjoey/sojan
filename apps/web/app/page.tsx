@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellLogo, HeroWheel } from "@/components/ui";
+import { BellLogo } from "@/components/ui";
+import { CompassWatermark } from "@/components/CompassWatermark";
 import { PageHeader } from "@/components/PageHeader";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { Group, Cell } from "@/components/tg/native";
@@ -68,7 +69,7 @@ export default function Home() {
         <>
           {/* ===== 卷首（编辑式 hero：文字为唯一焦点，盘环线稿出血于右缘） ===== */}
           <section className="relative overflow-hidden px-7 pt-12 lg:px-16 lg:pt-20">
-            <HeroWheel
+            <CompassWatermark
               className="pointer-events-none absolute -right-24 top-10 w-[300px] lg:-right-16 lg:w-[380px]"
               style={{ opacity: 0.14 }}
             />

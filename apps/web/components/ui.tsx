@@ -74,24 +74,6 @@ export function BellLogo({
   );
 }
 
-// —— 命盘环（hero 背景，缓慢自转）——
-export function HeroWheel({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <svg viewBox="0 0 320 320" className={className} style={style} aria-hidden>
-      <g className="zj-spin-slow" style={{ transformOrigin: "160px 160px" }}>
-        <circle cx="160" cy="160" r="150" fill="none" stroke="var(--color-ink)" strokeWidth="1.3" />
-        <circle cx="160" cy="160" r="118" fill="none" stroke="var(--color-ink)" strokeWidth="1" />
-        <circle cx="160" cy="160" r="64" fill="none" stroke="var(--color-ink)" strokeWidth="1" />
-        <g stroke="var(--color-ink)" strokeWidth=".9">
-          {Array.from({ length: 12 }, (_, i) => (
-            <line key={i} x1="160" y1="10" x2="160" y2="42" style={{ transform: `rotate(${i * 30}deg)`, transformOrigin: "160px 160px" }} />
-          ))}
-        </g>
-      </g>
-    </svg>
-  );
-}
-
 // —— 印章图标（方章，单字成标）——
 //
 // 三个 variant，各自对应一种「这是谁/处于什么状态」的判读，不是随手三种配色：

@@ -118,6 +118,7 @@ body {
 @keyframes zjFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes zjSpinSlow { to { transform: rotate(360deg); } }
 @keyframes zjSpinFast { to { transform: rotate(360deg); } }
+@keyframes zjSpinRev { to { transform: rotate(-360deg); } }
 /* 风铃主体：一阵风吹起后逐次衰减，后半程停歇，避免机械式匀速摇摆。 */
 @keyframes zjBellIdle {
   0%, 14%, 63%, 100% { transform: rotate(0deg); }

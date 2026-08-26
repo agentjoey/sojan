@@ -79,15 +79,13 @@ export const RAIL_ORDER: readonly NavId[] = [
 /** 移动九宫格：与竖栏同源，但不含「我的」（owner 决定：移动端由顶部语境胶囊进我的）。 */
 export const GRID_ORDER: readonly NavId[] = RAIL_ORDER.filter((id) => id !== "profiles");
 
-/**
- * ⚠️ 这里刻意**不**定义 `TG_ORDER`。
- *
- * 最终评审 C6：曾有一个 `TG_ORDER` 常量写在这里，全仓零引用——`app/page.tsx` 的
- * `TG_ENTRIES` 是它自己本地硬编码的项集，只从本文件消费 `isNavEnabled` 做 flag
- * 门控，从不读取任何顺序常量。留着这个死导出比删掉更危险：它的注释写着
- * 「Telegram 首页入口的项集」，后人会照 CLAUDE.md 记录的教训误以为改它就能
- * 改 TG 项集——改完什么也不会发生，这正是本仓库反复踩过的「入口两处不同步」
- * 失败形状本身。TG 项集本轮按既定决策仍在 `app/page.tsx` 本地硬编码，
- * 只共用这里的 flag 门控；若后续要把它提到单一事实源，请同时把 `TG_ENTRIES`
- * 改成消费方，不要只加一个没人读的常量。
- */
+// ⚠️ 这里刻意**不**定义 `TG_ORDER`。
+//
+// 最终评审 C6：曾有一个 `TG_ORDER` 常量写在这里，全仓零引用——`app/page.tsx` 的
+// `TG_ENTRIES` 是它自己本地硬编码的项集，只从本文件消费 `isNavEnabled` 做 flag
+// 门控，从不读取任何顺序常量。留着这个死导出比删掉更危险：它的注释写着
+// 「Telegram 首页入口的项集」，后人会照 CLAUDE.md 记录的教训误以为改它就能
+// 改 TG 项集——改完什么也不会发生，这正是本仓库反复踩过的「入口两处不同步」
+// 失败形状本身。TG 项集本轮按既定决策仍在 `app/page.tsx` 本地硬编码，
+// 只共用这里的 flag 门控；若后续要把它提到单一事实源，请同时把 `TG_ENTRIES`
+// 改成消费方，不要只加一个没人读的常量。

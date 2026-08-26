@@ -26,6 +26,12 @@ import { enabled, isActive, GRID_ORDER } from "@/lib/nav";
  * + 26px 间隔」（design ref：bar `padding: 56px 16px 0`、网格 `padding: 26px 20px 0`
  * 是兄弟节点，网格本就该在 bar 下方 26px）。
  *
+ * 水平内边距 20px（design ref 出处，供后人核对，终审曾误判此处应为 16px——
+ * 假阳性，出处不在本仓库、在设计包参考稿里）：**设计包参考稿 2a′ 画板**，
+ * 九宫格容器就是 `padding: 26px 20px 0`，紧接着就是
+ * `grid-template-columns: repeat(4, …)`——不是拍脑袋定的，也不是从竖栏
+ * 16px 抄来的，二者是设计包里两个不同画板的不同取值，不要互相对照改。
+ *
  * 最终评审 C5（复审二轮）：「进入时把焦点移入第一个格子」原来放在 `MobileShell`
  * 里，靠 `MutationObserver` 等 `next/dynamic` 异步 chunk 到位后再聚焦——那是
  * 因为彼时 `MobileShell` 无条件渲染 `<NavGrid open={open} .../>`，元素在

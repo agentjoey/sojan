@@ -185,7 +185,8 @@ describe("TG 首页页头改用 PageHeader（EP-tg-parity）", () => {
     const { container } = await renderHome();
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("照见");
-    expect(screen.getByText("— 卷 首 —")).toBeInTheDocument();
+    // UI v3 页首范式（Task 4）：kicker 不再用「— X —」破折号包裹，改为裸字。
+    expect(screen.getByText("卷 首")).toBeInTheDocument();
     expect(screen.getByText("你的命盘，是一面镜子")).toBeInTheDocument();
     // 结构性断言：PageHeader 渲染的 <header> 标签本身作为判别依据——
     // 文本断言在实现前就可能碰巧通过，只有这条能真正验证「改用了 PageHeader」。

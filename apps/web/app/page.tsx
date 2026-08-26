@@ -14,7 +14,7 @@ const ENTRIES = [
   { href: "/chart", key: "annual" as const },
   { href: "/chart", key: "chart" as const },
   { href: "/reading", key: "reading" as const },
-  ...(process.env.NEXT_PUBLIC_DREAM_ENABLED === "1" ? [{ href: "/dream", key: "dream" as const }] : []),
+  ...(isNavEnabled("dream") ? [{ href: "/dream", key: "dream" as const }] : []),
 ] as const;
 
 const CARDS = [{ id: "east" as const }, { id: "west" as const }, { id: "resonance" as const }] as const;

@@ -323,7 +323,9 @@ describe("UI v3 移动外壳", () => {
     });
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByTestId("shell-menu"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // 最终评审 C5：`NavGrid` 改成 `next/dynamic(ssr:false)` 懒加载后，覆盖层不再
+    // 是同步挂载——`findBy*` 会轮询等待异步 chunk resolve 后的重渲染。
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     const close = screen.getByTestId("shell-menu");
     expect(close.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(close);
@@ -338,7 +340,11 @@ describe("UI v3 移动外壳", () => {
     });
     const menu = screen.getByTestId("shell-menu");
     fireEvent.click(menu);
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await screen.findByRole("dialog");
+    // 最终评审 C3：Esc 监听已从 dialog 根 `onKeyDown`（靠冒泡、易被非可聚焦元素
+    // 吞掉）改成 `open` 时挂在 `document` 上的真实监听——测试要对 `document`
+    // 派发事件，才是测的真实路径，而不是绕过冒泡直接打在 dialog 上。
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(document.activeElement).toBe(menu);
   });
 
@@ -354,7 +360,7 @@ describe("UI v3 移动外壳", () => {
     });
     const menu = screen.getByTestId("shell-menu");
     fireEvent.click(menu);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     // 关闭键此刻就是 shell-menu 本身（原地切换图形，元素不变）。
     fireEvent.click(screen.getByTestId("shell-menu"));
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -371,7 +377,7 @@ describe("UI v3 移动外壳", () => {
       wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
     });
     fireEvent.click(screen.getByTestId("shell-menu"));
-    const firstCell = screen.getAllByTestId("nav-grid-cell")[0];
+    const [firstCell] = await screen.findAllByTestId("nav-grid-cell");
     expect(document.activeElement).toBe(firstCell);
   });
 
@@ -387,7 +393,7 @@ describe("UI v3 移动外壳", () => {
     });
     expect(screen.queryByTestId("nav-grid-seasons")).toBeNull();
     fireEvent.click(screen.getByTestId("shell-menu"));
-    expect(screen.getByTestId("nav-grid-seasons")).toBeInTheDocument();
+    expect(await screen.findByTestId("nav-grid-seasons")).toBeInTheDocument();
   });
 
   it("Telegram 环境内不渲染任何新外壳（冻结线）", async () => {
@@ -399,5 +405,43 @@ describe("UI v3 移动外壳", () => {
     });
     expect(screen.queryByTestId("shell-capsule")).toBeNull();
     expect(screen.queryByTestId("shell-menu")).toBeNull();
+    // `vi.doMock` 不随 `afterEach` 的 `vi.resetModules()` 自动撤销——不清理会
+    // 让 tg=true 泄漏进本文件后续测试（本轮新增 R1 用例即因此在追加时炸穿）。
+    vi.doUnmock("@/lib/tg/ui");
+  });
+
+  /**
+   * 补 R1：「移动端如何回到首页」此前全仓零测试覆盖——三次栽跟头的那条不变量
+   * （建好但不可达）只靠一个三元表达式撑着。同时钉住最终评审 C1：`MobileShell`
+   * 挂在 root layout，App Router 客户端跳转不重挂它，`open` 状态此前跨路由存活，
+   * 点任意格子后路由确实切了、覆盖层却原地不动。
+   */
+  it("端到端：覆盖层打开时胶囊回首页，路由变化后覆盖层自动关闭（R1 + C1）", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    const { rerender } = render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    // R1 的判据：覆盖层打开时胶囊必须显示品牌词「照见」并链到 `/`——九宫格
+    // 6 项不含首页，胶囊又被 D6 指去了「我的」，这条胶囊是移动端唯一回卷首的路径。
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/");
+    expect(capsule).toHaveTextContent("照见");
+
+    // 点九宫格任意一格，模拟真实导航。jsdom 里 next/link 点击不驱动本文件顶部
+    // mock 的 `usePathname`，所以用「改写 currentPath + rerender」模拟 App
+    // Router 跳转后 `usePathname()` 返回新值——这正是 C1 的 bug 现场：路由已切、
+    // `open` 状态却因为不重挂 layout 而跨路由存活。
+    fireEvent.click(screen.getAllByTestId("nav-grid-cell")[0]!);
+    currentPath = "/calendar";
+    rerender(<AppShell><div /></AppShell>);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -118,7 +118,17 @@ export function NavGrid({
                   // 项」的格子兜底调用 `onClose`——非当前项走正常导航，下一次
                   // 渲染由 C1 的 pathname 比对关闭，不需要在这里插手，避免和
                   // 那套渲染期复位打架。
-                  if (active) onClose();
+                  //
+                  // 最终复审：这里刻意用**精确匹配** `item.href === currentPath`，
+                  // 不复用上面的 `active`。`active`（`isActive`，前缀匹配）回答的
+                  // 是「这一格要不要高亮」，这里要回答的是另一个问题——「点下去
+                  // 会不会真的跳转」，两者在子路由下不等价：人在 `/fengshui/dwellings`
+                  // 时「境」格 `active` 为真（`/fengshui/dwellings`.startsWith(`/fengshui`)），
+                  // 但点它是真实跳转到 `/fengshui`。若在这里误用 `active`，会在
+                  // 跳转发生前就同步 `onClose()` → `close()` → 把焦点抢回菜单键，
+                  // 而此刻覆盖层马上就要因为跳转而不存在——正是 C1 注释里点名要
+                  // 避免的「跳转后抢焦点」，这次是从这个新分支溜进来的。
+                  if (item.href === currentPath) onClose();
                 }}
                 className="flex flex-col items-center justify-center gap-1 zj-wheel-focus"
                 style={{

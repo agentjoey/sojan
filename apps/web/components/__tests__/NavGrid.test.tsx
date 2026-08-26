@@ -42,6 +42,21 @@ describe("NavGrid 九宫格导航", () => {
     expect(screen.getByLabelText("运势").getAttribute("aria-current")).toBeNull();
   });
 
+  it("最终复审：人在子路由上点父级板块那一格，不提前关闭（真实跳转，交给 C1 渲染期复位）", async () => {
+    // 复审抓到的覆盖率缺口：`isActive` 是前缀匹配，`/fengshui/dwellings` 命中
+    // `/fengshui` 这一格的 `active=true`，但点它是真实跳转（子路由 → 父路径），
+    // 不是「同路由」。此前 `onClick` 直接判断 `active` 会在跳转发生前就同步
+    // 调 `onClose`，抢跑焦点归还。这里用 `/fengshui/dwellings` + 「境」格钉住：
+    // 必须精确匹配 `item.href === currentPath` 才关闭，这一格不该被关闭。
+    const onClose = await renderGrid(
+      { NEXT_PUBLIC_FENGSHUI_ENABLED: "1" },
+      "/fengshui/dwellings",
+    );
+    const cell = screen.getByLabelText("风水");
+    fireEvent.click(cell);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("是模态对话框，Esc 关闭（即使焦点已不在覆盖层子树内）", async () => {
     // 最终评审 C3：此前 Esc 挂在 dialog 根 `onKeyDown` 上、全靠事件冒泡——
     // dialog 根节点没有 `tabIndex`，一旦焦点不在其子树内（七十二候文字、格子

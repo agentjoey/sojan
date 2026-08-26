@@ -3,9 +3,9 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）**
-Last Updated:   2026-08-26 by claude-opus-5（UI v3 重建 A/B/C1，subagent 执行 + 三轮独立评审 + 两轮修复；已合 main 并发 staging 待 owner 实测）
+Last Updated:   2026-08-27 by claude-opus-5（UI v3 C2-1 命盘左列 + 桌面两栏，SDD 5 任务 + 全分支终审 + 一轮修复；已合 main 并发 staging）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 188 · llm 279 · web 738（全绿；`lint` 0 errors 已为阻塞闸门）
+测试:           core 192 · llm 279 · web 763（全绿；`lint` 0 errors 已为阻塞闸门）
 ⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
 
 > 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。
@@ -13,7 +13,11 @@ Last Updated:   2026-08-26 by claude-opus-5（UI v3 重建 A/B/C1，subagent 执
 >   · **B 命理可视化**：新建 `WuxingWheel`/`SeasonRuler`，改造 `BaziPillars`/`ZiweiBoard`；core 新增 `getCurrentSolarHou()`（七十二候 1–72 索引由 24 节气表推导，lunar-typescript 只给候名不给序号）。
 >   · **C1 桌面骨架 + 卷首 + 运势**：`TwoColumn` 左定右动、`CompassWatermark` 五层异速正反转水印（取代 `HeroWheel`）、`TodayCard`（已接入真实风铃素材 `windbell-jin.png`）。
 >   · **⚠️ TG 外壳按约定冻结，二期再动**——`TG_ENTRIES` 与 `{inTg && …}` 分支逐字未改。
->   · **未做**：C2（命盘+三段式解读+紫微棋盘）、C3（掷筊+解梦）、C4（我的+账号+境）、D（5s 七拍过场）。这些页面目前仍是旧 UI，与新外壳并存。
+>   · **C2-1 命盘左列 + 桌面两栏（2026-08-27 合入）**：`/chart` 接入 `TwoColumn`（左列 440px）；左列按 `5b` 建成日主行 + 纳音/生肖/年龄三枚 chip + 五行盘 + 四柱 + 大运三格 + 流年 chip；`WuxingRadar` 已被 B 块的 `WuxingWheel` 取代并删除；`PageHeader` 新增 `as` prop 修掉 `<header>` 嵌套（`/calendar` 同步修）。
+>     · **纳音/生肖是 core 新增的派生事实**（`deriveNayinZodiac`，从冻结命盘已存的**年柱字符串**反查，**不进冻结命盘**）——新旧命盘通吃、零迁移。⚠️ `ZiweiChartSchema` 里那个 `zodiac` 字段是**西洋盘的 tropical/sidereal 设置**，与生肖无关，别误用。
+>     · **年龄用简单年差不是周岁**（设计包示例「1993-12-22 生 · 33 岁」，2026-08 时其生日未到、周岁应为 32）。
+>     · 生产库实测：`profiles` 共 41 条，`luckPillars` 覆盖率 **41/41 = 100%**，空态兜底仍保留（防将来导入的老数据）。
+>   · **未做**：C2-2（右列：`3c` 三段式解读 + `6b` 紫微棋盘 + 西方盘/自我画像/时序归位）、C3（掷筊+解梦）、C4（我的+账号+境）、D（5s 七拍过场）。这些页面目前仍是旧 UI，与新外壳并存。
 > 🧭 **分支拓扑（别搞错生产在哪）**：**生产分支是 `production`**（`sojan.app` 指向它），不是 `main`。`main` = 集成分支，`staging` = `zhaojian.agentjoey.ai`。合 `main` / 推 `staging` **都不会碰生产**；上生产必须显式推 `production`。2026-08-26 核实：`production` 落后 `main` 17 个 commit（UI v3 合入前）。
 > ⚠️ **Tailwind 4 断点混单位陷阱（2026-08-26 踩中并修复）**：自定义断点用 px 而其余是 rem，会因 Tailwind 4 无法跨单位排序，让该断点的 media 块整体前置、**低断点反压高断点**，且 class-name 断言在结构上抓不到（七条测试全绿却全错）。已把 `--breakpoint-xl` 改为 `75rem`。详见 CLAUDE.md「Key Implementation Details」。
 

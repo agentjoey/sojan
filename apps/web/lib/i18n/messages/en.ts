@@ -255,6 +255,13 @@ export const en: Messages = {
     zodiacChip: "Year of the {animal}",
     ageChip: "Age {age}",
 
+    luckTitle: "Luck Cycles",
+    luckPrev: "Previous",
+    luckCurrent: "Current",
+    luckNext: "Next",
+    luckRange: "from age {startAge} · {startYear}",
+    flowYearTitle: "Annual",
+
     soulPalace: "命宫 (Life Palace)",
     bodyPalace: "身宫 (Body Palace)",
     fiveElementBureau: "五行局 (Five Element Bureau)",

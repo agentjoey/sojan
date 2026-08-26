@@ -262,6 +262,13 @@ export const zh = {
     zodiacChip: "属{animal}",
     ageChip: "{age} 岁",
 
+    luckTitle: "大运",
+    luckPrev: "前一运",
+    luckCurrent: "现行",
+    luckNext: "下一运",
+    luckRange: "{startAge} 岁起 · {startYear}",
+    flowYearTitle: "流年",
+
     soulPalace: "命宫",
     bodyPalace: "身宫",
     fiveElementBureau: "五行局",

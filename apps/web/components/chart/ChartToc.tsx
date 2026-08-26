@@ -17,11 +17,15 @@ const ROWS = [
  * hover 风格与卷首目录行对齐（`app/HomeClient.tsx` 的 `data-testid="toc-row"`）：
  * 唯一变化是箭头由 muted 转 ink（`group`/`group-hover:text-ink`），不加投影/位移/放大
  * （设计包 `06-desktop` §4 明令强调手法与 hover 都要克制）。
+ *
+ * `xl:hidden`（M6/R8）：spec §2.1/§10 的左列枚举本就不含目录；§2.2 原话是
+ * 「移动端由目录两行提供锚点跳转」——桌面上两个锚点目标就在紧邻可见的右列
+ * 里，点了几乎不动，纯属多余。jsdom 无布局，锚点一致性断言不受影响。
  */
 export function ChartToc() {
   const t = useT();
   return (
-    <nav className="mt-8" style={{ borderTop: "1px solid var(--color-line)" }}>
+    <nav className="mt-8 xl:hidden" style={{ borderTop: "1px solid var(--color-line)" }}>
       {ROWS.map(({ href, key }) => (
         <a
           key={href}

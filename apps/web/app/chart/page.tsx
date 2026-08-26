@@ -7,7 +7,7 @@ import { hasTgSession, isTelegram, tgGetProfile, tgGetQuestionnaire } from "@/li
 import type { QuestionnaireAnswers } from "@sojan/core";
 import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { timelineAction } from "@/app/actions";
-import { Card, BellLogo } from "@/components/ui";
+import { Card, BellLogo, cn } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 import { Markdown } from "@/components/Markdown";
@@ -245,7 +245,10 @@ export default function ChartPage() {
     <>
       {/* 三段式解读 */}
       <section id="reading-tabs" data-testid="reading-tabs-anchor">
-        <ChartBlock label={t("chart.readingTitle")}>
+        {/* 右列第一块：桌面上与左列頭部对齐，去掉自己的上边距/分隔线/上内边距
+            （I3）——移动端单列态紧接在 ChartToc 之后，那条线仍是有意义的分隔，
+            必须断点门控，不能无条件去掉。 */}
+        <ChartBlock label={t("chart.readingTitle")} className="xl:mt-0 xl:border-t-0 xl:pt-0">
           {!inTg && !reading && !streaming && (
             <button
               onClick={generate}
@@ -308,28 +311,30 @@ export default function ChartPage() {
           </Card>
         </ChartBlock>
       )}
+
+      {/* 免责声明（I1）：挪进右列末尾（叙述末尾），而非 TwoColumn 外层——
+          外层挂它会在 xl 断点把 document 撑高出约 116px，破坏「页面不滚、
+          两列各自滚」的两栏模型（`/calendar` 无此问题，它把免责句放进了
+          header 槽）。移动端单列态 DOM 顺序本就在最后，不受影响。 */}
+      <p className="mt-10 pb-10 text-[12px] leading-relaxed text-muted">
+        {t("chart.pageDisclaimer")}
+      </p>
     </>
   );
 
   return (
     <main>
       <TwoColumn leftWidth={440} header={header} left={left} right={right} />
-      {/* 免责声明是整页级合规文案，刻意放在 TwoColumn 外——塞进两栏会被归进
-          某一列（同 calendar 页 header 里那条的道理，但这里 TwoColumn 的
-          header 槽已经很挤，改放页面级更清楚）。 */}
-      <p
-        className="mx-auto mt-10 w-full px-5 pb-10 text-[12px] leading-relaxed text-muted md:max-xl:w-[min(100%-96px,720px)] md:max-xl:px-0 xl:max-w-[1120px] xl:px-14"
-      >
-        {t("chart.pageDisclaimer")}
-      </p>
     </main>
   );
 }
 
-// 图表区块：小标签 + 直接落纸底，区块间 1px 细线分隔（取代旧 Section 的朱砂破折号 + Card 包装）
-function ChartBlock({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+// 图表区块：小标签 + 直接落纸底，区块间 1px 细线分隔（取代旧 Section 的朱砂破折号 + Card 包装）。
+// borderTop 改用 Tailwind 类而非内联 style（I3）——内联优先级恒高于类，
+// 调用方传入的 `xl:border-t-0` 等断点类压不掉内联 style，此坑本仓已踩过一次。
+function ChartBlock({ label, children, className }: { label: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className="mt-10 pt-8" style={{ borderTop: "1px solid var(--color-line)" }}>
+    <section className={cn("mt-10 border-t border-[var(--color-line)] pt-8", className)}>
       <h2 className="mb-6 text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>{label}</h2>
       {children}
     </section>

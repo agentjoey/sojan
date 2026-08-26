@@ -48,7 +48,10 @@ export function LuckPillars({ bazi }: { bazi: UnifiedChart["bazi"] }) {
   const years = Array.from({ length: 10 }, (_, i) => start + i);
 
   return (
-    <div>
+    // mt-10 + border-top + pt-8（I4）：与 ChartBlock 的块级节奏对齐——此前根是
+    // 裸 <div>，上游 BaziPillars 末行只有 py-4，「大运」标题因此被吸进了
+    // 四柱块里（同款 11px/.3em 字号进一步加剧误读）。
+    <div className="mt-10 border-t border-[var(--color-line)] pt-8">
       <h3 className="text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>
         {t("chart.luckTitle")}
       </h3>

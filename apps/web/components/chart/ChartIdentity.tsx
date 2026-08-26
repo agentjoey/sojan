@@ -44,7 +44,11 @@ export function ChartIdentity({ chart }: { chart: UnifiedChart }) {
   if (age !== null) chips.push(t("chart.ageChip", { age }));
 
   return (
-    <div className="text-center">
+    // mt-8/xl:mt-6（I2）：页头与本组件之间此前是 0 间距（页头无下外边距、
+    // TwoColumn header 槽只在 xl 有 pb-6、grid 无 row-gap）——补回原
+    // ChartBlock 的 mt-10 pt-8 节奏留下的间距缺口。本组件只被 /chart 消费，
+    // 改这里不影响 /calendar。
+    <div className="mt-8 text-center xl:mt-6">
       <p data-testid="day-master-line" className="font-serif text-[17px]">
         <span className="text-cinnabar">{line}</span>
         {tagKey && <> ·{t(tagKey)}</>}

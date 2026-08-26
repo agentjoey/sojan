@@ -32,6 +32,7 @@ export const en: Messages = {
   },
   account: {
     title: "Account",
+    entry: "Account & Sign-in",
     kicker: "Account",
     sectionSubscription: "Subscription",
     sectionBinding: "Bindings",

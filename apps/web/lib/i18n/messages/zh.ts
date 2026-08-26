@@ -30,6 +30,7 @@ export const zh = {
   },
   account: {
     title: "账号",
+    entry: "账号与登录",
     kicker: "账 户",
     sectionSubscription: "订 阅",
     sectionBinding: "绑 定",

@@ -121,3 +121,18 @@ describe("档案列表：对照设计稿", () => {
     expect(screen.queryByText("＋ 新建档案")).toBeNull();
   });
 });
+
+describe("UI v3：账号入口（Task 2 移除常驻「账」项后，这里是唯一路径）", () => {
+  it("有一条独立的账号分节行，指向 /account", async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByTestId("account-entry")).toBeInTheDocument());
+    const entry = screen.getByTestId("account-entry");
+    expect(entry.getAttribute("href")).toBe("/account");
+  });
+
+  it("页头 action 槽里不再重复一个账号按钮（同页只留一个入口）", async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByTestId("account-entry")).toBeInTheDocument());
+    expect(screen.getAllByRole("link", { name: /账号/ })).toHaveLength(1);
+  });
+});

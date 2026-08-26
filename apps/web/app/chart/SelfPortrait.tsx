@@ -100,7 +100,7 @@ export function SelfPortrait({
   }
 
   return (
-    <Card className="mb-6" topAccent={portrait.dominantElement as "wood" | "fire" | "earth" | "metal" | "water"}>
+    <Card className="mb-6">
       <div className="mb-5 flex items-center gap-3">
         <img
           src={`/spirit/portrait-${spirit.dominantElement.toLowerCase()}.jpg`}

@@ -140,6 +140,82 @@ export function SealIcon({
   );
 }
 
+/**
+ * 全站**唯一**的强调手法（设计包 02-components §2）：2px 朱砂线 + 向对侧淡出的
+ * 极浅朱砂底 + 朱砂粗字（关键字由调用方用 `text-cinnabar font-semibold` 标）。
+ *
+ * ⚠️ 不要为「强调」再发明第二种表达（色块 / 渐变按钮 / 投影 / 顶边彩条）。
+ * `Card.topAccent` 就是被这条规则废掉的——一旦有先例，后面 8 屏就守不住。
+ *
+ * 用于：当前候、现行大运、当前流年、当前档案、命宫、生气方、危险区、选中筊象。
+ */
+export function Emphasis({
+  axis = "horizontal",
+  className,
+  children,
+  ...rest
+}: { axis?: "horizontal" | "vertical" } & React.HTMLAttributes<HTMLDivElement>) {
+  const horizontal = axis === "horizontal";
+  return (
+    <div
+      className={cn(horizontal ? "pl-3 -ml-3.5" : "pt-3 -mt-3.5", className)}
+      style={{
+        [horizontal ? "borderLeft" : "borderTop"]: "2px solid var(--color-cinnabar)",
+        backgroundImage: `linear-gradient(${horizontal ? "90deg" : "180deg"}, rgba(168,70,56,.07), rgba(168,70,56,0) 78%)`,
+      }}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** 方角小 chip（设计包 §4）：padding 4px 11px / radius 4px。 */
+export function Chip({
+  emphasis = false,
+  className,
+  children,
+  ...rest
+}: { emphasis?: boolean } & React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      className={cn("inline-flex items-center text-[12px]", className)}
+      style={{
+        padding: "4px 11px",
+        borderRadius: "var(--radius-chip)",
+        background: emphasis ? "transparent" : "var(--color-tint)",
+        color: emphasis ? "var(--color-cinnabar)" : "var(--color-ink-2)",
+        border: emphasis ? "1px solid var(--color-cinnabar)" : undefined,
+      }}
+      {...rest}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** 胶囊 chip（生肖 / 纳音 / 年龄 / 流年）：radius 9999px / 1px 细线 / 11.5px。 */
+export function PillChip({
+  className,
+  children,
+  ...rest
+}: React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      className={cn("inline-flex items-center text-[11.5px]", className)}
+      style={{
+        padding: "5px 12px",
+        borderRadius: "9999px",
+        border: "1px solid var(--color-line)",
+        color: "var(--color-ink-2)",
+      }}
+      {...rest}
+    >
+      {children}
+    </span>
+  );
+}
+
 // —— 按钮 ——
 export function Button({
   variant = "primary",
@@ -147,7 +223,7 @@ export function Button({
   children,
   ...rest
 }: {
-  variant?: "primary" | "secondary" | "text";
+  variant?: "primary" | "secondary" | "text" | "action";
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const base = "zj-btn inline-flex items-center justify-center gap-2 text-[15px] font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed";
   const styles =
@@ -155,11 +231,19 @@ export function Button({
       ? "px-6 py-3 text-[var(--color-paper)] bg-[var(--color-cinnabar)] hover:bg-[var(--color-cinnabar-press)]"
       : variant === "secondary"
         ? "px-6 py-3 text-[var(--color-ink)] bg-transparent border border-[var(--color-line)] hover:border-[var(--color-line-strong)]"
-        : "text-[var(--color-ink-2)] underline underline-offset-[5px] hover:text-[var(--color-ink)]";
+        : variant === "action"
+          ? "w-full py-4 text-[16px] font-medium text-[var(--color-paper)] bg-[var(--color-cinnabar)] hover:bg-[var(--color-cinnabar-press)]"
+          : "text-[var(--color-ink-2)] underline underline-offset-[5px] hover:text-[var(--color-ink)]";
   return (
     <button
       className={cn(base, styles, className)}
-      style={variant === "primary" || variant === "secondary" ? { borderRadius: "var(--radius-button)" } : undefined}
+      style={
+        variant === "primary" || variant === "secondary"
+          ? { borderRadius: "var(--radius-button)" }
+          : variant === "action"
+            ? { borderRadius: "var(--radius-button)", letterSpacing: "0.16em" }
+            : undefined
+      }
       {...rest}
     >
       {children}
@@ -167,19 +251,16 @@ export function Button({
   );
 }
 
-// —— 信息卡（细线描边，无阴影；可选顶边强调色：fire/water/metal/none）——
+// —— 信息卡（细线描边，无阴影）——
 export function Card({
-  topAccent,
   dark = false,
   className,
   children,
 }: {
-  topAccent?: Element | "cinnabar";
   dark?: boolean;
   className?: string;
   children: ReactNode;
 }) {
-  const accentVar = topAccent ? (topAccent === "cinnabar" ? "var(--color-cinnabar)" : `var(--color-${topAccent})`) : undefined;
   return (
     <div
       className={cn("p-5", className)}
@@ -188,7 +269,6 @@ export function Card({
         background: dark ? "var(--color-ink)" : "var(--color-surface)",
         color: dark ? "var(--color-on-ink)" : "var(--color-ink)",
         border: dark ? undefined : "1px solid var(--color-line)",
-        borderTop: accentVar ? `2px solid ${accentVar}` : undefined,
       }}
     >
       {children}
@@ -210,47 +290,34 @@ export function MutagenTag({ kind }: { kind: "禄" | "权" | "科" | "忌" }) {
   );
 }
 
-export function Tag({
-  children,
-  tone = "line",
-}: {
-  children: ReactNode;
-  tone?: "line" | "ink" | "gold";
-}) {
-  const style =
-    tone === "ink"
-      ? { background: "var(--color-tint)", color: "var(--color-ink-2)" }
-      : tone === "gold"
-        ? { background: "transparent", color: "var(--color-gold)", border: "1px solid var(--color-gold)" }
-        : { background: "transparent", color: "var(--color-ink-2)", border: "1px solid var(--color-line)" };
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 text-[12px]" style={{ borderRadius: "var(--radius-chip)", ...style }}>
-      {children}
-    </span>
-  );
-}
-
 // —— 天干地支圆徽（墨底纸字；日主朱砂双描边）——
+const GANZHI_SIZE = { sm: 26, md: 34, lg: 46 } as const;
+
 export function GanzhiBadge({
   char,
   highlight = false,
-  size = 44,
+  size = "md",
 }: {
   char: string;
-  highlight?: boolean; // 日主双描边
-  size?: number;
+  /**
+   * 日主双描边。⚠️ 这里的 box-shadow 是**描边**（inset 双层轮廓线），不是投影，
+   * 与「零阴影」不冲突，勿误删。
+   */
+  highlight?: boolean;
+  size?: keyof typeof GANZHI_SIZE;
 }) {
+  const px = GANZHI_SIZE[size];
   return (
     <span
       className="inline-flex items-center justify-center font-semibold"
       style={{
-        width: size,
-        height: size,
+        width: px,
+        height: px,
         borderRadius: "50%",
         background: "var(--color-ink)",
         color: "var(--color-paper)",
         fontFamily: "var(--font-serif)",
-        fontSize: size * 0.46,
+        fontSize: px * 0.46,
         boxShadow: highlight ? "0 0 0 2px var(--color-paper), 0 0 0 3px var(--color-cinnabar)" : undefined,
       }}
     >

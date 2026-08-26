@@ -270,7 +270,7 @@ export default function ChartPage() {
 
       {timeline && (
         <ChartBlock label={t("chart.timelineTitle")}>
-          <Card topAccent="metal">
+          <Card>
             <div className="reading-prose"><Markdown text={timeline.replace(/^##\s*本年时序\s*/, "")} /></div>
             <p className="mt-3 text-[11px] text-muted">{t("chart.timelineDisclaimer", { year: YEAR })}</p>
           </Card>

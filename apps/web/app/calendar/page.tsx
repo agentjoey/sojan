@@ -215,8 +215,8 @@ export default function CalendarPage() {
                     {fortune.lunarDate ? ` · ${fortune.lunarDate}` : ""}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <GanzhiBadge char={fortune.dayGanZhi[0]!} size={36} />
-                    <GanzhiBadge char={fortune.dayGanZhi[1]!} size={36} />
+                    <GanzhiBadge char={fortune.dayGanZhi[0]!} size="md" />
+                    <GanzhiBadge char={fortune.dayGanZhi[1]!} size="md" />
                   </div>
                 </div>
                 <div className="mt-4">

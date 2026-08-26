@@ -25,19 +25,49 @@ import { getCurrentSolarHou } from "@sojan/core";
  * 两步修复：
  * 1. 本文件加 `export const revalidate = 3600`——候的粒度是天，一小时的 ISR
  *    窗口足够让候按天推进，不需要更激进的重新生成频率。
- * 2. 「今日日期」与「星期」**不在此处算**，改由 `HomeClient` 在客户端算——
- *    服务端算的是部署/ISR 重新生成所在机器的 UTC 时刻，跨午夜时区本来就会算错一档；
- *    候（`solarHou`）仍留在此处（服务端），因为它只需要按天更新、ISR 一小时足够，
- *    且这是保住「`@sojan/core` 不进客户端 bundle」这条收益的关键——千万别把
- *    `getCurrentSolarHou()` 也搬回 `HomeClient`，那会把 2MB 的排盘依赖链 chunk
- *    重新拖进 `/` 路由，前功尽弃。
+ * 2. 「今日日期」与「星期索引」**仍在此处（服务端）算一次**，作为 `HomeClient`
+ *    的 **useState 初值**传下去——不是最终显示值。原因见下方「三段式」。
+ *
+ * ⚠️ 三段式收口（本文件另一处遗留 Critical：常态性 hydration mismatch）：
+ * `HomeClient` 虽是 client component，但 `/` 是全静态预渲染路由，它照样会被
+ * 服务端预渲染进静态 HTML（`grep -o "2026\.0[0-9]\.[0-9][0-9]" .next/server/app/index.html`
+ * 能看到烤死的日期）。此前的方案让 `HomeClient` 在渲染时直接 `new Date()`，
+ * 服务端用的是部署/ISR 机器的 UTC 时刻、客户端用访客本地时钟——两者不一致的
+ * 时长等于时区偏移量（华裔用户本地 00:00–07:59、美西用户本地 17:00–23:59 皆为
+ * 常态性不一致，不是「边界时刻」），React 会把它当 recoverable hydration error
+ * 处理并报 console 错误，不是「静默换值」。
+ *
+ * 正确做法（不冻结 + 无 mismatch + 最终以访客本地时钟为准，三者都要）：
+ * 1）本文件算一次「ISR 重新生成时刻」的日期/星期索引，当 **初值** props 传下去；
+ * 2）`HomeClient` 用这个 prop 作 `useState` 初值——服务端渲染与客户端首次渲染
+ *    逐字节一致，mismatch 从根上不存在；
+ * 3）`HomeClient` 随后在 `useEffect`（只在挂载后跑，服务端不执行）里用访客本地
+ *    时钟重算、`setState` 覆盖——挂载后立刻纠偏成访客本地时间。
+ * 有 `revalidate = 3600` 兜着，这个初值最多陈旧 1 小时，不会回到「永久冻结」。
+ *
+ * 候（`solarHou`）仍留在此处（服务端）现算，因为它只需要按天更新、ISR 一小时
+ * 足够，且这是保住「`@sojan/core` 不进客户端 bundle」这条收益的关键——千万别把
+ * `getCurrentSolarHou()` 也搬进 `HomeClient`，那会把 2MB 的排盘依赖链 chunk
+ * 重新拖进 `/` 路由，前功尽弃。日期/星期是纯 `Date` 运算，与 core 无关，不受此限。
  */
 export const revalidate = 3600;
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
 
 export default function Home() {
   // 七十二候：由 core 现算，卷首与运势页各自取值时机不同，故本页在此自取一次
   // （`TodayCard`/`SeasonRuler` 均不自己调 `getCurrentSolarHou()`，见两组件文档）。
   const solarHou = getCurrentSolarHou();
 
-  return <HomeClient solarHou={solarHou} />;
+  // 「今日日期」与「星期索引」：只作为 HomeClient 的 useState 初值（防 hydration
+  // mismatch），不是最终显示值——HomeClient 挂载后会用访客本地时钟纠偏，见上方文档。
+  const now = new Date();
+  const today = {
+    date: `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`,
+    dayIndex: now.getDay(),
+  };
+
+  return <HomeClient solarHou={solarHou} today={today} />;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BellLogo, SealIcon } from "@/components/ui";
@@ -79,35 +80,73 @@ type SolarHouProp = {
   index: number;
 };
 
+/** 服务端 `page.tsx` 用 `new Date()` 现算一次、当 useState 初值传下来的日期形状——
+ * 只是「ISR 重新生成时刻」的快照，挂载后立刻会被访客本地时钟纠偏，见下方 hook。 */
+type TodayProp = {
+  /** `YYYY.MM.DD`，服务端时区/时刻现算。 */
+  date: string;
+  /** `Date#getDay()` 的 0–6，喂给 `calendar.weekDays` 做星期文案索引。 */
+  dayIndex: number;
+};
+
 export type HomeClientProps = {
   /** 七十二候：服务端组件 `page.tsx` 用 `getCurrentSolarHou()` 现算后传入，
    * 本组件不再自己调用（该函数来自 `@sojan/core`，静态 import 会把整条排盘依赖链
    * 打进 TG 首页客户端 chunk，见 `.superpowers/sdd/2026-08-26-ui-v3-c1-daily/bundle-fix-report.md`）。 */
   solarHou: SolarHouProp;
+  /** 今日日期/星期索引的**初值**——来自 `page.tsx` 服务端现算，作用是让本组件的
+   * 首次客户端渲染与服务端预渲染的 HTML 逐字节一致（防 hydration mismatch）。
+   * 挂载后的 `useEffect` 会用访客本地时钟覆盖它，这个 prop 不是最终显示值。 */
+  today: TodayProp;
 };
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export default function HomeClient({ solarHou }: HomeClientProps) {
+function computeToday(): TodayProp {
+  const now = new Date();
+  return {
+    date: `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`,
+    dayIndex: now.getDay(),
+  };
+}
+
+export default function HomeClient({ solarHou, today: initialToday }: HomeClientProps) {
   const inTg = useIsTelegram();
   const router = useRouter();
   const t = useT();
 
   /**
-   * 终审必修 1：「今日日期」与「星期」**必须在客户端算**，不接受服务端 props——
-   * `/` 是全静态预渲染路由（见 `page.tsx` 的 `export const revalidate`），
-   * 若这两个值在服务端组件里算，会在构建/ISR 重新生成时刻被烤进 RSC payload，
-   * 且服务端算的是部署机器的 UTC，跨午夜本来就会跟访客本地时间错一档。
-   * 本组件是 `"use client"`，这里的 `new Date()` 在客户端 hydrate 时会重新求值——
-   * 首次 SSR/ISR 输出的文本与客户端 hydrate 后的文本可能不同（跨 ISR 窗口的边界
-   * 时刻），这是「日期必须以访客本地时钟为准」这条要求下**有意为之**的取舍，
-   * React 对文本节点的 hydration mismatch 只会静默换成客户端值，不影响交互。
+   * 为什么初值来自 `page.tsx` 传下来的 prop，而不是直接在这里 `new Date()`：
+   *
+   * `/` 是全静态预渲染路由（见 `page.tsx` 的 `export const revalidate = 3600`）——
+   * 这个 client component 照样会被服务端预渲染进静态 HTML。若这里的首次渲染
+   * 直接读 `new Date()`，服务端预渲染用的是部署/ISR 机器的 UTC 时刻，客户端
+   * hydrate 时读的是访客本地时钟，两者不一致的时长等于时区偏移量——华裔用户
+   * 每天本地 00:00–07:59、美西用户每天本地 17:00–23:59 都会踩到，是**常态**
+   * 而非边界时刻。React 19 会把这类文本 mismatch 当 recoverable error 处理并
+   * 报 console 错误（丢弃该处服务端 HTML、客户端重渲染），不是「静默换值」。
+   *
+   * 用服务端算好的 `initialToday` 作 `useState` 初值，服务端渲染与客户端首次
+   * 渲染就逐字节一致——mismatch 从根上不存在。随后下面的 `useEffect`（只在
+   * 挂载后跑，服务端不执行）立刻用访客本地时钟重算并 `setState` 覆盖：不冻结
+   * （`initialToday` 有 ISR 1 小时兜底）、无 hydration 错误（首渲一致）、
+   * 最终显示值仍以访客本地时钟为准（effect 覆盖），三者同时满足。
    */
-  const now = new Date();
-  const todayDate = `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`;
-  const weekDay = t("calendar.weekDays").split(",")[now.getDay()];
+  const [today, setToday] = useState<TodayProp>(initialToday);
+
+  useEffect(() => {
+    // 有意为之（不是可挪进渲染体的派生状态）：这正是「先用服务端初值渲染避免
+    // hydration mismatch、挂载后立刻用访客本地时钟纠偏」的规范写法，与
+    // `lib/i18n/I18nProvider.tsx`（62 行）、`components/tg/DarkImage.tsx`
+    // （21 行）是同一类已被本仓库接受的模式。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setToday(computeToday());
+  }, []);
+
+  const todayDate = today.date;
+  const weekDay = t("calendar.weekDays").split(",")[today.dayIndex];
 
   return (
     <main className="mx-auto w-full max-w-[480px] pb-16 lg:max-w-5xl">

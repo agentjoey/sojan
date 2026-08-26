@@ -62,4 +62,15 @@ describe("ChartIdentity", () => {
     expect(screen.getByTestId("day-master-line").textContent).toBe("Day Master 庚金 ·[Weak]");
     expect(screen.getAllByTestId("identity-chip")[1].textContent).toBe("Year of the 鸡");
   });
+
+  it("年柱非法（不在 60 甲子里）时 deriveNayinZodiac 返回 null —— 只剩年龄一枚 chip，不渲染 null/undefined", () => {
+    // 「甲丑」：地支合法、但干支阴阳不配对，不在 60 甲子里，LunarUtil.NAYIN['甲丑'] === undefined。
+    // deriveNayinZodiac 对它返回 null（Task 1 已实测）。这条覆盖 `if (nz)` 守卫的假侧——
+    // 之前五条用例的年柱永远合法，nz 恒为真，假侧从未被测到过。
+    const { container } = renderAt(fixture({ pillars: { year: { stem: "甲", branch: "丑" }, month: {}, day: {}, hour: {} } as never }));
+    const chips = screen.getAllByTestId("identity-chip");
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent).toBe("33 岁");
+    expect(container.textContent).not.toMatch(/null|undefined/);
+  });
 });

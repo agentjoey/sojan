@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { BellLogo } from "@/components/ui";
 import { NavGrid } from "@/components/NavGrid";
@@ -18,11 +18,28 @@ function labelKeyForPath(pathname: string): string {
  * 移动端顶部外壳（Task 6）：左侧语境胶囊 + 右侧菜单键，点开
  * `NavGrid` 九宫格全屏覆盖层。自成一体（含 `open` 状态与 `NavGrid` 本身），
  * 因为焦点归还（关闭后回到菜单键）需要同一个 `useRef` 既挂在按钮上、
- * 又被 `onClose` 读取——放在同一个组件里最直接，不必在 `AppShell` 与
+ * 又被 `close()` 读取——放在同一个组件里最直接，不必在 `AppShell` 与
  * 本组件之间转发 ref。
  *
  * 层叠顺序：`NavGrid` 的遮罩 `z-index: 40`，本组件顶栏必须压在其上——
  * 覆盖层打开时胶囊与菜单键仍需可见（菜单键原地变关闭键）。这里用 60。
+ *
+ * 焦点管理（评审 Critical + 控制器裁定必修，`NavGrid.tsx` 的注释已明确写明
+ * 这活留给外壳）：
+ * - 关闭：菜单键的 `onClick` 与 `NavGrid` 内部 Esc 都收敛到同一个 `close()`——
+ *   此前菜单键 `onClick` 是裸 `setOpen((v) => !v)`，不经过 `close()`，导致点击
+ *   关闭键这条路径完全不归还焦点。iOS Safari / WebView 点 `<button>` 默认不留
+ *   焦点（跟桌面浏览器行为不同），这个组件又叫 MobileShell——移动端正是主场，
+ *   所以这不是可以忽略的边角情况。
+ * - 打开：聚焦九宫格第一个导航格（而不是对话框容器本身）——`NavGrid` 根节点
+ *   没有 `tabIndex`，本任务文件清单不含 `NavGrid.tsx`，改它的可聚焦性不在这次
+ *   改动范围内；第一个导航格天然是 `<a href>`，本就可聚焦，键盘用户按 Tab 前
+ *   焦点已经在覆盖层内部的真实交互元素上。
+ * - 如实说明未做的部分：`aria-modal="true"` 通常意味着背景内容对辅助技术是
+ *   惰性的，但这里**没有做完整的 Tab 焦点陷阱**——覆盖层打开后一路 Tab 下去，
+ *   焦点仍会跑出覆盖层、落到背后页面的链接上。做完整陷阱需要枚举/监听覆盖层
+ *   内的可聚焦元素并在首尾兜圈，这次先只保证「进入时落进对话框」+「关闭后归还
+ *   菜单键」，把陷阱标记为已知缺口而不是假装做了。
  */
 export function MobileShell({ currentPath }: { currentPath: string }) {
   const t = useT();
@@ -34,9 +51,19 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
 
   function close() {
     setOpen(false);
-    // 无障碍：关闭后焦点归还菜单键（不管是点关闭键还是 NavGrid 内部 Esc 触发）。
+    // 无障碍：关闭后焦点归还菜单键——两条关闭路径（点关闭键 / NavGrid 内 Esc）
+    // 都必须走这个函数，见上方组件注释「评审 Critical」一节。
     menuRef.current?.focus();
   }
+
+  useEffect(() => {
+    if (!open) return;
+    // 无障碍：打开时把焦点移入对话框——聚焦九宫格第一个导航格（选择理由见
+    // 组件顶部注释）。不在 SSR 水合比对范围内：这个 effect 只在 `open` 变为
+    // `true`（用户点击之后）才跑，跟水合无关。
+    const firstCell = document.querySelector<HTMLAnchorElement>('[data-testid="nav-grid-cell"]');
+    firstCell?.focus();
+  }, [open]);
 
   return (
     <>
@@ -80,7 +107,7 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
           data-testid="shell-menu"
           aria-expanded={open}
           aria-label={open ? t("nav.close") : t("nav.menu")}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => (open ? close() : setOpen(true))}
           style={{
             width: 44,
             height: 44,

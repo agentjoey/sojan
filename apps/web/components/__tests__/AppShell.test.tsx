@@ -330,7 +330,7 @@ describe("UI v3 移动外壳", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("关闭后焦点归还菜单键", async () => {
+  it("关闭后焦点归还菜单键（Esc 路径）", async () => {
     const { AppShell } = await import("../AppShell");
     const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
     render(<AppShell><div /></AppShell>, {
@@ -340,6 +340,39 @@ describe("UI v3 移动外壳", () => {
     fireEvent.click(menu);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(document.activeElement).toBe(menu);
+  });
+
+  // 评审 Critical：此前菜单键 onClick 直接 setOpen(v => !v)，不经过 close()，
+  // 点击关闭这条路径根本不归还焦点——iOS Safari/WebView 点 <button> 默认不留
+  // 焦点（跟桌面浏览器不同），MobileShell 移动端正是主场，这不是边角情况。
+  // 两条关闭路径（本用例 + 上面的 Esc 用例）现在都收敛到同一个 close()。
+  it("关闭后焦点归还菜单键（点关闭键路径）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const menu = screen.getByTestId("shell-menu");
+    fireEvent.click(menu);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // 关闭键此刻就是 shell-menu 本身（原地切换图形，元素不变）。
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("打开时焦点移入对话框（九宫格第一个导航格）", async () => {
+    // 控制器裁定必修：NavGrid 声明 aria-modal="true"，若打开后焦点仍留在菜单键
+    // 上、Tab 又能跑到背后页面，aria-modal 就是一句假声明。选择聚焦第一个
+    // 导航格（而不是对话框容器本身）——理由见 MobileShell.tsx 顶部注释。
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    const firstCell = screen.getAllByTestId("nav-grid-cell")[0];
+    expect(document.activeElement).toBe(firstCell);
   });
 
   it("SSR 水合安全：打开前七十二候节点不存在，只在用户点开菜单后才挂载", async () => {

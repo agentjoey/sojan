@@ -24,7 +24,7 @@
 |---|---|---|
 | 1 | `TwoColumn` 桌面「左定右动」两栏骨架 | 新建 |
 | 2 | `TodayCard` 今日卡（卷首与运势共用） | 新建 |
-| 3 | `WindBell` 风铃**占位**组件 | 新建（占位） |
+| 3 | `WindBell` 风铃组件 | 新建（2026-08-26 追加：真实素材已接入，见 §7） |
 | 4 | `CompassWatermark` 五层转盘水印 + `zjSpinRev` keyframes | 新建（取代 `HeroWheel`） |
 | 5 | `app/page.tsx` 卷首重建（5a） | 重建 |
 | 6 | `app/calendar/page.tsx` 运势重建（桌面 8a；移动版推导） | 重建 |
@@ -32,7 +32,7 @@
 **不做：**
 - 其余 6 屏（C2/C3/C4）。
 - 排盘过场 5s 七拍（D 块）。
-- **风铃真实素材**——见 §7，本波只出占位。
+- **风铃四档配图**（吉/顺/平/谨随判词切换）——见 §7，本波只接入「谨」这一张。
 
 ## 3. 桌面骨架（06-desktop §2/§3）
 
@@ -114,7 +114,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ```
 卡头：`今 日`（朱砂眉标） | 日期 + 农历（Cormorant 13px）
-左栏 124px，border-right 1px line：风铃图撑满，幡面写当日判词
+左栏 124px，border-right 1px line：风铃图撑满（幡面刻字随图，非叠加）
 右栏：候名「处暑 · 初候」(11px/.28em) → 物候名 serif 23px/700 朱砂 → 1px 细线
       → 润色一句 serif 14.5px → 元数据行（`庚申 · 官杀当值` / `五维 3/10`）
 卡脚：`展开今日日签 →`（指向 /calendar）
@@ -124,13 +124,11 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ⚠️ 候名与物候名从 B 块的 `getCurrentSolarHou()` 取，**不要另算**。
 
-## 7. 风铃：本波只出占位
+## 7. 风铃：真实素材已接入（2026-08-26 更新）
 
-`WindBell`（原误称「风幡」——这是风铃的另一张图，不是风幡）组件接口按最终形态设计（`<WindBell verdict="谨" />`），但**渲染占位**：一块符合设计语言的细线区域 + 判词大字，不试图模仿幡面。
+`WindBell`（原误称「风幡」，owner 2026-08-26 纠正：这是风铃的另一张图，不是风幡）组件渲染 `public/brand/windbell-jin.png`（`<WindBell verdict="谨" />`）——owner 核实这张 1254×1254、RGBA 带透明通道的图就是要用的终版素材，不再是占位。
 
-理由见 backlog `EP-uiv3-banner`：设计包两张素材都烧着字、`windbell-source` 连 alpha 通道都没有，**没有可用的无字透明底图**；不 P 图伪造素材、不用手绘矢量凑数（`EP-jiao` 掷筊那轮已验证手绘到不了参考图水准，owner 判「效果太差，质感粗糙，放弃」）。
-
-拿到素材后只需换 `WindBell` 内部实现，调用方不动。**占位必须一眼看得出是占位**，不要做成「像是完成品的次品」——那会让人误以为这就是最终效果。
+背景见 backlog `EP-uiv3-banner`：图上的字（「谨」）是烧进图里的，**不是运行时叠字**。这意味着幡面上的字目前不随当日判词变化——设计包判词有四档（吉/顺/平/谨），但目前只有「谨」这一张对应素材。`verdict` prop 因此不再渲染为可见文字（避免与图上烧的字重复出现两个字），只进 `aria-label`，且措辞诚实、不声称图上写的是当日判词。等四档配图都到位后，应改为 `verdict → 图片文件` 的映射，`WindBell` 调用方接口不必再变。
 
 ## 8. 测试策略
 
@@ -140,7 +138,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 - **断点行为**：768/1200/1600 三档用 Tailwind 响应式类，断言类名而非视口——jsdom 测不了媒体查询生效。
 - **`TodayCard` 双消费方**：卷首与运势渲染的是**同一个组件**，补一条断言防止日后各自复制一份。
 - **`CompassWatermark`**：五层各自的动画名与时长、正反方向。⚠️ 别断言 SVG path。
-- **`WindBell` 占位**：断言它渲染的是占位而非成品（例如带 `data-placeholder`），避免日后素材到位时忘了替换。
+- **`WindBell` 真实素材**：断言真实素材已接入（`<img>` 指向 `windbell-jin.png`，`alt` 存在且诚实），并加一条 mutation 复验断言防止把 `verdict` 当可见大字叠加渲染（图上字已烧死，叠加会出现两个字）。
 - **B 块组件的接线**：`SeasonRuler` 的 `index` 来自 `getCurrentSolarHou()`，断言接线而非硬编码。
 - 关键改动做 **mutation 复验**。
 - ⚠️ 本波若动 `packages/core` 要跑三个包。
@@ -154,7 +152,7 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 - [ ] 桌面运势**不出黄历**，移动运势**保留黄历**
 - [ ] 宜忌桌面两栏逐行对齐（非 `<ul>` 散排）
 - [ ] 候名/物候名来自 `getCurrentSolarHou()`，非硬编码
-- [ ] `WindBell` 是**一眼可辨的占位**，接口按最终形态设计
+- [ ] `WindBell` 渲染真实素材（`windbell-jin.png`），不再叠加 `verdict` 可见文字
 - [ ] hover 只改 `border-color`/箭头色，**无投影、无位移、无放大**
 - [ ] 没有第二种强调手法；无新增裸十六进制；`--shadow-*` 仍全 `none`
 - [ ] 三包测试全绿；tsc/lint 不新增；关键改动 mutation 复验通过
@@ -162,6 +160,6 @@ position: absolute; right: -128px; top: -26px; width: 336px; opacity: .17
 
 ## 10. 待定
 
-1. **风铃素材**（backlog `EP-uiv3-banner`）——等 owner。
+1. **风铃四档配图**（吉/顺/平/谨，backlog `EP-uiv3-banner`）——等 owner，本波只有「谨」这一张。
 2. **移动版运势的版式**由 claude 推导（owner 授权），若日后 owner 补稿以稿为准。
 3. `HeroWheel` 是否还有别处消费方——实施时查证。

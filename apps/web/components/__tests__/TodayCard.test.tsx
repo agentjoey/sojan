@@ -37,11 +37,28 @@ describe("TodayCard", () => {
     expect(left.style.borderRight).toContain("var(--color-line)");
   });
 
-  it("风铃是占位（素材未到位，必须一眼可辨）", () => {
+  it("风铃真实素材已接入（非占位）", () => {
     render(<TodayCard {...props} />);
     const bell = screen.getByTestId("wind-bell");
-    expect(bell.getAttribute("data-placeholder")).toBe("wind-bell");
-    expect(bell).toHaveTextContent("谨");
+    expect(bell.getAttribute("data-placeholder")).toBeNull();
+    const img = bell.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toContain("windbell-jin.png");
+    // alt/aria-label 必须诚实：图上恒为「谨」，不能声称写的是当日判词
+    const label = img!.getAttribute("alt") ?? "";
+    expect(label.length).toBeGreaterThan(0);
+    expect(label).not.toBe(props.verdict);
+  });
+
+  it("不把 verdict 作为可见大字叠在风铃图上（mutation 靶点）", () => {
+    render(<TodayCard {...props} />);
+    const bell = screen.getByTestId("wind-bell");
+    // 图上恒为「谨」；用另一个 verdict 渲染，若组件把 verdict 当可见文字叠加，
+    // 这里就会在 DOM 里多出一个独立的、以 verdict 为唯一文本内容的可见节点。
+    const verdictTextNodes = Array.from(bell.querySelectorAll("span, div, p")).filter(
+      (el) => el.textContent === props.verdict && el.children.length === 0,
+    );
+    expect(verdictTextNodes.length).toBe(0);
   });
 
   it("卡脚链接由 href 给出", () => {

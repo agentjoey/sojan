@@ -105,6 +105,15 @@ export function NavGrid({
                 data-testid="nav-grid-cell"
                 aria-label={t(item.labelKey)}
                 aria-current={active ? "page" : undefined}
+                onClick={() => {
+                  // 随手项 3：点当前页那一格时 pathname 不变（很常见：打开看看
+                  // 又决定留在原页），`MobileShell` 里 C1 那套按 pathname 变化
+                  // 触发的复位不会跑，覆盖层会原地不关。这里只对「已经是当前
+                  // 项」的格子兜底调用 `onClose`——非当前项走正常导航，下一次
+                  // 渲染由 C1 的 pathname 比对关闭，不需要在这里插手，避免和
+                  // 那套渲染期复位打架。
+                  if (active) onClose();
+                }}
                 className="flex flex-col items-center justify-center gap-1 zj-wheel-focus"
                 style={{
                   padding: "16px 0",

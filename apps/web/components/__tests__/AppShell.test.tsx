@@ -444,6 +444,49 @@ describe("UI v3 移动外壳", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  /**
+   * 随手项 3：C1 的复位只按 pathname 变化触发——同一路由内点击、pathname 不变
+   * 时覆盖层不关。两个真实场景：打开菜单后点了当前页那一格；在首页打开覆盖层
+   * 后点「照见」胶囊回首页（R1 自己的场景）。这里在格子与胶囊的 `onClick` 上
+   * 各补一个兜底关闭，用例分别钉住。
+   */
+  it("随手项 3：点开菜单后点当前页那一格，覆盖层关闭（同路由兜底）", async () => {
+    currentPath = "/chart";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    const cells = screen.getAllByTestId("nav-grid-cell");
+    const currentCell = cells.find((c) => c.getAttribute("href") === "/chart");
+    expect(currentCell).toBeDefined();
+    fireEvent.click(currentCell!);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("随手项 3：在首页打开覆盖层后点「照见」胶囊，覆盖层关闭（同路由兜底，R1 场景）", async () => {
+    currentPath = "/";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="zh">{children}</I18nProvider>
+    );
+    render(<AppShell><div /></AppShell>, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("shell-menu"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.getAttribute("href")).toBe("/");
+    fireEvent.click(capsule);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 
 /**

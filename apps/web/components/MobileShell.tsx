@@ -113,6 +113,18 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
         <Link
           data-testid="shell-capsule"
           href={open ? "/" : "/profiles"}
+          onClick={() => {
+            // 随手项 3：覆盖层打开、且当前已经在首页时点胶囊——pathname 不会
+            // 变化，下面 C1 那套按 pathname 变化触发的复位逻辑不会跑，覆盖层
+            // 会原地不关（正是 R1 自己的场景：在 / 打开覆盖层后点「照见」回
+            // 首页）。这里显式兜底关闭。调用 `close()` 而不是裸 `setOpen(false)`
+            // 是刻意的：这条分支只在「点击后不会发生真实路由跳转」时触发，
+            // 不会撞上 C1 注释里警惕的「每次真实跳转都抢焦点」问题——反而因为
+            // 胶囊本身即将失去意义（覆盖层关闭、用户视觉焦点回到已经看过的
+            // 首页），把键盘焦点归还菜单键是合理的收尾，与「点击关闭键」那条
+            // 路径语义一致。
+            if (open && currentPath === "/") close();
+          }}
           className="font-serif inline-flex items-center gap-1.5 zj-wheel-focus"
           style={{
             padding: "7px 14px 7px 11px",

@@ -30,12 +30,25 @@ import type { CSSProperties, ReactNode } from "react";
  *
  * 三档响应式（06-desktop §3.1）：
  * - `<768px`（默认，无前缀类）：正常文档流单列，小内边距。
- * - `768–1199px`（`md:`，Tailwind 默认断点未被覆写，仍是 768）：单列居中，
- *   宽度 `min(100% - 96px, 720px)`——桌面专有的分隔线/内边距（44/56/48、
- *   列间细线）在这一档同样不出现，此前这些是**无断点的内联 style**，
- *   在 <1200px 全量生效（终审 Important：390px 视口内容宽被压到 290px、
- *   单列态多出一条毫无意义的竖线、header 底线在移动端也回来了）。
+ * - `768–1199px`（`md:max-xl:`，**不是裸 `md:`**——见下方 footgun 说明）：
+ *   单列居中，宽度 `min(100% - 96px, 720px)`——桌面专有的分隔线/内边距
+ *   （44/56/48、列间细线）在这一档同样不出现，此前这些是**无断点的内联
+ *   style**，在 <1200px 全量生效（终审 Important：390px 视口内容宽被压到
+ *   290px、单列态多出一条毫无意义的竖线、header 底线在移动端也回来了）。
  * - `≥1200px`（`xl:`）：两栏骨架 + 桌面专有的内边距/分隔线/页头底线。
+ *
+ * ⚠️ **`md:` vs `xl:` footgun（复审 Critical C1）**：本组件曾把上面这档写成裸
+ * `md:`（Tailwind 默认 768px），与 `xl:`（本仓覆写为 1200px）在 768–1199px
+ * 之外**本该**不重叠——但构建产物里 `xl:` 的 media 块排在 `md:` 前面，同
+ * `@layer utilities`、同特异度下按源序层叠，于是 ≥1200px 视口下源序在后的
+ * `md:` 类反而压过 `xl:` 类，桌面容器塌成 720px。**曾尝试在 `globals.css`
+ * 把五个断点按 sm→md→lg→xl→2xl 升序显式声明来让 `xl:` 排到 `md:` 后面，
+ * 但这个假设经构建产物实测证伪**（加前/加后分别 build + grep 产物，`xl` 的
+ * media 块位置完全没变，见 `globals.css` 断点声明上方注释）——即声明顺序
+ * 并不能可靠地控制 Tailwind 4 这里的媒体块输出顺序。所以本组件**不依赖任何
+ * 源序假设**：这一档写 `md:max-xl:` 而不是裸 `md:`——`max-xl:` 是
+ * `@media (width < 1200px)`，在 ≥1200px 根本不匹配，与 `xl:` 谁先谁后都
+ * 不再重要，这是唯一经验证有效的修法。
  */
 export function TwoColumn({
   leftWidth,
@@ -51,7 +64,7 @@ export function TwoColumn({
   return (
     <div
       data-testid="two-col-outer"
-      className="mx-auto w-full px-5 py-8 md:w-[min(100%-96px,720px)] md:px-0 md:py-10 xl:h-[100dvh] xl:w-full xl:max-w-[1120px] xl:flex xl:flex-col xl:px-14 xl:pt-11 xl:pb-12"
+      className="mx-auto w-full px-5 py-8 md:max-xl:w-[min(100%-96px,720px)] md:max-xl:px-0 md:max-xl:py-10 xl:h-[100dvh] xl:w-full xl:max-w-[1120px] xl:flex xl:flex-col xl:px-14 xl:pt-11 xl:pb-12"
     >
       <header
         data-testid="two-col-header"
@@ -66,7 +79,7 @@ export function TwoColumn({
       >
         <div
           data-testid="two-col-left"
-          className="xl:overflow-auto xl:min-h-0 xl:border-r xl:border-[var(--color-line)] xl:pr-8"
+          className="xl:overflow-auto xl:min-h-0 xl:border-r xl:border-[var(--color-line)] xl:pr-8 xl:pl-3.5 xl:-ml-3.5"
         >
           {left}
         </div>

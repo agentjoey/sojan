@@ -93,6 +93,11 @@ export interface WuxingWheelProps {
   size?: number;
 }
 
+// M1：被取代的 WuxingRadar 是 `<div className="w-full" style={{maxWidth:320}}><svg width="100%">`
+// ——响应式、且能在更宽的容器里长大。本组件此前是死的 width/height={280}，<320px 视口
+// （如 Galaxy Fold 外屏 280px CSS）会横向溢出，408px 的左列里也不会长大，是换线引入的回归。
+// 改为 width="100%" + aspect-square（viewBox 是正方形 320×320，靠宽高比撑高度，避免
+// 父级未显式给高度时 height:auto 塌成 0）+ maxWidth，`size` 语义由「尺寸」变为「上限」。
 export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 280 }: WuxingWheelProps) {
   const maxCount = Math.max(0, ...ORDER.map(({ cn }) => counts[cn] ?? 0));
   const dayMasterKey: Element | undefined = WUXING_LABEL_TO_KEY[dayMasterElement];
@@ -101,7 +106,16 @@ export function WuxingWheel({ counts, dayMasterStem, dayMasterElement, size = 28
   const ariaLabel = `五行盘：${summary}；日主 ${dayMasterStem}`;
 
   return (
-    <svg data-testid="wuxing-wheel" viewBox="0 0 320 320" width={size} height={size} role="img" aria-label={ariaLabel}>
+    <svg
+      data-testid="wuxing-wheel"
+      viewBox="0 0 320 320"
+      width="100%"
+      height="auto"
+      className="aspect-square"
+      style={{ maxWidth: size }}
+      role="img"
+      aria-label={ariaLabel}
+    >
       {ORDER.map(({ element, cn }, i) => {
         const start = START + i * STEP;
         const isDayMaster = element === dayMasterKey;

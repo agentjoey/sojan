@@ -209,6 +209,14 @@ export default function CalendarPage() {
           <Link href="/chart" className="ml-auto shrink-0 text-[12px] text-gold underline underline-offset-4">{t("calendar.toTimeline")}</Link>
         </div>
       )}
+
+      {/* 免责声明：合规文案（CLAUDE.md「心理占星 ≠ 临床心理…强制免责声明」），
+          必须与 loading/fortune 状态无关地常显——放进 header（页级，不参与
+          loading 门槛），而不是 right（loading 时整体为 null）。此前误放进
+          right 导致 loading 期间免责声明连同五维/宜忌/候标尺一起消失，是纯
+          回归，评审已判 Important；测试见 page.test.tsx「loading 态下免责
+          声明仍然可见」。 */}
+      <p className="mt-6 text-[12px] leading-relaxed text-muted">{t("calendar.disclaimer")}</p>
     </>
   );
 
@@ -267,7 +275,12 @@ export default function CalendarPage() {
 
         {/* 水墨配图：桌面 8a 稿无此位置（信息更密、更编辑式），移动端保留——
             既有能力（EP-cal-img，20 张人工筛选图 + curate skill），设计包未说废弃，
-            与「黄历桌面不出、移动保留」是同一条取舍线（见任务报告/ledger）。 */}
+            与「黄历桌面不出、移动保留」是同一条取舍线（见任务报告/ledger）。
+            ⚠️ 已知副作用（非疏忽，如实记录）：`xl:hidden` 只是不显示，节点仍会挂载，
+            桌面视口下这张图与下面的深色兜底探测图仍会各发一次网络请求——这是「响应式
+            只能用 Tailwind 断点类、不许 matchMedia/JS 判视口」这条约束的必然代价（要
+            完全不发请求就得在 JS 里判断视口再决定渲不渲染，那正是被禁止的做法）。桌面
+            用户因此会有一点不可见的图片流量，规模是 20 张图里的 1 张，可接受。 */}
         {img && (
           <div className="mx-auto mt-8 max-w-[340px] xl:hidden">
             <FortuneFrame src={imgSrc!} alt={img.alt} seed={selected} />
@@ -279,7 +292,8 @@ export default function CalendarPage() {
       </div>
     );
 
-  // 桌面右列：五维 / 宜忌两栏 / 候标尺 / 免责——桌面不出黄历（06-desktop §3 信息密度取舍）。
+  // 桌面右列：五维 / 宜忌两栏 / 候标尺——桌面不出黄历（06-desktop §3 信息密度取舍）。
+  // 免责声明已挪到 header（见上，页级常显，不随 loading 消失）。
   // 移动端单列时同一份内容紧随左列之后，额外保留黄历（既有已上线能力，删了是功能回退）。
   const right =
     loading || !fortune ? null : (
@@ -314,7 +328,13 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* 今日宜忌：桌面两栏细线对齐，移动端单栏细线分行（不做两栏，见 brief 裁定） */}
+        {/* 今日宜忌：桌面两栏细线对齐，移动端单栏细线分行（不做两栏，见 brief 裁定）。
+            ⚠️ 这里是本文件里唯一没有走「单容器 + xl:hidden」模式、而是两个容器各自
+            渲染一份 YiJiColumn 的地方——不是疏漏。测试钉住的是 `yiji-grid` 元素本身的
+            内联 `gridTemplateColumns: "1fr 1fr"`，而移动端必须是单栏；若改成单容器+
+            响应式类，desktop 容器就不能再对「任意宽度」恒为内联两栏（那正是 TwoColumn
+            自己的契约要刻意避免的写法），字面上的「1fr 1fr」断言与「移动端单栏」这两个
+            要求没法用同一个容器同时满足，所以两份 YiJiColumn 是必要的重复，非误用。 */}
         <div data-testid="yiji-grid" className="hidden xl:grid" style={{ gridTemplateColumns: "1fr 1fr", columnGap: 40 }}>
           <YiJiColumn title={yiTitle} items={yiItems} dotColor="var(--color-wood)" />
           <YiJiColumn title={jiTitle} items={jiItems} dotColor="var(--color-cinnabar)" />
@@ -336,7 +356,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        <p className="text-[12px] leading-relaxed text-muted">{t("calendar.disclaimer")}</p>
       </div>
     );
 

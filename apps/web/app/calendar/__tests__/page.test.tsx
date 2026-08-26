@@ -111,4 +111,25 @@ describe("UI v3 运势（8a）", () => {
     const label = (await screen.findByRole("img", { name: /候/ })).getAttribute("aria-label")!;
     expect(label).toContain(String(getCurrentSolarHou().index));
   });
+
+  /**
+   * 评审 Important：免责声明是合规文案（CLAUDE.md「心理占星 ≠ 临床心理…
+   * 强制免责声明」），必须与 loading/fortune 状态无关地常显。此前重建时它被
+   * 挪进了 `right`（`loading || !fortune ? null : (...)`），导致 loading 期间
+   * 免责声明连同五维/宜忌/候标尺一起消失——纯回归，且此前 5 条测试都没让
+   * `fortune` 停在 pending 态，红灯根本没机会亮。本条把 `dailyFortuneAction`
+   * 停在 pending，钉住「loading 分支渲染时免责声明已经在场」。
+   */
+  it("loading 态下免责声明仍然可见（评审 Important：不得随 right 的 loading 门槛一起消失）", async () => {
+    let resolveFortune!: (f: DailyFortune) => void;
+    dailyFortuneActionMock.mockImplementationOnce(
+      () => new Promise<DailyFortune>((resolve) => { resolveFortune = resolve; }),
+    );
+    await renderCalendar();
+    // 先确认真的落在 loading 分支（fortune 还没到达）
+    await screen.findByText("正在推算当日流日…");
+    expect(screen.getByText("每日运势为流日命理的启发性参照，非吉凶预言。请结合现实理性判断。")).toBeInTheDocument();
+    // 收尾：把挂起的 action 结算掉，避免污染后续测试（未被 act 包裹的 setState 警告）
+    await act(async () => { resolveFortune(fortune); });
+  });
 });

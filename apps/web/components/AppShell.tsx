@@ -9,25 +9,18 @@ import { isTelegram } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { enabled, RAIL_ORDER } from "@/lib/nav";
 
-/** 竖栏与底栏当前的项集（Task 2 会改成新项集）。「照」不在目录里，由铜铃承担。 */
-const NAV = enabled(RAIL_ORDER);
-
-// 「照」（首页）不在 lib/nav 的目录里，由铜铃承担；「账」不受任何 flag 门控
-// （EP-account-login：/account 本身不是 flag 功能，常驻显示）。两者仍需出现在
-// 移动底栏 / 桌面竖栏里，本任务保留最小的本地补全。
-const HOME_ITEM = { id: "home" as const, href: "/", char: "照", labelKey: "nav.home" };
-const ACCOUNT_ITEM = { id: "account" as const, href: "/account", char: "账", labelKey: "nav.account" };
-const BOTTOM_NAV = [HOME_ITEM, ...NAV, ACCOUNT_ITEM];
+// Task 2：项集改为 RAIL_ORDER（运/盘/灵/境/梦/起/我）。「照」由顶部铜铃承担、不占项；
+// 「账」已并入「我的」（/profiles），不再作为独立导航项常驻。
+const RAIL = enabled(RAIL_ORDER);
 
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
 // spec §10：导航项内边距只在「≥6 项」时收紧（52px→48px 触控目标，仍高于 44px 下限）。
-// 两个 flag 都关闭时 NAV.length=4，绝不能被这条收紧规则波及——那会是本分支对自己
-// 「flag 关闭时产品行为完全不变」这条约束的字面违反（最终评审 Blocking 4）。
-// BOTTOM_NAV 含「照」与「账」，与改动前 NAV（同样含照与账）语义等价，故门槛沿用同一常量。
-const NAV_COMPACT = BOTTOM_NAV.length >= 6;
+// 三个 flag 都关闭时 RAIL.length=4（运/盘/起/我），绝不能被这条收紧规则波及——那会是
+// 本分支对自己「flag 关闭时产品行为完全不变」这条约束的字面违反（最终评审 Blocking 4）。
+const NAV_COMPACT = RAIL.length >= 6;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
@@ -56,11 +49,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="fixed inset-y-0 left-0 z-30 hidden w-[82px] flex-col items-center gap-2 py-6 md:flex"
             style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-line)" }}
           >
-            <Link href="/" className="mb-5" aria-label={t("nav.home")} onClick={() => setBellRing((n) => n + 1)}>
+            {/* 「照」不再是独立导航项（并入铜铃），aria-label 改用品牌名而非 nav.home——
+                nav.home 的字面值「首页」仍保留给别处（Step 3 裁定），但不应再出现在这里，
+                否则「导航不再含‘首页’」这条断言会被这枚铜铃自己撞穿。 */}
+            <Link href="/" className="mb-5" aria-label={t("common.brand")} onClick={() => setBellRing((n) => n + 1)}>
               <BellLogo size={30} motion="ring" ringKey={bellRing} />
             </Link>
-            {[...NAV, ACCOUNT_ITEM].map((item) => (
-              <NavItem key={item.href} href={item.href} char={item.char} label={t(item.labelKey)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
+            {RAIL.map((item) => (
+              <NavItem
+                key={item.href}
+                href={item.href}
+                char={item.char}
+                label={t(item.labelKey)}
+                active={isActive(pathname, item.href)}
+                compact={NAV_COMPACT}
+                style={item.id === "profiles" ? { marginTop: "auto" } : undefined}
+              />
             ))}
           </nav>
 
@@ -73,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
             }}
           >
-            {BOTTOM_NAV.map((item) => (
+            {RAIL.map((item) => (
               <NavItem key={item.href} href={item.href} char={item.char} label={t(item.labelKey)} active={isActive(pathname, item.href)} compact={NAV_COMPACT} />
             ))}
           </nav>
@@ -85,9 +89,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function NavItem({ href, char, label, active, compact }: { href: string; char: string; label: string; active: boolean; compact: boolean }) {
+function NavItem({
+  href,
+  char,
+  label,
+  active,
+  compact,
+  style,
+}: {
+  href: string;
+  char: string;
+  label: string;
+  active: boolean;
+  compact: boolean;
+  style?: React.CSSProperties;
+}) {
   return (
-    <Link href={href} className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")} aria-label={label}>
+    <Link href={href} className={cn("zj-nav flex flex-col items-center gap-1 py-1.5", compact ? "px-1.5" : "px-2")} aria-label={label} style={style}>
       <span
         key={active ? "on" : "off"}
         className="inline-flex items-center justify-center font-semibold"

@@ -21,11 +21,12 @@ export const en: Messages = {
     calendar: "Fortune",
     chart: "Chart",
     reading: "Reading",
-    spirit: "Spirit",
+    spirit: "Ask",
     fengshui: "Feng Shui",
     dream: "Dream",
     profiles: "Me",
     account: "Account",
+    start: "New Chart",
   },
   account: {
     title: "Account",

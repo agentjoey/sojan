@@ -19,11 +19,12 @@ export const zh = {
     calendar: "运势",
     chart: "命盘",
     reading: "解读",
-    spirit: "本命",
+    spirit: "问事",
     fengshui: "风水",
     dream: "解梦",
     profiles: "我的",
     account: "账号",
+    start: "起盘",
   },
   account: {
     title: "账号",

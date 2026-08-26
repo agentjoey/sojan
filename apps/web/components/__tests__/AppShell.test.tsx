@@ -3,11 +3,13 @@ import { render, screen } from "@testing-library/react";
 import { zh } from "@/lib/i18n/messages/zh";
 import { en } from "@/lib/i18n/messages/en";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+let currentPath = "/";
+vi.mock("next/navigation", () => ({ usePathname: () => currentPath }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
+  currentPath = "/";
 });
 
 describe("EP-dream 导航「梦」flag 门控", () => {
@@ -97,9 +99,11 @@ function hasClassToken(className: string, token: string): boolean {
 }
 
 describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控（而非无条件生效）", () => {
-  // EP-account-login 加了一条不受 flag 门控的常驻「账」项，NAV 基数从 4 变成 5——
-  // 下面三条用例的具体 flag 组合据此重新校过，边界语义（<6 用 px-2，≥6 用 px-1.5）不变。
-  it("三个 flag 都关闭时（NAV.length=5：照/运/盘/我/账，仍 <6）导航项用 px-2，不收紧", async () => {
+  // Task 2 改项集：RAIL_ORDER = 运/盘/灵/境/梦/起/我（含 profiles、不含 home/account），
+  // 「照」由铜铃承担、「账」并入「我的」不再单独占位——基数从旧版的 [照/运/盘/我/账]=5
+  // 变成新版 [运/盘/起/我]=4。下面三条用例的具体 flag 组合据此重新校过，
+  // 边界语义（<6 用 px-2，≥6 用 px-1.5）不变。
+  it("三个 flag 都关闭时（NAV.length=4：运/盘/起/我，仍 <6）导航项用 px-2，不收紧", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
@@ -111,19 +115,19 @@ describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控�
     }
   });
 
-  it("只开一个 flag 时（NAV.length=6：+境，触到 ≥6 门槛）导航项收紧为 px-1.5", async () => {
+  it("只开境时（NAV.length=5：运/盘/境/起/我，仍 <6）导航项仍不收紧，用 px-2", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
     const classNames = await renderShellAndGetNavItemClassNames();
     expect(classNames.length).toBeGreaterThan(0);
     for (const cn of classNames) {
-      expect(hasClassToken(cn, "px-1.5")).toBe(true);
-      expect(hasClassToken(cn, "px-2")).toBe(false);
+      expect(hasClassToken(cn, "px-2")).toBe(true);
+      expect(hasClassToken(cn, "px-1.5")).toBe(false);
     }
   });
 
-  it("风水 + 灵都开启、梦关闭时（NAV.length=7）导航项仍收紧为 px-1.5", async () => {
+  it("境 + 灵都开启、梦关闭时（NAV.length=6：运/盘/灵/境/起/我，触到 ≥6 门槛）导航项收紧为 px-1.5", async () => {
     vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "");
@@ -133,6 +137,51 @@ describe("最终评审 Blocking 4：导航内边距按 NAV.length ≥ 6 门控�
       expect(hasClassToken(cn, "px-1.5")).toBe(true);
       expect(hasClassToken(cn, "px-2")).toBe(false);
     }
+  });
+});
+
+describe("UI v3：竖栏项集（7 项，「我的」沉底，无「照」无「账」）", () => {
+  it("全 flag 开启时竖栏 7 项，顺序为 运/盘/灵/境/梦/起/我", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "1");
+    // 裁定 R3：RAIL_ORDER 定义在 lib/nav.ts（而非 AppShell.tsx），避免后续任务
+    // NavGrid 组件与 AppShell 之间的循环依赖。
+    const { RAIL_ORDER } = await import("@/lib/nav");
+    expect(RAIL_ORDER).toEqual(["calendar", "chart", "spirit", "fengshui", "dream", "reading", "profiles"]);
+  });
+
+  it("导航不再含「首页」与「账号」两项（照＝铜铃，账已并入我的）", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getAllByLabelText("运势").length).toBeGreaterThan(0); // 先证明导航真的渲染了
+    expect(screen.queryByLabelText("首页")).toBeNull();
+    expect(screen.queryByLabelText("账号")).toBeNull();
+  });
+
+  it("「盘」的标签是「命盘」而不是「解读」", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    expect(screen.getAllByLabelText("命盘").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("解读")).toBeNull();
+  });
+
+  it("「起盘」入口存在且指向 /reading", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const links = screen.getAllByLabelText("起盘");
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]!.getAttribute("href")).toBe("/reading");
   });
 });
 

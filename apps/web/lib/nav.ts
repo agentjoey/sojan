@@ -35,11 +35,11 @@ const FLAGS: Record<FlagKey, boolean> = {
 
 export const NAV_CATALOG: Record<NavId, NavCatalogEntry> = {
   calendar: { href: "/calendar", char: "运", labelKey: "nav.calendar" },
-  chart:    { href: "/chart",    char: "盘", labelKey: "nav.reading" },
+  chart:    { href: "/chart",    char: "盘", labelKey: "nav.chart" },
   spirit:   { href: "/spirit",   char: "灵", labelKey: "nav.spirit",   flag: "spirit" },
   fengshui: { href: "/fengshui", char: "境", labelKey: "nav.fengshui", flag: "fengshui" },
   dream:    { href: "/dream",    char: "梦", labelKey: "nav.dream",    flag: "dream" },
-  reading:  { href: "/reading",  char: "起", labelKey: "nav.reading" },
+  reading:  { href: "/reading",  char: "起", labelKey: "nav.start" },
   profiles: { href: "/profiles", char: "我", labelKey: "nav.profiles" },
 };
 
@@ -63,11 +63,13 @@ export function enabled(order: readonly NavId[]): NavItem[] {
  * `AppShell.tsx` 会构成循环依赖。
  */
 
-/** 桌面竖栏 / 移动底栏当前的项集（Task 2 会改成新项集）。「照」不在目录里，由铜铃承担。 */
-export const RAIL_ORDER: readonly NavId[] = ["calendar", "chart", "spirit", "fengshui", "dream", "profiles"];
+/** 桌面竖栏：7 项，「我的」沉底。「照」由顶部铜铃承担，不占项；「账」已并入「我的」。 */
+export const RAIL_ORDER: readonly NavId[] = [
+  "calendar", "chart", "spirit", "fengshui", "dream", "reading", "profiles",
+];
 
-/** 预留给后续任务（如网格式导航）使用的项集，Task 1 暂与 RAIL_ORDER 一致。 */
-export const GRID_ORDER: readonly NavId[] = RAIL_ORDER;
+/** 移动九宫格：与竖栏同源，但不含「我的」（owner 决定：移动端由顶部语境胶囊进我的）。 */
+export const GRID_ORDER: readonly NavId[] = RAIL_ORDER.filter((id) => id !== "profiles");
 
 /** Telegram 首页入口的项集（不含「灵」——EP-jiao 最终评审 C1 内测期摘除）。 */
 export const TG_ORDER: readonly NavId[] = ["calendar", "chart", "fengshui", "reading", "dream", "profiles"];

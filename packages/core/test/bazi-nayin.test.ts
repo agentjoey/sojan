@@ -15,4 +15,8 @@ describe("deriveNayinZodiac", () => {
     expect(deriveNayinZodiac("不是干支")).toBeNull();
     expect(deriveNayinZodiac("癸")).toBeNull();
   });
+
+  it("干支长度正确但不在60甲子里的无效干支返回 null（覆盖 nayin 查表守卫）", () => {
+    expect(deriveNayinZodiac("甲丑")).toBeNull();
+  });
 });

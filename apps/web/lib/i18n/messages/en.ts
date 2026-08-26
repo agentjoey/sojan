@@ -248,6 +248,12 @@ export const en: Messages = {
     strengthWeak: "身弱 (Weak)",
     strengthBalanced: "中和 (Balanced)",
     strengthUnknown: "—",
+    dayMasterLine: "Day Master {stem}{element}",
+    strengthTagStrong: "[Strong]",
+    strengthTagWeak: "[Weak]",
+    strengthTagBalanced: "[Balanced]",
+    zodiacChip: "Year of the {animal}",
+    ageChip: "Age {age}",
 
     soulPalace: "命宫 (Life Palace)",
     bodyPalace: "身宫 (Body Palace)",

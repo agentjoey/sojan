@@ -255,6 +255,12 @@ export const zh = {
     strengthWeak: "身弱",
     strengthBalanced: "中和",
     strengthUnknown: "—",
+    dayMasterLine: "{stem}{element}日主",
+    strengthTagStrong: "【偏强型】",
+    strengthTagWeak: "【偏弱型】",
+    strengthTagBalanced: "【中和型】",
+    zodiacChip: "属{animal}",
+    ageChip: "{age} 岁",
 
     soulPalace: "命宫",
     bodyPalace: "身宫",

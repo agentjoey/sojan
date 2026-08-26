@@ -16,12 +16,17 @@ function setup() {
 }
 
 describe("TwoColumn 桌面左定右动两栏", () => {
-  it("两列各自独立滚动：overflow auto + min-height 0（缺后者会一起撑高页面）", () => {
+  it("两列各自独立滚动：overflow auto + min-height 0（缺后者会一起撑高页面），只在 xl 断点生效", () => {
     setup();
     for (const id of ["two-col-left", "two-col-right"]) {
       const el = screen.getByTestId(id);
-      expect(el.style.overflow).toBe("auto");
-      expect(el.style.minHeight).toBe("0px");
+      expect(el.className).toContain("xl:overflow-auto");
+      expect(el.className).toContain("xl:min-h-0");
+      // 不再通过内联 style 承载（内联 style 优先级恒高于类，无法被断点关闭，
+      // 移动端单列态会凭空多出滚动容器）——同下面「不再通过内联 style 承载」
+      // 那条对 border-right/padding 的既有断言是同一类守卫。
+      expect(el.style.overflow).toBe("");
+      expect(el.style.minHeight).toBe("");
     }
   });
 

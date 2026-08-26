@@ -16,6 +16,13 @@ import type { CSSProperties, ReactNode } from "react";
  * 这样 grid 才有一个「非内容撑出来」的高度，两列的 `overflow:auto` 才真正生效。
  * **必须 `xl:` 断点门控**：移动端仍要走正常文档流滚动，定高会直接毁掉它。
  *
+ * 左右两列自己的 `overflow:auto`/`min-height:0` 同样只在 `xl:` 生效（Tailwind
+ * `xl:overflow-auto xl:min-h-0` 类，不是无断点的内联 style）——理由与下面「三档
+ * 响应式」一致：这两条是桌面独立滚动专用的，移动端单列走正常文档流，若在
+ * <1200px 也生效，会凭空多出两个滚动容器（影响 `position: sticky` 子元素、
+ * 可能裁切绝对定位内容），且以前用内联 style 写还有个副作用——内联 style
+ * 优先级恒高于类，没法只在 xl 断点关闭。
+ *
  * 断点用 Tailwind `xl:`（globals.css @theme 覆写为 1200px，见 06-desktop §2），
  * 列宽只经 CSS 变量 `--two-col-left` 传递给该断点类，不写内联
  * gridTemplateColumns——内联 style 优先级恒高于类，写了就等于任何宽度都是
@@ -59,16 +66,11 @@ export function TwoColumn({
       >
         <div
           data-testid="two-col-left"
-          className="xl:border-r xl:border-[var(--color-line)] xl:pr-8"
-          style={{ overflow: "auto", minHeight: "0px" }}
+          className="xl:overflow-auto xl:min-h-0 xl:border-r xl:border-[var(--color-line)] xl:pr-8"
         >
           {left}
         </div>
-        <div
-          data-testid="two-col-right"
-          className="xl:pl-10"
-          style={{ overflow: "auto", minHeight: "0px" }}
-        >
+        <div data-testid="two-col-right" className="xl:overflow-auto xl:min-h-0 xl:pl-10">
           {right}
         </div>
       </div>

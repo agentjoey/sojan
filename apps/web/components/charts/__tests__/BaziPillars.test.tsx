@@ -94,6 +94,20 @@ describe("EP-east-ui-r2 BaziPillars", () => {
     expect(container.innerHTML).not.toContain("var(--color-panel-strong)");
   });
 
+  it("日柱走竖向强调手法（border-top + 180deg 渐变），其余三柱不带", () => {
+    renderPillars();
+    const day = screen.getByTestId("pillar-col-day");
+    const year = screen.getByTestId("pillar-col-year");
+    expect(day.style.borderTop).toContain("var(--color-cinnabar)");
+    expect(day.style.backgroundImage).toContain("180deg");
+    expect(year.style.borderTop).toBe("");
+  });
+
+  it("日柱的「主」章保留（身份标记，与强调手法并存）", () => {
+    renderPillars();
+    expect(screen.getByTestId("bazi-day-seal")).toBeInTheDocument();
+  });
+
   it("五行计数 chip：细边（1px line）、无底色填充、计数正确", () => {
     renderPillars();
     const earth = screen.getByTestId("wuxing-chip-earth");

@@ -3,10 +3,19 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）**
-Last Updated:   2026-08-25 by claude-sonnet-5（EP-jiao 掷筊问事，subagent 执行 + 全分支评审 + owner UAT 两轮）
+Last Updated:   2026-08-26 by claude-opus-5（UI v3 重建 A/B/C1，subagent 执行 + 三轮独立评审 + 两轮修复；已合 main 并发 staging 待 owner 实测）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 175 · llm 279 · web 620（全绿；`lint` 0 errors 已为阻塞闸门）
+测试:           core 188 · llm 279 · web 738（全绿；`lint` 0 errors 已为阻塞闸门）
 ⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
+
+> 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。
+>   · **A 地基外壳**：`lib/nav.ts` 成为导航单一事实源；移动端底栏删除，改「顶部胶囊 + 44px 菜单键 + 六宫格覆盖层」；`ui.tsx` 原语收敛——**`Emphasis` 是全站唯一强调手法**（删了 `Tag` 与 `Card.topAccent`）。
+>   · **B 命理可视化**：新建 `WuxingWheel`/`SeasonRuler`，改造 `BaziPillars`/`ZiweiBoard`；core 新增 `getCurrentSolarHou()`（七十二候 1–72 索引由 24 节气表推导，lunar-typescript 只给候名不给序号）。
+>   · **C1 桌面骨架 + 卷首 + 运势**：`TwoColumn` 左定右动、`CompassWatermark` 五层异速正反转水印（取代 `HeroWheel`）、`TodayCard`（已接入真实风铃素材 `windbell-jin.png`）。
+>   · **⚠️ TG 外壳按约定冻结，二期再动**——`TG_ENTRIES` 与 `{inTg && …}` 分支逐字未改。
+>   · **未做**：C2（命盘+三段式解读+紫微棋盘）、C3（掷筊+解梦）、C4（我的+账号+境）、D（5s 七拍过场）。这些页面目前仍是旧 UI，与新外壳并存。
+> 🧭 **分支拓扑（别搞错生产在哪）**：**生产分支是 `production`**（`sojan.app` 指向它），不是 `main`。`main` = 集成分支，`staging` = `zhaojian.agentjoey.ai`。合 `main` / 推 `staging` **都不会碰生产**；上生产必须显式推 `production`。2026-08-26 核实：`production` 落后 `main` 17 个 commit（UI v3 合入前）。
+> ⚠️ **Tailwind 4 断点混单位陷阱（2026-08-26 踩中并修复）**：自定义断点用 px 而其余是 rem，会因 Tailwind 4 无法跨单位排序，让该断点的 media 块整体前置、**低断点反压高断点**，且 class-name 断言在结构上抓不到（七条测试全绿却全错）。已把 `--breakpoint-xl` 改为 `75rem`。详见 CLAUDE.md「Key Implementation Details」。
 
 > ⏸️ **现处于「收集反馈」阶段**：除非用户反馈驱动或线上 bug，否则不主动改代码。新需求先入 BACKLOG，待反馈后排期。
 > 🎚️ **生产 flag 实际取值（2026-08-25 核实，别再被 Vercel 面板骗一次）**：`SPIRIT=1` / `FENGSHUI=1` / `DREAM=1`，**三个在生产都是开的**。

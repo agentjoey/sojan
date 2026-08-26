@@ -143,6 +143,30 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
     // （21 行）是同一类已被本仓库接受的模式。
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setToday(computeToday());
+
+    // ⚠️ 复审 Minor M6：上面这行只在挂载时纠偏一次——长驻标签页（不刷新、
+    // 不切走再切回）跨过本地午夜后，`today` 会一直停在挂载那一刻的日期，
+    // 卷首日期/星期整整错一天，且没有任何机制会自动纠正（`visibilitychange`
+    // 也不会触发，因为标签页可能全程保持前台）。补一个到「下一次本地
+    // 00:00」的 `setTimeout`，到点重算并重新调度下一次午夜。
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleMidnightRollover = () => {
+      const now = new Date();
+      // +5s 缓冲：避免系统时钟/定时器抖动导致提前几毫秒触发、读到的还是前一天。
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+      timer = setTimeout(() => {
+        // 不需要 eslint-disable：`react-hooks/set-state-in-effect` 只管 effect
+        // body 里直接同步的 setState，这里是定时器回调里的 setState（订阅外部
+        // 时钟变化），是规则本身认可的写法（同上方注释引的 DarkImage 例子）。
+        setToday(computeToday());
+        scheduleMidnightRollover();
+      }, nextMidnight.getTime() - now.getTime());
+    };
+    scheduleMidnightRollover();
+
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, []);
 
   const todayDate = today.date;

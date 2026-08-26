@@ -157,5 +157,28 @@ describe("HomeClient：今日日期/星期（终审必修 1，收口版）", () 
       expect(screen.getByText(/2026\.08\.26/)).toBeInTheDocument();
       expect(screen.getByText(/Wed/)).toBeInTheDocument();
     });
+
+    /**
+     * 复审 Minor M6：此前的 `useEffect(..., [])` 只在挂载时纠偏一次——长驻
+     * 标签页（不刷新、不切走再切回）跨过本地午夜后，`today` 会一直停在挂载
+     * 那一刻，日期/星期整整错一天。补了一个到「下一次本地 00:00」的
+     * `setTimeout`，到点重算并重新调度下一次。这里不刷新、不重新挂载，只
+     * 推进系统时钟越过午夜，钉住页面会自己纠偏。
+     */
+    it("长驻标签页跨过本地午夜后自动纠偏，不需要用户手动刷新（M6）", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 7, 26, 23, 59, 50)); // 2026-08-26 23:59:50 本地
+      renderHome("zh");
+      expect(screen.getByText(/2026\.08\.26/)).toBeInTheDocument();
+      expect(screen.getByText(/周三/)).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(20_000); // 跨过午夜 + 5s 缓冲
+      });
+
+      expect(screen.getByText(/2026\.08\.27/)).toBeInTheDocument();
+      expect(screen.getByText(/周四/)).toBeInTheDocument();
+      expect(screen.queryByText(/2026\.08\.26/)).toBeNull();
+    });
   });
 });

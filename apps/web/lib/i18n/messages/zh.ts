@@ -107,8 +107,17 @@ export const zh = {
       calendar: { title: "今日运势", sub: "流日 · 每日一推" },
       annual: { title: "本年时序", sub: "流年 · 大限四化" },
       chart: { title: "我的命盘", sub: "命理 + 心理解读" },
+      spirit: { title: "本命之灵", sub: "守护灵与年度指引" },
       reading: { title: "起盘建档", sub: "出生信息即时排盘" },
       dream: { title: "解梦", sub: "梦的映照 · 心理解读" },
+    },
+    // 卷首今日卡（TodayCard）的通用（非按档案个性化）文案——首页匿名可见，
+    // 具体到人的判词/润色句/元数据仍在 /calendar 由 LLM 按档案生成。
+    today: {
+      weekday: "周{day}",
+      verdict: "观",
+      polish: "先观其时，未必急于行动——完整流日解读，一点即达。",
+      meta: "登记出生信息，解锁你的专属流日解读",
     },
     cards: {
       east: {

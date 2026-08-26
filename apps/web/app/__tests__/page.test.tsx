@@ -193,3 +193,44 @@ describe("TG 首页页头改用 PageHeader（EP-tg-parity）", () => {
     expect(container.querySelector("header")).not.toBeNull();
   });
 });
+
+/**
+ * Task 4：卷首 `app/page.tsx` 重建（UI v3，03-screens 5a）——只覆盖 `{!inTg && (…)}`
+ * 那一支。`renderHome()` 是全文件共用的 helper（既服务 TG 分支也服务 web 分支，见上面
+ * 「web 首页目录列表：解梦「梦」（inTg=false 臂）」那组已有测试），本组只需在渲染前把
+ * `tgEnv.inTg` 拨回 `false`（顶层 `beforeEach` 默认 `true`，服务 TG 相关分组）。
+ *
+ * 目录基线断言默认拿到 4 行：顶层 `beforeEach` 把 SPIRIT/FENGSHUI 两个 flag 都 stub 成
+ * "1"、DREAM 未 stub（默认关闭）——卷首目录只消费 SPIRIT（灵）与 DREAM（梦，可选第 5 行）
+ * 两个 flag，FENGSHUI 不在卷首目录范围内（境仍只在 AppShell 侧栏/TG 首页），所以默认态
+ * 下卷首目录恰好是「盘/灵/运/候」4 行。
+ */
+describe("UI v3 卷首（5a）", () => {
+  beforeEach(() => {
+    tgEnv.inTg = false;
+  });
+
+  it("Hero 用 CompassWatermark 而非已删除的 HeroWheel", async () => {
+    const { container } = await renderHome();
+    expect(container.querySelector('[data-testid="compass-ticks"]')).not.toBeNull();
+  });
+
+  it("今日卡在页面上，且卡脚指向 /calendar", async () => {
+    await renderHome();
+    const card = screen.getByTestId("today-card-left");
+    expect(card).toBeInTheDocument();
+    expect(screen.getByText(/展开今日日签/).closest("a")!.getAttribute("href")).toBe("/calendar");
+  });
+
+  it("七十二候标尺的 index 来自 getCurrentSolarHou，不是硬编码", async () => {
+    await renderHome();
+    const label = screen.getByRole("img", { name: /候/ }).getAttribute("aria-label")!;
+    const { getCurrentSolarHou } = await import("@sojan/core");
+    expect(label).toContain(String(getCurrentSolarHou().index));
+  });
+
+  it("目录 4 行，各带朱文方印字符", async () => {
+    await renderHome();
+    expect(screen.getAllByTestId("toc-row")).toHaveLength(4);
+  });
+});

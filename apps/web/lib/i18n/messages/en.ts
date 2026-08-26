@@ -109,8 +109,15 @@ export const en: Messages = {
       calendar: { title: "Daily fortune", sub: "Daily flow · one push a day" },
       annual: { title: "Yearly cycle", sub: "Annual themes · 大限四化 (Four Transforms)" },
       chart: { title: "My chart", sub: "命理 (Mingli) + psychological reading" },
+      spirit: { title: "Guardian Spirit", sub: "Guardian spirit & yearly guidance" },
       reading: { title: "Cast chart", sub: "Birth info instant chart" },
       dream: { title: "Dreams", sub: "Dream mirror · psychological reflection" },
+    },
+    today: {
+      weekday: "{day}",
+      verdict: "Watch",
+      polish: "Observe the moment before you act — your full daily reading is one tap away.",
+      meta: "Add your birth info to unlock your personalized daily reading",
     },
     cards: {
       east: {

@@ -231,6 +231,7 @@ export const zh = {
     palaceDetailStars: "主星：{stars}",
     palaceDetailEmpty: "本宫无主星，借三方四正（{palaces}）之星：{stars}",
     mutagenLegendTitle: "四化",
+    ziweiBoardAria: "紫微命盘十二宫，可选择宫位查看详情",
 
     radarAria: "五行雷达图",
     missingCaption: "五行缺{elements}，喜用或在此方向",

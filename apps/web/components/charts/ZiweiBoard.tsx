@@ -24,6 +24,15 @@ import { useT } from "@/lib/i18n/I18nProvider";
  * 不涉及 SVG 的 role="img" 陷阱。默认选中 soulPalaceBranch 对应宫（命宫），
  * 下方 Emphasis 详情块随选中切换；空宫时借星来自 core 的 deriveTriad（三方
  * 四正），不在本组件里算对宫。详情文案是确定性字符串拼装，不引入 LLM。
+ *
+ * I5/I6 修复（终审：只搬了 BaguaWheel 交互契约的一半）：
+ * - I5 选中态必须**视觉可见**，不能只有 `aria-pressed`——`BaguaWheel` 选中态是
+ *   视觉的（卦字变朱砂 + 短划线），`aria-pressed` 只是它的无障碍镜像；本组件
+ *   此前只搬了镜像。选中宫内层补一圈 inset 1px 朱砂描边（细线格语言的朱砂
+ *   变体，不是 Emphasis 那套 2px 边+渐变——全站强调手法只留一种）。
+ * - I6 棋盘从纯展示变成十二个可聚焦按钮后，`ziwei-grid` 补 `role="group"` +
+ *   `aria-label`（同 `BaguaWheel` 交互化时的既有契约），给 Tab 序里凭空多出的
+ *   十二站一个上位语境。
  */
 
 // 地支 → 网格坐标（row/col，1-indexed）。
@@ -88,7 +97,17 @@ function PalaceCell({
           }
         }}
         className="zj-wheel-focus flex h-full flex-col"
-        style={{ padding: 8, cursor: "pointer" }}
+        style={{
+          padding: 8,
+          cursor: "pointer",
+          // I5：选中态必须有视觉指示，不能只靠 aria-pressed（照抄 BaguaWheel 既有
+          // 契约：选中态是视觉的，aria-pressed 只是它的无障碍镜像）。选中态语言取
+          // 自本组件已有的「细线格」（1px var(--color-line) 描边），内层补一圈同量级
+          // 的 1px 朱砂描边——用 inset box-shadow 而非 border，避免影响盒模型/布局；
+          // 刻意不用 Emphasis 的 2px 边 + 渐变底（那是全站唯一保留给「强调」的手法，
+          // 这里的选中态是「细线格语言」的朱砂变体，不是第二种强调表达）。
+          boxShadow: selected ? "inset 0 0 0 1px var(--color-cinnabar)" : undefined,
+        }}
       >
         {/* 顶部：宫名（左上，muted 小字）+ 四化标签（右）*/}
         <div className="flex items-start justify-between gap-1">
@@ -271,6 +290,7 @@ function CenterCell({ ziwei }: { ziwei: ZiweiChart }) {
 }
 
 export function ZiweiBoard({ ziwei }: { ziwei: ZiweiChart }) {
+  const t = useT();
   // 默认选中命宫：即 branch === soulPalaceBranch 的那一宫；找不到则退回第一宫兜底。
   const defaultName =
     ziwei.palaces.find((p) => p.branch === ziwei.soulPalaceBranch)?.name ?? ziwei.palaces[0]?.name ?? "";
@@ -281,6 +301,8 @@ export function ZiweiBoard({ ziwei }: { ziwei: ZiweiChart }) {
     <div className="flex flex-col gap-4">
       <div
         data-testid="ziwei-grid"
+        role="group"
+        aria-label={t("chart.ziweiBoardAria")}
         className="grid w-full md:aspect-square"
         style={{
           gridTemplateColumns: "repeat(4, 1fr)",

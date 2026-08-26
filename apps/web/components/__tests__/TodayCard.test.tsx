@@ -55,15 +55,16 @@ describe("TodayCard", () => {
     expect(img!.getAttribute("alt")).toBe(props.bellAlt);
   });
 
-  it("不把任何文字当可见大字叠在风铃图上（mutation 靶点）", () => {
+  // ⚠️ 复审 Minor M5：此前这条断言「没有 textContent 恰好等于这句长 bellAlt
+  // 的可见节点」——组件现在收不到裸 verdict，只收一整句 alt，没人会把一整句
+  // alt 原样当可见大字叠上去（真出问题的 mutation 更可能是叠一个短字如
+  // 「谨」），这条断言其实测不出真实回归。`WindBell` 本身只渲染一个
+  // `<Image>`，不该有任何可见文本子节点——直接断言 `textContent` 为空串，
+  // 对「把任何文字（不管长短）叠回去」的任何形态都会红。
+  it("风铃图容器没有任何可见文本（mutation 靶点，M5）", () => {
     render(<TodayCard {...props} />);
     const bell = screen.getByTestId("wind-bell");
-    // bellAlt 只应出现在 img 的 alt 属性里，不应作为独立可见文本节点出现——
-    // 否则说明组件把它当可见大字叠加渲染了（08-25 之前的占位实现就是这么干的）。
-    const visibleNodes = Array.from(bell.querySelectorAll("span, div, p")).filter(
-      (el) => el.textContent === props.bellAlt && el.children.length === 0,
-    );
-    expect(visibleNodes.length).toBe(0);
+    expect(bell.textContent).toBe("");
   });
 
   it("卡脚链接由 href 给出，文案由 expandLabel 给出", () => {

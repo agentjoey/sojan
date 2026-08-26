@@ -199,6 +199,8 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
               expandLabel={t("common.todayCard.expand")}
               // 无档案态没有真实判词可算（展示层零推算）——用明确的空态记号
               // 插值进 alt 文案，不拿一个像判词的字冒充第五档（终审必修 8）。
+              // 复审 Minor M2：alt 模板已去掉「另见右栏」这个虚假的方位声称
+              // （首页没有右栏），措辞改为对首页/运势页都成立，见 zh.ts 注释。
               bellAlt={t("common.todayCard.bellAlt", { verdict: t("home.today.emptyVerdict") })}
             />
           </div>

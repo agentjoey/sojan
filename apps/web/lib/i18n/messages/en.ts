@@ -18,8 +18,15 @@ export const en: Messages = {
     todayCard: {
       label: "Today",
       expand: "Open today's reading →",
+      // 复审 Minor M3：这里此前是繁体「謹」，与图上和 zh 文案的简体「谨」不一致——
+      // alt 是在陈述图上究竟写了哪个字，措辞必须诚实，改成简体。
+      // 复审 Minor M2：此前措辞声称「see today's verdict on the right」，首页
+      // 没有这个「right」——理想修法是拆两条 key，但首页那条已被
+      // `app/__tests__/page.test.tsx` 终审必修 8 的既有断言钉死为必须含
+      // {verdict} 插值结果（本波全局约束：该文件既有断言不许改），故去掉方位
+      // 声称，改成对两个消费方都成立的措辞，理由见 zh.ts 同一处注释。
       bellAlt:
-        "Wind bell illustration with the character “謹” (Caution) fixed on the banner (not today's actual verdict); see today's verdict on the right: {verdict}",
+        "Wind bell illustration with the character “谨” (Caution) fixed on the banner (not today's actual verdict — today's verdict is “{verdict}”)",
     },
   },
   nav: {

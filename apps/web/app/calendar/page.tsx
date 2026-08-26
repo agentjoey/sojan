@@ -45,10 +45,17 @@ function gradeOf(overall: number): "auspicious" | "smooth" | "neutral" | "cautio
  * 挤成两三行贴死。这里按字符数分档：中文单字沿用原设计的大字号，长值降字号、
  * 放宽行高、允许换行——纯展示层字号逻辑，不做任何「按语言判断」的推算分支
  * （长度是显示层已有的字符串属性，不是从命盘再算一遍）。
+ *
+ * ⚠️ 复审 Minor M1：这里此前是三档（≤2 / 3–6 / 其余），但 `calendar.grade.*`
+ * 目前只有 zh 的 吉/顺/平/谨（长度均为 1）与 en 的
+ * "吉 (Auspicious)"/"顺 (Smooth)"/"平 (Steady)"/"谨 (Cautious)"（长度
+ * 14/10/10/12）这 8 个值——中间那档（3–6）对现有全部值都不可达，是个测不到、
+ * 也用不到的死分支。收成两档：CJK 单字（≤2）沿用大字号，其余（含未来更长的
+ * locale 文案）统一走「降字号 + 放宽行高 + 允许换行」这一档——`break-words`
+ * 本就是为兜住任意长度设计的，不需要中间那档来过渡。
  */
 function verdictTextClass(len: number): string {
   if (len <= 2) return "text-[40px] leading-none xl:text-[64px]";
-  if (len <= 6) return "text-[30px] leading-tight xl:text-[44px]";
   return "break-words text-[22px] leading-snug xl:text-[32px]";
 }
 

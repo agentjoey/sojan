@@ -272,9 +272,9 @@ export const en: Messages = {
     birthMutagens: "生年四化 (Natal Four Transforms)",
     bodyPalaceSuffix: "身 (Body)",
 
-    ziweiSchoolZhongzhou: "Zhongzhou School",
-    ziweiSchoolDefault: "Quanshu School",
-    bodyPalaceSame: "Body palace conjunct",
+    ziweiSchoolZhongzhou: "中州派 (Zhongzhou School)",
+    ziweiSchoolDefault: "全书派 (Quanshu School)",
+    bodyPalaceSame: "身宫同度 (Body Palace conjunct)",
     ziweiBoardHint: "Tap any palace for its detail; empty palaces show borrowed stars.",
 
     palaceDetailStars: "主星 (Major Stars): {stars}",

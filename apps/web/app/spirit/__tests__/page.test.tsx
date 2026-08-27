@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
@@ -85,13 +85,33 @@ vi.mock("@/lib/supabase", () => ({
  * setState 可能落在 act 作用域之外（dream/fengshui 测试记过同一时序竞争，这里沿用
  * 同一解法）——本文件新增的掷筊闸门测试在 render 后立即同步断言（不经 findBy /
  * waitFor），必须保证 profile 加载在 render 返回前就已完成。
+ *
+ * UI v3 C3：page.tsx 现在调 `useShellContext`（3e 揭晓/追问期间把移动端语境胶囊
+ * 声明为筊象名），渲染必须包 `ShellProvider`（真实应用里由 AppShell 提供），否则
+ * hook 抛「必须在 ShellProvider 内使用」。ShellProvider 与探针必须出自**同一次**
+ * 动态 import——静态 import 拿到的是 resetModules 之前的旧模块实例，context 对不上。
  */
 async function renderSpiritPage(url: string = "/spirit") {
   window.history.pushState({}, "", url);
   const { default: Page } = await import("../page");
   const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+  const { ShellProvider, useShellContextValue } = await import("@/components/ShellContext");
+  /** 把 ShellContext 当前声明的语境词渲染出来，供 3e 胶囊语境断言读取。
+   *  加「胶囊:」前缀：揭晓屏的筊象大字名与 label 同文（都是「圣筊」），裸渲染会
+   *  与既有断言 `getByText("圣筊")` 的唯一匹配撞车。 */
+  function ShellLabelProbe() {
+    const { label } = useShellContextValue();
+    return <div data-testid="shell-label">{label ? `胶囊:${label}` : ""}</div>;
+  }
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return <I18nProvider locale="zh">{children}</I18nProvider>;
+    return (
+      <I18nProvider locale="zh">
+        <ShellProvider>
+          <ShellLabelProbe />
+          {children}
+        </ShellProvider>
+      </I18nProvider>
+    );
   }
   let result!: ReturnType<typeof render>;
   await act(async () => {
@@ -420,6 +440,12 @@ describe("EP-jiao 危机前置拦截：doThrow 接线", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     // 揭晓屏/掷筊动画都不该出现——命中拦截时压根没进 throwing 阶段。
     expect(screen.queryByTestId("jiao-block")).toBeNull();
+    // 验收返工 C4：是「换成求助引导屏」——筊杯卡（262px 图区+三列释义）、三掷点、
+    // 问题输入都必须一并不在；三掷点的 aria-label「还可以掷 n 次」也不该在危机屏
+    // 上向读屏用户播报。只查文案在场抓不到「卡片照旧渲染」这种结构破坏。
+    expect(screen.queryByTestId("jiao-card")).toBeNull();
+    expect(screen.queryByTestId("jiao-throw-dots")).toBeNull();
+    expect(screen.queryByPlaceholderText(/该不该/)).toBeNull();
 
     // 「我知道了」把用户带回空白的 asking 阶段，而不是让他一键重掷同一句话。
     fireEvent.click(screen.getByRole("button", { name: "我知道了" }));
@@ -441,5 +467,117 @@ describe("EP-jiao 危机前置拦截：doThrow 接线", () => {
     expect(throwJiaoMock).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getAllByTestId("jiao-block")).toHaveLength(2));
     expect(screen.queryByText("先别急着掷这一卦")).toBeNull();
+  });
+});
+
+/**
+ * UI v3 C3（03-screens 掷筊 5c/3d/3e）：三态版式断言。
+ * 每条都先回答过「实现被回退它会不会变红」：筊杯卡三列释义/圣筊强调、三掷点点亮、
+ * 历史筊象字着色、揭晓后语境胶囊、输入框 serif+朱砂光标——各自对应一个可独立
+ * 回退的实现点，删掉对应实现即只有对应用例变红（mutation 复验输出见实施报告）。
+ */
+describe("UI v3 C3：掷筊三态版式", () => {
+  const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
+
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** 与「EP-jiao 掷筊闸门」describe 里的 settleThrow 同义：animationEnd → 点「继续」。 */
+  async function settleThrow() {
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    const continueBtn = await screen.findByRole("button", { name: "继续" });
+    fireEvent.click(continueBtn);
+  }
+
+  it("筊杯卡（5c）：渲染三列筊象释义（圣/笑/阴单字+短注），圣筊列走强调手法（2px 朱砂左边线）", async () => {
+    await renderSpiritPage();
+    const card = screen.getByTestId("jiao-card");
+    // 三列各自在场（单字精确匹配——图区固定字样「一 俯 一 仰 · 圣 筊」是另一段
+    // 文本，不会被这三个精确匹配命中，已用两侧输入验证过 matcher 能区分）。
+    expect(within(card).getByText("圣")).toBeInTheDocument();
+    expect(within(card).getByText("笑")).toBeInTheDocument();
+    expect(within(card).getByText("阴")).toBeInTheDocument();
+    expect(within(card).getByText("不允")).toBeInTheDocument();
+    // 强调手法挂在圣筊列上：Emphasis 的内联 2px 朱砂左边线。回退成普通 div 即变红。
+    const emph = screen.getByTestId("jiao-omen-emphasis");
+    expect(emph).toHaveStyle({ borderLeft: "2px solid var(--color-cinnabar)" });
+    expect(within(emph).getByText("圣")).toBeInTheDocument();
+  });
+
+  it("问事态（3d）：问题输入是 serif 19px + 朱砂光标，字数按 n / 500 显示", async () => {
+    await renderSpiritPage();
+    const textarea = screen.getByPlaceholderText(/该不该/);
+    expect(textarea.className).toContain("font-serif");
+    expect(textarea.className).toContain("text-[19px]");
+    expect((textarea as HTMLElement).style.caretColor).toBe("var(--color-cinnabar)");
+    fireEvent.change(textarea, { target: { value: "该不该换工作" } });
+    expect(screen.getByText("6 / 500")).toBeInTheDocument();
+  });
+
+  it("三掷点（3d）：未掷时 0 格点亮，笑筊用掉一次后 3 格中恰 1 格点亮", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "仰"], omen: "笑筊" });
+    await renderSpiritPage();
+    expect(screen.getByTestId("jiao-throw-dots").querySelectorAll("[data-lit='true']")).toHaveLength(0);
+
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    await settleThrow();
+    await waitFor(() => expect(screen.getByText(/神明发笑/)).toBeInTheDocument());
+
+    const dots = screen.getByTestId("jiao-throw-dots").querySelectorAll("[data-lit]");
+    expect(dots).toHaveLength(3);
+    expect(screen.getByTestId("jiao-throw-dots").querySelectorAll("[data-lit='true']")).toHaveLength(1);
+  });
+
+  it("最近问过的（3d）：筊象单字墨色、字前 6px 色点按筊象着色（圣 wood / 阴 cinnabar / 笑 gold）（验收返工 I2）", async () => {
+    listJiaoHistoryMock.mockResolvedValueOnce([
+      { id: "h1", omen: "圣筊", summary: "换工作的纠结", fullText: null, createdAt: "2026-08-20T00:00:00Z" },
+      { id: "h2", omen: "阴筊", summary: "搬家与否", fullText: null, createdAt: "2026-08-19T00:00:00Z" },
+      { id: "h3", omen: "笑筊", summary: "问得太笼统的一次", fullText: null, createdAt: "2026-08-18T00:00:00Z" },
+    ]);
+    await renderSpiritPage();
+    const section = (await screen.findByText("最近问过的")).closest("section") as HTMLElement;
+    expect(section).not.toBeNull();
+    // 单字：三条都必须是 ink——wood 3.06:1 / gold 2.48:1 低于 13px 的 AA 4.5:1（返工单 I2）。
+    const charOf = (ch: string) => within(section).getByText(ch) as HTMLElement;
+    expect(charOf("圣").style.color).toBe("var(--color-ink)");
+    expect(charOf("阴").style.color).toBe("var(--color-ink)");
+    expect(charOf("笑").style.color).toBe("var(--color-ink)");
+    // 筊象色降级为字前 6px 色点（装饰）：逐条钉住各自令牌，回退成无色/同色即变红。
+    const dotOf = (ch: string) => {
+      const li = charOf(ch).closest("li")!;
+      return within(li).getByTestId("omen-dot") as HTMLElement;
+    };
+    expect(dotOf("圣").style.background).toBe("var(--color-wood)");
+    expect(dotOf("阴").style.background).toBe("var(--color-cinnabar)");
+    expect(dotOf("笑").style.background).toBe("var(--color-gold)");
+  });
+
+  it("卡脚圆钮：背景走类（bg-[var(--color-cinnabar)]）而非内联 style——内联简写会让 hover:bg-* 失效（验收返工 I1）", async () => {
+    await renderSpiritPage();
+    const btn = screen.getByRole("button", { name: "掷筊" }) as HTMLElement;
+    expect(btn.className).toContain("bg-[var(--color-cinnabar)]");
+    expect(btn.className).toContain("hover:bg-[var(--color-cinnabar-press)]");
+    expect(btn.style.background).toBe("");
+  });
+
+  it("揭晓（3e）：落定后语境胶囊声明为这一卦的筊象名（ShellContext label），asking 时为空", async () => {
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValue(new Response("这一掷是圣筊。"));
+    await renderSpiritPage();
+    // asking：没有筊象，胶囊语境回退路由默认（label 为 null，探针渲染为空）
+    expect(screen.getByTestId("shell-label").textContent).toBe("");
+
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+
+    await waitFor(() => expect(screen.getByTestId("shell-label").textContent).toBe("胶囊:圣筊"));
   });
 });

@@ -71,7 +71,13 @@
   --color-earth: #ce9a4a;
   --color-metal: #b6a079;
   --color-water: #3e83a0;
-  --color-on-wood: #f1f7f2;
+
+  /* —— 筊杯漆面（掷筊 5c 弦月插画专用；色值取自设计包 02-components §6「面色与
+     刻字」——验收返工 I4：此前用 cinnabar/tint 凑，「仰」那枚在白卡上仅
+     1.18:1，两枚几乎不可区分；新增令牌不违反「无裸十六进制」，组件里一律
+     引用变量。图形（非文字）对比门槛 3:1，两值均达标） —— */
+  --color-jiao-down: #a3382c; /* 俯（弧面朝上）朱漆深色 */
+  --color-jiao-up: #b5453a; /* 仰（平面朝上）朱漆浅色 */  --color-on-wood: #f1f7f2;
   --color-on-fire: #fff1eb;
   --color-on-earth: #fff8ec;
   --color-on-metal: #fcfaf4;

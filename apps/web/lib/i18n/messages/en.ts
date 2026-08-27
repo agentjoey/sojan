@@ -33,7 +33,9 @@ export const en: Messages = {
     home: "Home",
     calendar: "Fortune",
     chart: "Chart",
-    spirit: "Ask",
+    // EP-nav-label-2 (UI v3 C3): /spirit nav label is now 掷筊; the seal char 灵
+    // stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
+    spirit: "掷筊 (Jiao)",
     fengshui: "Feng Shui",
     dream: "Dream",
     profiles: "Me",
@@ -411,6 +413,10 @@ export const en: Messages = {
     followUpPlaceholder: "Anything else you'd like to ask?",
     followUpSubmit: "Ask more",
     historyTitle: "Recent dreams",
+    // UI v3 C3 (03-screens dream 6a additions): preview block and privacy note.
+    previewTitle: "How the Spirit reads it",
+    previewBody: "Your 本命之灵 (Natal Spirit) reads the dream with your chart and recent state of mind — reflection, not prediction.",
+    privacyNote: "Only a third-person summary and the Spirit's reply are kept — never your original dream text.",
   },
   jiao: {
     kicker: "Divination",
@@ -439,6 +445,14 @@ export const en: Messages = {
     followUpSubmit: "Ask more",
     historyTitle: "Recent questions",
     newThrow: "Ask about something else",
+    // UI v3 C3 (03-screens jiao 5c/3d/3e additions):
+    cardCta: "Cast the blocks",
+    followUpNote: "Follow-ups stay within this throw · not prediction, not diagnosis",
+    // One-word glosses for the card's three-omen legend — the long omen*Desc strings
+    // would collide with the reveal screen's identical text (getByText uniqueness).
+    omenShengShort: "Assent",
+    omenXiaoShort: "Unclear",
+    omenYinShort: "Dissent",
     // Crisis pre-throw guard (EP-jiao final-review gap-fill, see lib/jiao-crisis.ts):
     // when the narrow self-harm/medical-emergency wordlist hits, we skip the throw
     // entirely and swap in this guidance instead. Only numbers we're confident stay
@@ -467,6 +481,8 @@ export const en: Messages = {
     bestDirection: "生气方 (Sheng Chi / life-generating direction)",
     tabs: { chart: "Chart", remedy: "Remedies", object: "Add" },
     directionsTitle: "The eight directions",
+    // UI v3 C4-2 (03-screens fengshui 6d): one-line summary of the four auspicious directions under the wheel.
+    fourAuspicious: "四吉方 (Four Auspicious Directions)",
     affinityTitle: "Colors & materials that suit you",
     remedyTitle: "Things you can try",
     personalTitle: "Your natal directions",

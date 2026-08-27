@@ -12,8 +12,10 @@ import { listJiaoHistory, appendJiaoHistory, type JiaoHistoryEntry } from "@/lib
 import { JiaoThrow, JiaoBlocksStatic } from "@/components/JiaoThrow";
 import { SpiritPanel } from "@/app/chart/SpiritPanel";
 import { PageHeader } from "@/components/PageHeader";
-import { Button } from "@/components/ui";
+import { Button, Emphasis } from "@/components/ui";
 import { Paywall } from "@/components/Paywall";
+import { TwoColumn } from "@/components/TwoColumn";
+import { useShellContext } from "@/components/ShellContext";
 import { jiaoSummaryAction } from "@/app/actions";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 
@@ -37,9 +39,23 @@ type Stage =
       question?: string;
     };
 
-/** 筊象 → 大字名 / 传统释义 的 i18n 键（UAT②：揭晓屏用，两个键此前定义了却无人使用）。 */
-const OMEN_NAME_KEY: Record<Omen, string> = { 圣筊: "jiao.omenSheng", 笑筊: "jiao.omenXiao", 阴筊: "jiao.omenYin" };
+/** 筊象 → 传统释义 的 i18n 键（UAT②：揭晓屏用）。
+ *  筊象大字名不再走 i18n 键（验收返工 I3）：`stage.omen` 本身就是中文术语
+ *  （圣筊/笑筊/阴筊），两个 locale 都该原样显示——en 此前的
+ *  "圣筊 (Sheng — assent)" 有 19 字符，44px 大字在 402px 视口折 2–3 行，
+ *  而英文是默认路径；gloss 由下一行的释义（omenXxxDesc）承担。 */
 const OMEN_DESC_KEY: Record<Omen, string> = { 圣筊: "jiao.omenShengDesc", 笑筊: "jiao.omenXiaoDesc", 阴筊: "jiao.omenYinDesc" };
+/** 筊杯卡三列释义的单字短注（5c）——与揭晓屏长句刻意不同文，见 zh.ts 键上注释。 */
+const OMEN_SHORT_KEY: Record<Omen, string> = { 圣筊: "jiao.omenShengShort", 笑筊: "jiao.omenXiaoShort", 阴筊: "jiao.omenYinShort" };
+
+/** 3d「最近问过的」筊象单字着色（03-screens 掷筊节）：圣 wood、阴 cinnabar、笑 gold。 */
+const OMEN_CHAR_COLOR: Record<Omen, string> = {
+  圣筊: "var(--color-wood)",
+  笑筊: "var(--color-gold)",
+  阴筊: "var(--color-cinnabar)",
+};
+
+const OMENS: Omen[] = ["圣筊", "笑筊", "阴筊"];
 
 export default function SpiritPage() {
   const t = useT();
@@ -55,6 +71,14 @@ export default function SpiritPage() {
   const [history, setHistory] = useState<JiaoHistoryEntry[]>([]);
   // UAT④：历史入口从「只在 asking 阶段的页面底部」挪到页头常驻按钮，本地开关控制展开/收起。
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // 3e（03-screens 掷筊节）：胶囊语境显示筊象名——揭晓与追问（灵解）期间，移动端
+  // 顶部语境胶囊从路由默认的「掷筊」换成这一卦的筊象名（如「圣筊」）。桌面端不做
+  // 胶囊语境（06-desktop §4：语境由竖栏当前项 + 页头大标题承担），此声明在桌面
+  // 无可见效果。useShellContext 是 hook，必须无条件调用、位于所有早退之前。
+  useShellContext(
+    stage.kind === "revealed" || stage.kind === "conversing" ? stage.omen : null,
+  );
 
   useEffect(() => {
     if (!ENABLED) return;
@@ -215,11 +239,51 @@ export default function SpiritPage() {
       </Centered>
     );
 
-  // UAT④：历史入口挪到页头常驻按钮——掷筊前/掷筊中/对话中都要看得见、点得到，
-  // 不再像此前那样只在 stage.kind === "asking" 的页面底部才出现（进了对话就没影了）。
-  // 只在有历史时才渲染入口，没历史没什么可点的。两个节点在下面 conversing/主两条
-  // 渲染分支里各引用一次——同一时刻只会有一条分支真正被渲染，不存在重复挂载。
-  const historyToggle = history.length > 0 && (
+  // UI v3 C3（03-screens 掷筊 5c/3d/3e）：问事态（asking/rethrow）历史以页内列表
+  // 呈现（设计 3d「最近问过的」，筊象单字着色）；其余阶段仍由 UAT④ 的页头常驻
+  // 入口 + 展开面板承担——两种形态同一时刻只挂一种，不存在重复渲染。
+  const inlineHistory = stage.kind === "asking" || stage.kind === "rethrow";
+
+  const historyRow = (h: JiaoHistoryEntry) => {
+    const summary = (
+      <>
+        {/* 验收返工 I2：筊象色只进字前 6px 色点（装饰，aria-hidden），单字用 ink——
+            wood 3.06:1 / gold 2.48:1 都低于 13px 正文的 AA 4.5:1（同 C1 根因）。 */}
+        <span
+          data-testid="omen-dot"
+          aria-hidden="true"
+          className="mr-1.5 inline-block h-[6px] w-[6px] rounded-full align-middle"
+          style={{ background: OMEN_CHAR_COLOR[h.omen] }}
+        />
+        <span className="mr-2 font-serif font-semibold" style={{ color: "var(--color-ink)" }}>
+          {h.omen.slice(0, 1)}
+        </span>
+        {h.summary}
+      </>
+    );
+    return h.fullText ? (
+      <li key={h.id}>
+        <button
+          type="button"
+          onClick={() => {
+            // 续接历史：没有问题原文（jiao_history 不存，迁移 0019），question 传
+            // undefined——continueJiaoReply 据此走「续接历史」重载，不重建首轮 prompt。
+            // exhausted 未知，默认 false：历史列表不存这一位，绝大多数条目本就不是
+            // 「三笑筊拆解」那种，默认按普通规则续问，代价可接受。
+            setStage({ kind: "conversing", seed: [{ role: "spirit", content: h.fullText! }], omen: h.omen, exhausted: false, question: undefined });
+            setHistoryOpen(false);
+          }}
+          className="block w-full text-left text-[13px] leading-relaxed text-ink-2 underline decoration-[var(--color-line)] underline-offset-4 transition-colors hover:text-ink hover:decoration-[var(--color-cinnabar)]"
+        >
+          {summary}
+        </button>
+      </li>
+    ) : (
+      <li key={h.id} className="text-[13px] leading-relaxed text-ink-2">{summary}</li>
+    );
+  };
+
+  const historyToggle = history.length > 0 && !inlineHistory && (
     <button
       type="button"
       onClick={() => setHistoryOpen((v) => !v)}
@@ -228,32 +292,9 @@ export default function SpiritPage() {
       {t("jiao.historyTitle")} {historyOpen ? "↑" : "→"}
     </button>
   );
-  const historyPanel = history.length > 0 && historyOpen && (
+  const historyPanel = history.length > 0 && historyOpen && !inlineHistory && (
     <div className="border-b border-[var(--color-line)] bg-surface px-4 py-4">
-      <ul className="space-y-2.5">
-        {history.map((h) =>
-          h.fullText ? (
-            <li key={h.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  // 续接历史：没有问题原文（jiao_history 不存，迁移 0019），question 传
-                  // undefined——continueJiaoReply 据此走「续接历史」重载，不重建首轮 prompt。
-                  // exhausted 未知，默认 false：历史列表不存这一位，绝大多数条目本就不是
-                  // 「三笑筊拆解」那种，默认按普通规则续问，代价可接受。
-                  setStage({ kind: "conversing", seed: [{ role: "spirit", content: h.fullText! }], omen: h.omen, exhausted: false, question: undefined });
-                  setHistoryOpen(false);
-                }}
-                className="block w-full text-left text-[13px] leading-relaxed text-ink-2 underline decoration-[var(--color-line)] underline-offset-4 transition-colors hover:text-ink hover:decoration-[var(--color-cinnabar)]"
-              >
-                {h.summary}
-              </button>
-            </li>
-          ) : (
-            <li key={h.id} className="text-[13px] leading-relaxed text-ink-2">{h.summary}</li>
-          ),
-        )}
-      </ul>
+      <ul className="space-y-2.5">{history.map(historyRow)}</ul>
     </div>
   );
 
@@ -279,11 +320,122 @@ export default function SpiritPage() {
     );
   }
 
-  return (
-    <main className="mx-auto max-w-[720px] px-4 pb-8 pt-6">
-      <PageHeader kicker={t("jiao.kicker")} title={t("jiao.title")} annotation={t("jiao.subtitle")} action={historyToggle || undefined} />
-      {historyPanel}
+  const throwable = stage.kind === "asking" || stage.kind === "rethrow";
 
+  // 左列（06-desktop §3：掷筊左列 440px＝筊台；问题输入与掷筊按钮同属筊台一侧）。
+  // 筊杯卡（5c）：细线卡；图区 262px 随阶段换内容（静态弦月插画 / 抛掷动画 / 落定
+  // 静态筊），三列筊象释义（圣筊走强调手法），卡脚「掷 筊 问 事」+ 46px 朱砂圆钮。
+  // ⚠️ 验收返工 C4：crisis 时左列整体不渲染——「命中即直接换成求助引导屏」意味着
+  // 筊杯卡（262px 图区 + 三列释义）与三掷点都不能留在屏上：402×850 下它们会把
+  // 热线号码挤出首屏，且三掷点的 aria-label「还可以掷 n 次」会在危机屏上向读屏
+  // 用户播报剩余掷筊次数。右列的引导文案由那个跨 stage 持续挂载的 aria-live
+  // region 承载（不卸载、播报可靠），左列只是为空，TwoColumn 结构不变。
+  const left = stage.kind === "crisis" ? null : (
+    <>
+      {throwable && (
+        <div className="mb-6">
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder={t("jiao.placeholder")}
+            rows={3}
+            className="w-full resize-none rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 font-serif text-[19px] text-ink placeholder:font-sans placeholder:text-[14px] placeholder:text-muted focus:border-[var(--color-cinnabar)] focus:outline-none"
+            style={{ caretColor: "var(--color-cinnabar)" }}
+          />
+          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted">
+            <span>{tooLong ? t("jiao.errorTooLong") : ""}</span>
+            <span className="font-latin">{question.trim().length} / 500</span>
+          </div>
+        </div>
+      )}
+
+      <section
+        data-testid="jiao-card"
+        className="rounded-[var(--radius-card)] border border-[var(--color-line)] bg-surface"
+      >
+        {/* 图区 262px：asking/rethrow/reading 静态弦月插画；throwing 抛掷动画
+            （JiaoThrow 已上线，不碰）；revealed 落定静态筊（仓库几何版）。
+            crisis 到不了这里——左列整个被门控（见 left 定义处 C4 注释）。 */}
+        <div className="relative flex h-[262px] items-center justify-center overflow-hidden border-b border-[var(--color-line)]">
+          {stage.kind === "throwing" ? (
+            <JiaoThrow blocks={stage.blocks} onSettled={() => setStage({ kind: "revealed", blocks: stage.blocks, omen: stage.omen })} />
+          ) : stage.kind === "revealed" ? (
+            <JiaoBlocksStatic blocks={stage.blocks} />
+          ) : (
+            <JiaoCardArt />
+          )}
+        </div>
+
+        {/* 三列筊象释义（圣/笑/阴），圣筊走强调手法（02-components §2「选中筊象」）。
+            列头用单字（圣/笑/阴）+ 单字短注，不用筊象全名与长句——全名/长句与揭晓屏
+            同文会让 getByText 唯一匹配撞车（见 OMEN_SHORT_KEY 注释）。 */}
+        <div className="grid grid-cols-3 gap-3 px-5 py-4">
+          {OMENS.map((omen) => {
+            const body = (
+              <>
+                <p className="font-serif text-[16px] font-semibold text-ink">{omen.slice(0, 1)}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">{t(OMEN_SHORT_KEY[omen])}</p>
+              </>
+            );
+            return omen === "圣筊" ? (
+              <Emphasis key={omen} data-testid="jiao-omen-emphasis">{body}</Emphasis>
+            ) : (
+              <div key={omen}>{body}</div>
+            );
+          })}
+        </div>
+
+        {/* 卡脚：只在可掷阶段（asking/rethrow）出现——掷筊按钮是这里唯一的触发点，
+            46px 朱砂圆钮，钮内是长按摇动图标（中心实心点 + 按压环 + 左右震动弧）。
+            ⚠️ 设计 5c 卡脚另有「长按摇杯 · 震动与落地声可关」小字：长按手势与震动/
+            落地声开关在仓库现状里不存在（现状是单击掷筊），写上等于声称不存在的
+            功能（反幻觉），故不渲染——见实施报告。 */}
+        {throwable && (
+          <div className="flex items-center justify-between border-t border-[var(--color-line)] px-5 py-3">
+            <span className="text-[13px] tracking-[0.3em] text-ink-2">{t("jiao.cardCta")}</span>
+            <button
+              type="button"
+              onClick={doThrow}
+              disabled={!canThrow}
+              aria-label={stage.kind === "rethrow" ? t("jiao.xiaoRethrow") : t("jiao.throwCta")}
+              className="zj-wheel-focus inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cinnabar)] text-[var(--color-paper)] transition-colors duration-200 hover:bg-[var(--color-cinnabar-press)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" aria-hidden="true">
+                <circle cx="12" cy="12" r="2.2" fill="currentColor" />
+                <circle cx="12" cy="12" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M3.6 9.2a8.6 8.6 0 0 0 0 5.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M20.4 9.2a8.6 8.6 0 0 1 0 5.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* 三掷点（3d）：每用掉一次掷筊点亮一格；笑筊重掷状态行紧随其后。 */}
+      <div
+        data-testid="jiao-throw-dots"
+        className="mt-4 flex items-center justify-center gap-2"
+        aria-label={t("jiao.throwsLeft", { n: String(MAX_THROWS - throws.length) })}
+      >
+        {Array.from({ length: MAX_THROWS }, (_, i) => (
+          <span
+            key={i}
+            data-lit={i < throws.length}
+            className="h-[6px] w-[6px] rounded-full"
+            style={{ background: i < throws.length ? "var(--color-cinnabar)" : "var(--color-line-strong)" }}
+          />
+        ))}
+      </div>
+      {stage.kind === "rethrow" && (
+        <p className="mt-2 text-center text-[12px] text-muted">{t("jiao.throwsLeft", { n: String(MAX_THROWS - throws.length) })}</p>
+      )}
+    </>
+  );
+
+  // 右列（06-desktop §3：揭晓 + 灵解 + 追问；移动端单列时按 DOM 序接在筊台之后）。
+  const right = (
+    <>
+      {historyPanel}
       {/*
        * 掷筊结果播报（无障碍）：JiaoThrow 内部的 aria-live 只包着两枚纯装饰用的筊块
        * div（无 accessible text，data-* 不进无障碍树），实际什么都播报不出来——这是
@@ -297,13 +449,14 @@ export default function SpiritPage() {
        * 有的内容——UAT②新增的揭晓屏尤其要绕开这个坑：筊象大字名就是这个 live
        * region 本身，不是揭晓屏下方另起的一个新节点）；同时避免了可见段落与播报
        * 文案各说各话、或被 getByText 命中两份重复文本。
+       * UI v3 C3：revealed 的大字名按 3e 提到 serif 44px（揭晓屏主视觉）。
        */}
       <p
         aria-live="polite"
         role="status"
         className={
           stage.kind === "revealed"
-            ? "mt-6 text-center font-serif text-[26px] font-bold text-ink"
+            ? "mt-2 font-serif text-[44px] font-bold leading-[1.2] text-ink"
             : stage.kind === "rethrow"
               ? "mt-6 text-[14px] leading-relaxed text-ink-2"
               : stage.kind === "reading" || stage.kind === "throwing"
@@ -321,7 +474,7 @@ export default function SpiritPage() {
             crisis 分支同一套道理：命中危机拦截时页面从「输入问题」直接换成求助
             引导，这个变化本身也必须被播报出来，而不是静默换了一屏文字。 */}
         {stage.kind === "revealed"
-          ? t(OMEN_NAME_KEY[stage.omen])
+          ? stage.omen
           : stage.kind === "rethrow"
             ? t("jiao.xiaoHint")
             : stage.kind === "reading"
@@ -333,59 +486,20 @@ export default function SpiritPage() {
                   : ""}
       </p>
 
-      {stage.kind === "crisis" && (
-        <div className="mt-5 flex justify-center">
-          <Button onClick={reset}>{t("jiao.crisisBack")}</Button>
-        </div>
-      )}
-
-      {stage.kind === "asking" && (
-        <div className="mt-6">
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder={t("jiao.placeholder")}
-            rows={3}
-            className="w-full resize-none rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 text-[14px] text-ink placeholder:text-muted focus:border-[var(--color-cinnabar)] focus:outline-none"
-          />
-          {tooLong && <p className="mt-2 text-[12px]" style={{ color: "var(--color-seal)" }}>{t("jiao.errorTooLong")}</p>}
-          <Button onClick={doThrow} disabled={!canThrow}>{t("jiao.throwCta")}</Button>
-        </div>
-      )}
-
-      {stage.kind === "throwing" && (
-        <JiaoThrow blocks={stage.blocks} onSettled={() => setStage({ kind: "revealed", blocks: stage.blocks, omen: stage.omen })} />
-      )}
-
-      {/*
-       * UAT②（最要害的一项）：动画落定后不再直接跳去 reading/rethrow——此前筊象结果
-       * 从未被展示给用户，omenSheng/omenXiao/omenYin 三个键定义了却无人用正是这块
-       * 缺口的症状。这里先定格展示：大字筊象名（挂在上面的持续 live region 里，见
-       * 那段注释）+ 落地的两枚筊本身（一俯一仰这样的实际组合）+ 传统释义，用户看
-       * 清楚了再点「继续」才推进到下一步。
-       * 推进方式选「用户点继续」而非自动延时：①不给 reduced-motion 用户再引入一个
-       * 新的计时器分支（延时推进得额外判断"用户是否明确点开过所以已经看过"，模型
-       * 更复杂）；②这一屏的意义正是「留意你看到结果那一刻的反应」——交给用户自己
-       * 决定看多久、什么时候准备好翻篇，比替他倒计时更贴合「筊象是镜子」这个立意。
-       */}
+      {/* 3e 揭晓屏：筊象大字（上面的 live region）+ 传统释义 + 细线 +「继续」。
+          落定静态筊在左列筊杯卡图区（仓库几何版 blockVisual，02 §6）。 */}
       {stage.kind === "revealed" && (
-        <div className="mt-4 flex flex-col items-center gap-1 text-center">
-          <JiaoBlocksStatic blocks={stage.blocks} />
-          <p className="mt-5 max-w-[380px] text-[13px] leading-relaxed text-ink-2">{t(OMEN_DESC_KEY[stage.omen])}</p>
-          <Button onClick={() => void proceedAfterReveal(stage.omen)} className="mt-6">{t("jiao.revealContinue")}</Button>
+        <div className="mt-3">
+          <p className="max-w-[380px] text-[13px] leading-relaxed text-ink-2">{t(OMEN_DESC_KEY[stage.omen])}</p>
+          <div className="mt-6 border-t border-[var(--color-line)] pt-6">
+            <Button onClick={() => void proceedAfterReveal(stage.omen)}>{t("jiao.revealContinue")}</Button>
+          </div>
         </div>
       )}
 
-      {stage.kind === "rethrow" && (
-        <div className="mt-2">
-          <p className="text-[12px] text-muted">{t("jiao.throwsLeft", { n: String(MAX_THROWS - throws.length) })}</p>
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={3}
-            className="mt-3 w-full resize-none rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 text-[14px] text-ink focus:border-[var(--color-cinnabar)] focus:outline-none"
-          />
-          <Button onClick={doThrow} disabled={!canThrow}>{t("jiao.xiaoRethrow")}</Button>
+      {stage.kind === "crisis" && (
+        <div className="mt-5">
+          <Button onClick={reset}>{t("jiao.crisisBack")}</Button>
         </div>
       )}
 
@@ -406,7 +520,65 @@ export default function SpiritPage() {
           {error}
         </div>
       ) : null}
+
+      {/* 3d「最近问过的」：问事态页内列表，筊象单字着色（圣 wood / 阴 cinnabar / 笑 gold）。 */}
+      {inlineHistory && history.length > 0 && (
+        <section className="mt-10 border-t border-[var(--color-line)] pt-6">
+          <h2 className="text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>{t("jiao.historyTitle")}</h2>
+          <ul className="mt-3 space-y-2.5">{history.map(historyRow)}</ul>
+        </section>
+      )}
+    </>
+  );
+
+  const header = (
+    <PageHeader as="div" kicker={t("jiao.kicker")} title={t("jiao.title")} annotation={t("jiao.subtitle")} action={historyToggle || undefined} />
+  );
+
+  return (
+    <main>
+      <TwoColumn leftWidth={440} header={header} left={left} right={right} />
     </main>
+  );
+}
+
+/**
+ * 筊杯卡图区的静态弦月插画（5c，asking/rethrow 等未掷阶段）：两枚饱满弦月筊，
+ * 几何取 02-components §6（外弧 A56,56、内缘二次曲线内凹 30px、两枚内缘相对、
+ * 落地姿态不对称）。面色用专用令牌 --color-jiao-down/up（验收返工 I4：设计稿
+ * 漆色以新令牌形式落地，不违反「无裸十六进制」；此前用 cinnabar/tint 凑，
+ * 「仰」仅 1.18:1，两枚不可区分）。右上竖排「筊/杯」、底部「一 俯 一 仰 · 圣 筊 /
+ * 朱漆 · 手掷」为插画固定字样（命理术语两个 locale 都保持中文）。
+ */
+function JiaoCardArt() {
+  return (
+    <div className="relative h-full w-full" aria-hidden="true">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <svg viewBox="0 0 264 172" className="h-[150px] w-auto">
+          <path
+            d="M132,30 A56,56 0 0 0 132,142 Q102,86 132,30 Z"
+            fill="var(--color-jiao-down)"
+            transform="translate(-20,16) rotate(-34 132 86) scale(.94)"
+          />
+          <path
+            d="M132,30 A56,56 0 0 1 132,142 Q162,86 132,30 Z"
+            fill="var(--color-jiao-up)"
+            transform="translate(4,-8) rotate(27 132 86)"
+          />
+        </svg>
+      </div>
+      <div
+        className="absolute right-4 top-3 flex gap-2 text-muted"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        <span className="font-serif text-[15px]">筊<span className="ml-1 font-latin text-[10px] tracking-normal">jiǎo</span></span>
+        <span className="font-serif text-[15px]">杯<span className="ml-1 font-latin text-[10px] tracking-normal">bēi</span></span>
+      </div>
+      <div className="absolute inset-x-0 bottom-3 text-center">
+        <p className="font-serif text-[13px] tracking-[0.3em] text-ink-2">一 俯 一 仰 · 圣 筊</p>
+        <p className="mt-1 text-[10.5px] tracking-[0.28em] text-muted">朱 漆 · 手 掷</p>
+      </div>
+    </div>
   );
 }
 

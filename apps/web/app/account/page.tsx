@@ -7,6 +7,7 @@ import { hasTgSession, tgLoginWithWidget, tgLogout } from "@/lib/tg/client";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { Paywall } from "@/components/Paywall";
 import { PageHeader } from "@/components/PageHeader";
+import { Emphasis } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { LocaleSwitch } from "@/lib/i18n/switch";
 
@@ -466,15 +467,16 @@ export default function AccountPage() {
   const identitiesRows = (
     <>
       <div className="space-y-2 text-[13px]">
+        {/* 6c（03-screens 我的+账号节）：绑定与登录诸行，未绑定项朱砂。 */}
         <div className="flex items-center justify-between">
           <span style={{ color: "var(--color-muted)" }}>{t("account.email")}</span>
-          <span style={{ color: "var(--color-ink)" }}>
+          <span data-testid="identity-email" style={{ color: identities?.email ? "var(--color-ink)" : "var(--color-cinnabar)" }}>
             {identities?.email ?? t("account.notLinked")}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span style={{ color: "var(--color-muted)" }}>Telegram</span>
-          <span style={{ color: "var(--color-ink)" }}>
+          <span data-testid="identity-telegram" style={{ color: identities?.telegram?.username ? "var(--color-ink)" : "var(--color-cinnabar)" }}>
             {identities?.telegram?.username ?? t("account.notLinked")}
           </span>
         </div>
@@ -562,7 +564,8 @@ export default function AccountPage() {
         <Section label={t("account.sectionSubscription")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[14px] font-medium" style={{ color: "var(--color-ink)" }}>
+              {/* 6c：订阅等级 serif 19px。 */}
+              <p className="font-serif text-[19px] font-semibold" style={{ color: "var(--color-ink)" }} data-testid="billing-tier">
                 {billing.tier === "member" ? t("account.tierMember") : t("account.tierFree")}
               </p>
               {billing.tier === "member" && billing.memberUntil ? (
@@ -696,13 +699,9 @@ export default function AccountPage() {
 
       {(view.kind === "telegram" || view.kind === "email") && (
         <Section label={t("account.sectionData")}>
-          <div
-            className="p-4"
-            style={{
-              border: "1px solid var(--color-cinnabar)",
-              borderRadius: "var(--radius-card)",
-            }}
-          >
+          {/* 6c：危险区走全站唯一的强调手法（Emphasis，02-components §2 列出的
+              「危险区」用例）——取代此前的朱砂边框盒（那是第二种强调手法）。 */}
+          <Emphasis data-testid="danger-zone" className="py-1">
             <h3 className="mb-2 text-[13px] font-medium" style={{ color: "var(--color-cinnabar)" }}>
               {t("account.dangerZone")}
             </h3>
@@ -752,7 +751,7 @@ export default function AccountPage() {
                 )}
               </div>
             )}
-          </div>
+          </Emphasis>
         </Section>
       )}
 

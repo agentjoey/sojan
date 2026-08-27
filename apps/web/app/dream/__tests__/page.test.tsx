@@ -401,3 +401,62 @@ describe("EP-auth-return：解梦草稿用 sessionStorage 兜底", () => {
     expect(sessionStorage.getItem("zj_dream_draft")).toBe("");
   });
 });
+
+/**
+ * UI v3 C3（03-screens 解梦 6a）：版式断言。
+ * 每条对应一个可独立回退的实现点（预告块 / 隐私说明 / 历史日期 / serif 输入区 /
+ * 主按钮月星图标），删掉对应实现即只有对应用例变红（mutation 复验输出见实施报告）。
+ */
+describe("UI v3 C3：解梦 6a 版式", () => {
+  it("首轮提交前渲染「灵会怎么读」预告块与隐私说明，提交进入对话后两者都消失", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("这个梦在处理坠落感。", { status: 200 })));
+    await renderDreamPage();
+    const textarea = await screen.findByRole("textbox");
+    expect(screen.getByText("灵会怎么读")).toBeInTheDocument();
+    expect(screen.getByTestId("dream-preview")).toBeInTheDocument();
+    expect(screen.getByText(/不存梦的原文/)).toBeInTheDocument();
+
+    // 验收 Minor 补测另一半：turns 非空后预告块与隐私说明必须让位（它们只在
+    // turns.length === 0 时渲染——若把条件写丢，对话态里会挂着两块不合时宜的文案）。
+    fireEvent.change(textarea, { target: { value: "我梦见自己在坠落，怎么都落不到底。" } });
+    fireEvent.click(screen.getByText("解这个梦"));
+    await waitFor(() => expect(screen.getByText("这个梦在处理坠落感。")).toBeInTheDocument());
+    expect(screen.queryByTestId("dream-preview")).toBeNull();
+    expect(screen.queryByText(/不存梦的原文/)).toBeNull();
+  });
+
+  it("输入区是 serif 18px、底 1px 墨线（underline 形态，不是全边框盒）", async () => {
+    await renderDreamPage();
+    const textarea = (await screen.findByRole("textbox")) as HTMLElement;
+    expect(textarea.className).toContain("font-serif");
+    expect(textarea.className).toContain("text-[18px]");
+    expect(textarea.className).toContain("border-b");
+    expect(textarea.className).toContain("border-[var(--color-ink)]");
+  });
+
+  it("主按钮「解这个梦」带下弦月+星子图标（22px svg）", async () => {
+    await renderDreamPage();
+    await screen.findByRole("textbox");
+    const icon = screen.getByTestId("dream-submit-icon");
+    expect(icon.tagName.toLowerCase()).toBe("svg");
+    // 图标必须挂在提交按钮上，而不是页面别处的孤立装饰
+    expect(icon.closest("button")).not.toBeNull();
+    expect(icon.closest("button")!.textContent).toContain("解这个梦");
+  });
+
+  it("最近的梦：每条摘要带日期（本地时区的 YYYY-MM-DD，不是 UTC 截取——验收 Minor）", async () => {
+    // 20:00Z 在 UTC+8 是次日 04:00：UTC slice 给 19 号、本地日期给 20 号——
+    // 期望值用同一个平台 API 现算（不是从 SUT 反推：SUT 的选择是「本地还是 UTC」，
+    // 这个平台调用只是日历换算本身），任何时区下都成立。
+    const createdAt = "2026-08-19T20:00:00Z";
+    const expected = new Date(createdAt).toLocaleDateString("en-CA");
+    listDreamHistoryMock.mockResolvedValueOnce([
+      { id: "h1", summary: "一个关于坠落的梦", fullText: "这个梦在处理坠落感。", createdAt },
+    ]);
+    await renderDreamPage();
+    await screen.findByText("一个关于坠落的梦");
+    const date = screen.getByText(expected) as HTMLElement;
+    expect(date.className).toContain("font-latin");
+    expect(date.textContent).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});

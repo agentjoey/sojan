@@ -39,7 +39,9 @@ export const zh = {
     home: "首页",
     calendar: "运势",
     chart: "命盘",
-    spirit: "问事",
+    // EP-nav-label-2（UI v3 C3）：/spirit 导航小字改为「掷筊」；大字方印字符「灵」
+    // 不变（lib/nav.ts 的 char），TG_ENTRIES 的对应项不动（TG 冻结）。
+    spirit: "掷筊",
     fengshui: "风水",
     dream: "解梦",
     profiles: "我的",
@@ -415,6 +417,10 @@ export const zh = {
     followUpPlaceholder: "还想问点什么？",
     followUpSubmit: "追问",
     historyTitle: "最近的梦",
+    // UI v3 C3（03-screens 解梦 6a 新增）：预告块与隐私说明。
+    previewTitle: "灵会怎么读",
+    previewBody: "灵会带着你的命盘与近况来读这个梦——是观照，不是预言。",
+    privacyNote: "只存第三人称摘要与灵的回复，不存梦的原文。",
   },
   jiao: {
     kicker: "掷 筊",
@@ -443,6 +449,14 @@ export const zh = {
     followUpSubmit: "接着问",
     historyTitle: "最近问过的",
     newThrow: "换一件事问",
+    // UI v3 C3（03-screens 掷筊节 5c/3d/3e 新增）：
+    cardCta: "掷 筊 问 事",
+    followUpNote: "追问仍在这一卦之内 · 非预测、非诊断",
+    // 筊杯卡三列筊象释义的单字短注——不能用 OMEN_DESC_KEY 的长句：长句与揭晓屏
+    // 释义同文会让既有断言（getByText 唯一匹配）撞车，且三列卡片放不下整句。
+    omenShengShort: "允",
+    omenXiaoShort: "未明",
+    omenYinShort: "不允",
     // 危机前置拦截（EP-jiao 最终评审补项，见 lib/jiao-crisis.ts）：命中最窄一层
     // 自伤/医疗急症词表时，不掷筊，直接换成这三个键渲染的求助引导屏。文案克制、
     // 不说教，热线信息只给确知准确、长期稳定的号码（120/110 是中国大陆通用应急
@@ -473,6 +487,8 @@ export const zh = {
     bestDirection: "生气方",
     tabs: { chart: "盘", remedy: "化解", object: "添置" },
     directionsTitle: "八方吉凶",
+    // UI v3 C4-2（03-screens 境 6d）：八方盘下方的四吉方一行说明。
+    fourAuspicious: "四吉方",
     affinityTitle: "宜用色与材",
     remedyTitle: "可做的事",
     // Task 9（EP-fs-15）：宅八方 + 合看 chips。dwellingTitle/personalTitle 分开标注

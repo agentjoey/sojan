@@ -255,9 +255,13 @@ export function SpiritPanel({
       </div>
 
       {/* Sticky Input */}
+      {/* 3e（03-screens 掷筊节）：追问输入条上方的边界注记——追问仍在这一卦之内。 */}
+      <p className="border-t border-[var(--color-line)] bg-paper px-4 pt-2 text-[11px] text-muted">
+        {t("jiao.followUpNote")}
+      </p>
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-0 z-10 flex items-end gap-2 border-t border-[var(--color-line)] bg-paper px-4 pt-3"
+        className="sticky bottom-0 z-10 flex items-end gap-2 bg-paper px-4 pt-3"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
       >
         <textarea

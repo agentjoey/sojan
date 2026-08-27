@@ -563,9 +563,14 @@ export default function FengshuiPage() {
   // 化解 tab 同理：宅层分级化解属会员功能，而 f.remedies 在未放行时本来就只含
   // 个人层（fs 是 Layer 0）——不再需要单独算一份 personalOnlyRemedies 兜底。
 
-  // 生气方（6d 详情块）：当前视角下 star === "生气" 的那一格——八宅表每卦每星
-  // 恰占一格（core 的 BY_STAR 是卦↔星的双射，见 eight-mansions.ts），find 必中。
-  const shengQiDir = DIRECTIONS.find((d) => activeVerdicts[d].star === "生气")!;
+  // 生气方（6d 详情块）：star === "生气" 的那一格——八宅表每卦每星恰占一格
+  // （core 的 BY_STAR 是卦↔星的双射，见 eight-mansions.ts），find 必中。
+  // ⚠️ 验收返工 C2：取 **f.personalDirections**（恒为主档案本命），与块内
+  // tagline（deriveFengshuiTagline(f.personalDirections, …)）同源——此前随
+  // activeVerdicts 走，切到非同组同住人视角时标题与基调句会指向两个不同方位
+  // （「生气方 · 西 / 你的生气在东南」），是「两套八方不得互推」的同型错误。
+  // 四吉方说明仍随视角走（它是轮盘视角的文字版）；生气方详情块是主档案语境。
+  const shengQiDir = DIRECTIONS.find((d) => f.personalDirections[d].star === "生气")!;
   // 四吉方一行说明（6d）：当前视角的四吉，按 rank（吉序 1→4）排列。
   const auspiciousDirs = DIRECTIONS.filter((d) => activeVerdicts[d].auspicious)
     .sort((a, b) => activeVerdicts[a].rank - activeVerdicts[b].rank);
@@ -597,14 +602,18 @@ export default function FengshuiPage() {
     : [];
 
   /** 化解清单（TG=Group+Cell / web=Card 列表）。两个宿主共享同一份条目。 */
-  // 6d：成本分级标签按档着色——零成本 wood / 挪动 earth / 添置与装修 line-strong
-  // （6d 只给了三档；装修是 core Effort 的第四档，归并进 line-strong 一档，见报告）。
+  // 6d + 验收返工 C1：成本分级的五行色**只进标签左侧 6px 色点**（装饰元素，
+  // aria-hidden），标签文字保持 --color-ink-2（5.42:1）——wood 3.06 / earth 2.33 /
+  // line-strong 1.38 全部低于 11px 正文的 AA 4.5:1，而改动前的 --color-muted
+  // （4.84:1）是 2026-08 一次 P0 critique 专门提上来的（globals.css:53 注释），
+  // 文字着色会把那次修复推翻。添置/装修档的色点用 --color-metal（line-strong 是
+  // 分隔线令牌，从来不是文字/装饰色）。
   // 键是 core 数据里的 canonical effort 值（与 locale 无关），不是翻译后的标签。
-  const EFFORT_COLOR: Record<string, string> = {
+  const EFFORT_DOT_COLOR: Record<string, string> = {
     零成本: "var(--color-wood)",
     挪动: "var(--color-earth)",
-    添置: "var(--color-line-strong)",
-    装修: "var(--color-line-strong)",
+    添置: "var(--color-metal)",
+    装修: "var(--color-metal)",
   };
   function renderRemedyList(items: typeof f.remedies) {
     return inTg ? (
@@ -660,9 +669,15 @@ export default function FengshuiPage() {
                   </span>
                 )}
                 <span
-                  className="ml-auto shrink-0 text-[11px] tracking-[0.1em]"
-                  style={{ color: EFFORT_COLOR[r.effort] ?? "var(--color-muted)" }}
+                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[11px] tracking-[0.1em]"
+                  style={{ color: "var(--color-ink-2)" }}
                 >
+                  <span
+                    data-testid="effort-dot"
+                    aria-hidden="true"
+                    className="inline-block h-[6px] w-[6px] rounded-full"
+                    style={{ background: EFFORT_DOT_COLOR[r.effort] ?? "var(--color-line-strong)" }}
+                  />
                   {t(`fengshui.effortLabel.${r.effort}`)}
                 </span>
               </div>
@@ -692,12 +707,13 @@ export default function FengshuiPage() {
   }
 
   // 6d + 06-desktop §3（境：左列 440px 两栏）：tab 行放 TwoColumn 的 header 槽
-  // （页首之下、两栏之上）；左列＝「盘」tab 的确定性骨架（宅盘 → 生气方/基调/叙述 →
-  // 本命盘 → 引导语）+ 四吉方一行说明；右列＝化解/添置 tab 内容 + 同住人对照 + 免责。
-  // ⚠️ 左列内部顺序（房屋八方 → 一句话基调 → 本命八方）是既有测试用
-  // compareDocumentPosition 钉死的（评审后续 #4/#6）——把基调/叙述挪去右列会让
-  // DOM 序变成「本命盘 → 基调」，当场撞红那两条，所以「盘」tab 的全部内容作为
-  // 一个整体留在左列，不按「左盘右文」硬切（详见实施报告）。
+  // （页首之下、两栏之上）。验收返工 C3 后的分栏——左列＝房屋八方盘（有宅/剪影/
+  // 探测态）或居所引导语 + 四吉方一行说明；右列＝生气方块/基调/叙述 → 本命盘 →
+  // 化解/添置 tab 内容 + 同住人对照 + 免责。
+  // ⚠️ 既有测试用 compareDocumentPosition 钉死的 DOM 序只有「房屋八方 → 一句话
+  // 基调 → 本命八方」这条相对顺序（评审后续 #4/#6）：房屋盘在左节点、基调与本命盘
+  // 在右节点时，左节点恒先于右节点，基调又在本命盘之前——这条顺序天然成立，
+  // 所以本结构不违反那两条断言（第一版「盘 tab 整体居左」正是把这条读过头了）。
   const tabRow = inTg ? (
     <div className="mt-5">
       <Segmented
@@ -818,6 +834,55 @@ export default function FengshuiPage() {
             )
           )}
 
+          {/* 「还没登记居所 / 朝向未确定 / 读取失败」三条引导语。判据是**有没有登记
+              朝向已知的居所**（hasDwellingChart），不是 f.layer——f.layer 现在受
+              会员状态影响，用它会让「有宅但被挡」的用户读到「这个居所的朝向未确定」
+              这种与事实不符的提示。 */}
+          {!hasDwellingChart && dwellings !== undefined && (
+            <section className="mt-8">
+              {dwellingsError ? (
+                <div>
+                  <p className="text-[13px] text-muted">{t("fengshui.dwellingsError")}</p>
+                  <button
+                    type="button"
+                    onClick={retryDwellings}
+                    className="mt-2 text-[13px]"
+                    style={{ color: "var(--color-cinnabar)" }}
+                  >
+                    {t("fengshui.retryDwellings")}
+                  </button>
+                </div>
+              ) : dwelling ? (
+                <p className="text-[13px] text-muted">{t("fengshui.facingUnknownNote")}</p>
+              ) : (
+                <div>
+                  <p className="text-[13px] text-muted">{t("fengshui.noDwelling")}</p>
+                  <Link href="/fengshui/dwellings" className="mt-2 inline-block text-[13px]" style={{ color: "var(--color-cinnabar)" }}>
+                    {t("fengshui.addDwelling")}
+                  </Link>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      )}
+      {/* 四吉方一行说明（6d）：左列常驻——「盘」tab 里它是本命盘的文字版摘要，
+          「化解」tab 里它是方位过滤的参照（点卦字筛选后不用切回盘 tab 核对）。 */}
+      <p data-testid="four-auspicious" className="mt-6 text-[12px] leading-relaxed text-muted">
+        {t("fengshui.fourAuspicious")} ·{" "}
+        {auspiciousDirs.map((d) => `${DIRECTION_LABEL[d]}（${activeVerdicts[d].star}）`).join(" · ")}
+      </p>
+    </>
+  );
+
+  const right = (
+    <>
+      {/* 盘 tab 的右列部分（生气方/基调/叙述/本命盘）**不挂 panelProps**：TG 的
+          tabpanel 契约（评审 M4）要求每个 tab 恰一个 panel，由左列 div 担任
+          （fs-panel-chart）；右列这个 div 只是同一 tab 内容在桌面两栏下的另一半，
+          不再是独立 landmark。 */}
+      {tab === "chart" && (
+        <div>
           {/* 一句话基调（评审后续 #6）：确定性、始终可见，不依赖 LLM 是否已返回。
               「展开完整解读」只收起**成功路径**的长文（situation/youAndSpace）——
               `NarrativeStatus` 本身必须无条件挂载：它内部还处理 degraded/failed
@@ -912,49 +977,9 @@ export default function FengshuiPage() {
             </div>
           </section>
 
-          {/* 「还没登记居所 / 朝向未确定 / 读取失败」三条引导语。判据是**有没有登记
-              朝向已知的居所**（hasDwellingChart），不是 f.layer——f.layer 现在受
-              会员状态影响，用它会让「有宅但被挡」的用户读到「这个居所的朝向未确定」
-              这种与事实不符的提示。 */}
-          {!hasDwellingChart && dwellings !== undefined && (
-            <section className="mt-8">
-              {dwellingsError ? (
-                <div>
-                  <p className="text-[13px] text-muted">{t("fengshui.dwellingsError")}</p>
-                  <button
-                    type="button"
-                    onClick={retryDwellings}
-                    className="mt-2 text-[13px]"
-                    style={{ color: "var(--color-cinnabar)" }}
-                  >
-                    {t("fengshui.retryDwellings")}
-                  </button>
-                </div>
-              ) : dwelling ? (
-                <p className="text-[13px] text-muted">{t("fengshui.facingUnknownNote")}</p>
-              ) : (
-                <div>
-                  <p className="text-[13px] text-muted">{t("fengshui.noDwelling")}</p>
-                  <Link href="/fengshui/dwellings" className="mt-2 inline-block text-[13px]" style={{ color: "var(--color-cinnabar)" }}>
-                    {t("fengshui.addDwelling")}
-                  </Link>
-                </div>
-              )}
-            </section>
-          )}
         </div>
       )}
-      {/* 四吉方一行说明（6d）：左列常驻——「盘」tab 里它是本命盘的文字版摘要，
-          「化解」tab 里它是方位过滤的参照（点卦字筛选后不用切回盘 tab 核对）。 */}
-      <p data-testid="four-auspicious" className="mt-6 text-[12px] leading-relaxed text-muted">
-        {t("fengshui.fourAuspicious")} ·{" "}
-        {auspiciousDirs.map((d) => `${DIRECTION_LABEL[d]}（${activeVerdicts[d].star}）`).join(" · ")}
-      </p>
-    </>
-  );
 
-  const right = (
-    <>
       {tab === "remedy" && (
         <section className="mt-6" {...panelProps("remedy")}>
           <h2 className="text-[18px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.remedyTitle")}</h2>

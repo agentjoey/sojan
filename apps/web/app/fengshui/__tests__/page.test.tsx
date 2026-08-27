@@ -1753,17 +1753,43 @@ describe("UI v3 C4-2：境 6d 版式", () => {
     expect(block.textContent).toContain("金命之人，宜近土——你的生气在东南。");
   });
 
-  it("四吉方一行说明：恰列出坎1 的四吉（东南生气/东天医/南延年/北伏位），不含凶方星名", async () => {
+  it("四吉方一行说明：恰列出坎1 的四吉，整串比对并钉住 rank 1→4 排序（验收返工 C5）", async () => {
     await renderPage();
     const line = (await screen.findByTestId("four-auspicious")) as HTMLElement;
-    expect(line.textContent).toContain("四吉方");
-    expect(line.textContent).toContain("东南（生气）");
-    expect(line.textContent).toContain("东（天医）");
-    expect(line.textContent).toContain("南（延年）");
-    expect(line.textContent).toContain("北（伏位）");
-    // 两侧都钉：凶方星名不进这一行（坎1 四凶＝绝命/五鬼/六煞/祸害，抽查两个）
-    expect(line.textContent).not.toContain("绝命");
-    expect(line.textContent).not.toContain("五鬼");
+    // 整串相等——子串匹配区分不了 南/西南、北/东北（验收方实证：
+    // "西南（延年）".includes("南（延年）") === true），也测不到 rank 排序；
+    // 排序错、方位错配、多格少格，这一条都会红。
+    expect(line.textContent).toBe("四吉方 · 东南（生气） · 东（天医） · 南（延年） · 北（伏位）");
+  });
+
+  it("切到同住人视角后，生气方标题仍与基调句同源（均取主档案本命，不随视角走）（验收返工 C2）", async () => {
+    dwellingsFixture.current = [dwellingL1(["p2"])];
+    await renderPage();
+    await waitFor(() => expect(screen.getByRole("button", { name: "阿乙" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "阿乙" }));
+    // 阿乙＝兑7（西四命），其生气在西北（乾）——标题若随视角走会变成「生气方 · 西北」，
+    // 与块内基调句「你的生气在东南」在同一个 Emphasis 里打架（返工单 C2 的事故形态）。
+    const block = (await screen.findByTestId("shengqi-block")) as HTMLElement;
+    const heading = within(block).getByText(
+      (_, el) => el?.tagName === "H2" && el.textContent === "生气方 · 东南",
+    );
+    expect(heading).toBeInTheDocument();
+    expect(block.textContent).toContain("金命之人，宜近土——你的生气在东南。");
+    expect(block.textContent).not.toContain("西北");
+  });
+
+  it("桌面两栏方向：左列是四吉方说明（有宅时还有宅盘），右列是基调+本命盘+tab 内容（验收返工 C3）", async () => {
+    await renderPage();
+    await screen.findByLabelText("八方吉凶盘");
+    const leftCol = screen.getByTestId("two-col-left") as HTMLElement;
+    const rightCol = screen.getByTestId("two-col-right") as HTMLElement;
+    // 右列（盘 tab 内容）：基调句、本命八方标题、本命盘都在
+    expect(within(rightCol).getByText("金命之人，宜近土——你的生气在东南。")).toBeInTheDocument();
+    expect(within(rightCol).getByText("本命八方")).toBeInTheDocument();
+    expect(within(rightCol).getByLabelText("八方吉凶盘")).toBeInTheDocument();
+    // 左列：四吉方说明在；本命盘不在（方向反了的话这条红）
+    expect(within(leftCol).getByTestId("four-auspicious")).toBeInTheDocument();
+    expect(within(leftCol).queryByLabelText("八方吉凶盘")).toBeNull();
   });
 
   it("桌面两栏骨架：TwoColumn 左列宽 440px（06-desktop §3「境 440px」）", async () => {
@@ -1789,7 +1815,7 @@ describe("UI v3 C4-2：境 6d 版式", () => {
     expect((screen.getByRole("button", { name: "盘" }) as HTMLElement).style.fontWeight).toBe("");
   });
 
-  it("可做的事：成本分级标签按档着色（零成本 wood / 挪动 earth / 添置 line-strong），不是同一色", async () => {
+  it("可做的事：成本分级标签文字保持 ink-2（AA），五行色只在标签左侧 6px 色点上（验收返工 C1）", async () => {
     await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "化解" }));
     await screen.findByText("可做的事");
@@ -1802,8 +1828,15 @@ describe("UI v3 C4-2：境 6d 版式", () => {
     expect(add).toBeTruthy();
     const tagOf = (r: typeof zero) =>
       within(screen.getByText(r.action).closest("li")!).getByText(r.effort, { exact: true }) as HTMLElement;
-    expect(tagOf(zero).style.color).toBe("var(--color-wood)");
-    expect(tagOf(move).style.color).toBe("var(--color-earth)");
-    expect(tagOf(add).style.color).toBe("var(--color-line-strong)");
+    // 文字色：三档都必须是 ink-2——wood 3.06 / earth 2.33 / line-strong 1.38 全低于
+    // 11px 的 AA 4.5:1，而 ink-2 是 5.42:1（验收方独立实算，见返工单 C1）。
+    expect(tagOf(zero).style.color).toBe("var(--color-ink-2)");
+    expect(tagOf(move).style.color).toBe("var(--color-ink-2)");
+    expect(tagOf(add).style.color).toBe("var(--color-ink-2)");
+    // 色点：档位信息改由装饰色点承担，逐档钉住（添置档是 metal，不是 line-strong）。
+    const dotOf = (r: typeof zero) => within(tagOf(r)).getByTestId("effort-dot") as HTMLElement;
+    expect(dotOf(zero).style.background).toBe("var(--color-wood)");
+    expect(dotOf(move).style.background).toBe("var(--color-earth)");
+    expect(dotOf(add).style.background).toBe("var(--color-metal)");
   });
 });

@@ -174,11 +174,16 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
 
   // M8：解读按钮的箭头 hover 此前用 `group-hover:translate-x-1`，违反
   // 06-desktop §4「hover 只改 border-color 与文字/箭头颜色，不得投影/位移/放大」。
-  it("解读按钮 hover 只变色，不位移（06-desktop §4）", async () => {
+  // I2（C2-2 终审）：此前只断言不位移/不放大，没断言不变色——把 R6 删掉的
+  // `group-hover:text-[var(--color-on-ink-gold)]` 原样加回去也照样全绿（金色 hover
+  // 会让对比度从 5.40:1 跌到 3.31:1，22px 常规字重不吃大字豁免，见 bf4ede9）。
+  // 补一条 `not.toMatch(/hover:text-/)` 钉死「hover 既不位移也不变色」的另一半。
+  it("解读按钮箭头 hover 既不位移也不变色（R6：变色会跌到 3.31:1）", async () => {
     await renderChart();
     const arrow = screen.getByTestId("generate-arrow");
     expect(arrow.className).not.toContain("translate-x");
     expect(arrow.className).not.toContain("scale-");
+    expect(arrow.className).not.toMatch(/hover:text-/);
   });
 
   // M7：`<section id="reading-tabs">` 里直接套 `ChartBlock` 的 `<section>`是多余

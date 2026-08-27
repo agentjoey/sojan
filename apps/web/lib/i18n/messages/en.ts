@@ -411,6 +411,10 @@ export const en: Messages = {
     followUpPlaceholder: "Anything else you'd like to ask?",
     followUpSubmit: "Ask more",
     historyTitle: "Recent dreams",
+    // UI v3 C3 (03-screens dream 6a additions): preview block and privacy note.
+    previewTitle: "How the Spirit reads it",
+    previewBody: "Your 本命之灵 (Natal Spirit) reads the dream with your chart and recent state of mind — reflection, not prediction.",
+    privacyNote: "Only a third-person summary and the Spirit's reply are kept — never your original dream text.",
   },
   jiao: {
     kicker: "Divination",

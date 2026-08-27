@@ -415,6 +415,10 @@ export const zh = {
     followUpPlaceholder: "还想问点什么？",
     followUpSubmit: "追问",
     historyTitle: "最近的梦",
+    // UI v3 C3（03-screens 解梦 6a 新增）：预告块与隐私说明。
+    previewTitle: "灵会怎么读",
+    previewBody: "灵会带着你的命盘与近况来读这个梦——是观照，不是预言。",
+    privacyNote: "只存第三人称摘要与灵的回复，不存梦的原文。",
   },
   jiao: {
     kicker: "掷 筊",

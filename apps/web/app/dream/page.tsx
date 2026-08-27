@@ -204,17 +204,17 @@ export default function DreamPage() {
       <div className="mt-6">
         {turns.length === 0 && (
           <>
+            {/* 6a（03-screens 解梦节）：输入区 serif 18px、底 1px 墨线、右下字数。 */}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("dream.placeholder")}
               rows={5}
-              className="w-full resize-none bg-transparent p-4 text-[15px] leading-[1.9] outline-none focus:border-[var(--color-line-strong)]"
-              style={{ border: "1px solid var(--color-line)", borderRadius: "var(--radius-card)", color: "var(--color-ink)" }}
+              className="w-full resize-none border-0 border-b border-[var(--color-ink)] bg-transparent px-0 py-3 font-serif text-[18px] leading-[1.9] text-ink outline-none placeholder:font-sans placeholder:text-[14px] placeholder:text-muted focus:border-[var(--color-cinnabar)]"
             />
             <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted">
               <span>{tooLong ? t("dream.errorTooLong") : ""}</span>
-              <span className="font-latin">{input.trim().length}/2000</span>
+              <span className="font-latin">{input.trim().length} / 2000</span>
             </div>
           </>
         )}
@@ -223,9 +223,23 @@ export default function DreamPage() {
           <div className="mt-4">
             {turns.length === 0 ? (
               <Button onClick={submit} disabled={!canSubmit}>
+                {/* 6a：主按钮带下弦月+星子图标（22px svg，线宽 1.7）。 */}
+                <svg viewBox="0 0 22 22" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" data-testid="dream-submit-icon">
+                  <path d="M13.5 3.2a7.8 7.8 0 1 0 5.3 13.5A8.8 8.8 0 0 1 13.5 3.2Z" />
+                  <path d="M17.6 2.6v3M19.1 4.1h-3" />
+                  <circle cx="20" cy="9" r="0.4" fill="currentColor" stroke="none" />
+                </svg>
                 {pending ? t("dream.interpreting") : t("dream.submit")}
               </Button>
             ) : null}
+          </div>
+        )}
+
+        {/* 6a：「灵会怎么读」预告块（首轮提交前）。 */}
+        {turns.length === 0 && (
+          <div className="mt-8 border-t border-[var(--color-line)] pt-6" data-testid="dream-preview">
+            <h2 className="text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>{t("dream.previewTitle")}</h2>
+            <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{t("dream.previewBody")}</p>
           </div>
         )}
 
@@ -282,7 +296,7 @@ export default function DreamPage() {
             <ul className="mt-3 space-y-2.5">
               {history.map((h) =>
                 h.fullText ? (
-                  <li key={h.id}>
+                  <li key={h.id} className="flex items-baseline justify-between gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -292,19 +306,30 @@ export default function DreamPage() {
                         setTurns([{ role: "spirit", content: h.fullText! }]);
                         setInput("");
                       }}
-                      className="block w-full text-left text-[13px] leading-relaxed text-ink-2 underline decoration-[var(--color-line)] underline-offset-4 transition-colors hover:text-ink hover:decoration-[var(--color-cinnabar)]"
+                      className="min-w-0 flex-1 text-left text-[13px] leading-relaxed text-ink-2 underline decoration-[var(--color-line)] underline-offset-4 transition-colors hover:text-ink hover:decoration-[var(--color-cinnabar)]"
                     >
                       {h.summary}
                     </button>
+                    {/* 6a：最近的梦＝摘要 + 日期（Cormorant）。createdAt 是 ISO 串，
+                        取日期前缀即可（纯展示层截取，非命理推算）。 */}
+                    <span className="shrink-0 font-latin text-[11px] text-muted">{h.createdAt.slice(0, 10)}</span>
                   </li>
                 ) : (
                   // 迁移 0018 之前写入的旧行没有 full_text，续接功能对它降级不可用——
                   // 只当摘要展示，不做成看起来能点的样子。
-                  <li key={h.id} className="text-[13px] leading-relaxed text-ink-2">{h.summary}</li>
+                  <li key={h.id} className="flex items-baseline justify-between gap-3 text-[13px] leading-relaxed text-ink-2">
+                    <span className="min-w-0 flex-1">{h.summary}</span>
+                    <span className="shrink-0 font-latin text-[11px] text-muted">{h.createdAt.slice(0, 10)}</span>
+                  </li>
                 ),
               )}
             </ul>
           </div>
+        )}
+
+        {/* 6a：隐私说明常驻页尾——「只存第三人称摘要与灵的回复，不存梦的原文」。 */}
+        {turns.length === 0 && (
+          <p className="mt-8 text-[11.5px] leading-relaxed text-muted">{t("dream.privacyNote")}</p>
         )}
       </div>
     </main>

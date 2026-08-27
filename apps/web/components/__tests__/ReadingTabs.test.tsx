@@ -118,13 +118,25 @@ describe("ReadingTabs（3c）", () => {
     expect(classes).toContain("reading-prose-3c");
   });
 
+  // I1：此前断言只查 `not.toBe("")`，把三元 `{streaming ? t("chart.generating") : "—"}`
+  // 整段挖成 `{"—"}`（streaming 语义完全消失）也照样全绿——用例名承诺的「给的是生成中
+  // 提示」一个字没被测到。改断实际文案，并补一条对侧（非 streaming → "—"）钉死两侧。
   it("streaming 且当前段无内容时给的是生成中提示，不是空白", () => {
     render(
       <I18nProvider locale="zh">
         <ReadingTabs sections={[]} chart={CHART} streaming />
       </I18nProvider>,
     );
-    expect(screen.getByTestId("reading-head").textContent).not.toBe("");
+    expect(screen.getByTestId("reading-head").textContent).toBe("正在为你照见…");
+  });
+
+  it("非 streaming 且当前段无内容时给的是「—」占位，不是生成中提示", () => {
+    render(
+      <I18nProvider locale="zh">
+        <ReadingTabs sections={[]} chart={CHART} streaming={false} />
+      </I18nProvider>,
+    );
+    expect(screen.getByTestId("reading-head").textContent).toBe("—");
   });
 
   it("心理段在 western 为 null（不知时辰/缺出生地降级路径）时：chip 列表与承重事实块都不渲染，但结论与正文仍在", () => {

@@ -384,6 +384,9 @@ body {
 .reading-prose-3c {
   font-size: 15px;
   line-height: 2.05;
+  /* spec §5：桌面列宽上限 620px（上限而非目标值——右列内容宽仅 528px，
+     吃不满是预期的，别为了凑 620 去改栏宽）。 */
+  max-width: 620px;
 }
 
 /* ===== Telegram Mini App 主题（跟随 TG colorScheme；非 TG 无此属性→零影响）===== */

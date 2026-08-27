@@ -346,17 +346,12 @@ export const zh = {
       still: "宜守静",
     },
 
-    yi: "宜",
-    ji: "忌",
     favorableToday: "今日喜用",
     interaction: "流日{kind}命{withPillar}支",
     todayYi: "今日宜",
     todayJi: "今日忌",
     auspiciousYi: "趋吉 · 宜",
     cautionJi: "避祸 · 忌",
-
-    almanac: "黄历",
-    none: "—",
 
     dims: {
       career: "事业",

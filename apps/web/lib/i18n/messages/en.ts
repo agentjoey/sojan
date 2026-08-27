@@ -341,17 +341,12 @@ export const en: Messages = {
       still: "宜守静 (Favorable for stillness)",
     },
 
-    yi: "宜 (Favorable)",
-    ji: "忌 (Unfavorable)",
     favorableToday: "今日喜用 (Today’s favorables)",
     interaction: "流日{kind}命{withPillar}支 (Daily flow {kind} on {withPillar} branch)",
     todayYi: "今日宜 (Favorable today)",
     todayJi: "今日忌 (Unfavorable today)",
     auspiciousYi: "趋吉 · 宜 (Auspicious · Do)",
     cautionJi: "避祸 · 忌 (Avoid harm · Don’t)",
-
-    almanac: "黄历 (Almanac)",
-    none: "—",
 
     dims: {
       career: "事业 (Career)",

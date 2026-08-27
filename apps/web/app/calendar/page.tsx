@@ -374,14 +374,7 @@ export default function CalendarPage() {
         {/* 七十二候标尺：index 来自 getCurrentSolarHou，不硬编码 */}
         <SeasonRuler index={solarHou.index} label={solarHou.hou} />
 
-        {/* 黄历：移动端保留（控制器裁定），桌面不出 */}
-        {fortune.almanacYi.length + fortune.almanacJi.length > 0 && (
-          <div data-testid="huangli" className="xl:hidden">
-            <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.almanac")}</div>
-            <div className="mt-3 text-[13px] text-ink-2"><span style={{ color: "var(--color-wood)" }}>{t("calendar.yi")}</span>　{fortune.almanacYi.join("、") || t("calendar.none")}</div>
-            <div className="mt-1.5 text-[13px] text-ink-2"><span style={{ color: "var(--color-cinnabar)" }}>{t("calendar.ji")}</span>　{fortune.almanacJi.join("、") || t("calendar.none")}</div>
-          </div>
-        )}
+        {/* owner 打磨批指令 1：移动端黄历块（data-testid="huangli"）已全站删除。 */}
 
       </div>
     );

@@ -55,6 +55,8 @@
 - [x] ~~**[EP-motion-bell] 首页与主菜单风铃图标增强动态**~~ —— **2026-08-21 交付**。`BellLogo` 新增 `motion` 参数（`idle` 常驻循环 / `ring` 敲响一次即停），首页卷首与桌面主菜单 Logo 改用 `ring`（进入渲染时 + 点击各触发一次）；`CastingOverlay` 的常驻摆动语义不变（仍是 `idle`）。
 
 ## 🟡 MED
+- [ ] **[EP-i18n-hydration] en 浏览器无 cookie 首访 = 全站 hydration mismatch**（2026-08-28 打磨批真实浏览器自查揪出，**既有问题非本批引入**）：服务端 locale 只认 `x-zj-locale` header 与 `zj_locale` cookie（`lib/i18n/server.ts`，默认 zh），**不解析 `Accept-Language`**；而客户端 `detectLocale()` 对非中文浏览器一律 `en`。于是 en 用户首次访问（还没有 cookie）时 SSR 出中文、客户端 hydrate 出英文，React 报 hydration mismatch 并重生成整树（实测差异样例：SSR `aria-label="运势"` vs 客户端 `"Fortune"`）。考虑到首发海外市场、en 是多数访客的默认路径，这不是边角。修法方向：服务端加 Accept-Language 解析（与 detectLocale 同规则），或客户端首帧先按 cookie/默认渲染、挂载后再切换（I18nProvider 已有 effect 纠偏先例）。另有两条 attribute 级既有警告一并记录：`<html>` 的 `--tg-viewport-height`（TG 视口脚本）、CompassWatermark 浮点坐标 SSR/客户端序列化位数差。
+
 - [ ] **[EP-uiv3-banner] 风铃图只有「谨」这一档，吉/顺/平三档待补**（UI v3 子项目 B 挂起项，2026-08-26 开；2026-08-26 owner 纠正术语并确认素材）
   **术语更正（owner 2026-08-26）**：这个组件此前被 claude 一路误称「风幡」——**不对，这是风铃的另一张图**，组件已改名 `WindBell`（原 `WindBanner`）。幡带（红色垂带）本身仍可称「幡面」，但整件东西叫风铃。
 
@@ -90,16 +92,16 @@
 
 - [ ] **[EP-uiv3-c3c4-defer] UI v3 C3+C4 验收延后项（2 条，待 owner 拍板）** —— 2026-08-27，C3+C4 已完成验收（外部 agent kimicode 实施、claude 两轮验收），这两条不阻塞、需产品决策
   1. **五行色能否作文字色的全局规则**。验收实算：`wood` 3.06:1 / `earth` 2.33:1 / `gold` 2.48:1 / `line-strong` 1.38:1，纸底全部低于 AA 4.5:1；设计包 `03-screens.md`「境」「掷筊」两节都指定五行色当文字色。C3+C4 已按临时解法落地——**文字保持 `ink`/`ink-2`（可读），五行色只降级为装饰用的小色点/边框**，不再作文字色。这条规则若 owner 认可，应写进 CLAUDE.md 与设计系统文档固化，避免 D 块与后续再犯；若不认可，需给出一组过 AA 的五行文字色值。
-  2. **`en.nav.spirit` 现在是 `"掷筊 (Jiao)"`**，与同级六项（`Home / Fortune / Chart / Feng Shui / Dream / Me`，全英文）体例不一致；该键还兼任移动端语境胶囊默认文案，中英混排在 82px 竖栏与 44px 胶囊里都最挤。建议改 `"Jiao"` 或 `"Cast Jiao"`，zh 的「掷筊」不动。
+  2. **`en.nav.spirit` 现在是 `"问事 (Jiao)"`**（2026-08-28 打磨批把中文部分从「掷筊」改为「问事」，体例问题依旧）：与同级六项（`Home / Fortune / Chart / Feng Shui / Dream / Me`，全英文）体例不一致；该键还兼任移动端语境胶囊默认文案，中英混排在 82px 竖栏与 44px 胶囊里都最挤。建议改 `"Jiao"` 或 `"Cast Jiao"`，zh 的「问事」不动。
 
 - [ ] **[EP-uiv3-c3c4-minor] UI v3 C3+C4 验收记录的 Minor 项（放行未返工）** —— 均不阻塞，可顺手清
-  - 解梦「最近的梦」预告块用例只测了「首轮前在场」，未测「提交后消失」——`{turns.length === 0 && …}` 改无条件渲染仍会绿。
-  - `dream/page.tsx` 输入区一处 `border-0 border-b border-[var(--color-ink)]` 依赖 Tailwind utility 输出顺序（当前产物成立），建议直接写 `border-b` 更稳，不依赖顺序。
+  - ~~解梦「最近的梦」预告块用例只测了「首轮前在场」~~ —— **2026-08-27 验收返工轮已修**（`f4e114c`，补了「提交后消失」一侧断言）。
+  - ~~`dream/page.tsx` 输入区 `border-0 border-b` 依赖 utility 顺序~~ —— **同上轮已修**（去掉多余的 `border-0`）。
   - 掷筊「最近问过的」三列短注只断言了「不允」一条，圣/笑两列短注删掉仍会绿。
 
-- [ ] **[EP-uiv3-c1-defer] UI v3 C1 终审的两条延后项**（2026-08-26，C1 已合 main，这两条**不阻塞**）
-  ① **首页风铃 alt 在无档案态是病句** → 归 **C4**（C4 本就要动 i18n）。现文案单条 key 带 `{verdict}` 插值，首页无档案时插进去的是空态记号「—」，读屏读出「……当日判词为「—」」，而首页压根没有「判词」这个概念。复审建议拆成两条 key（首页用只描述图片的 `bellAltPlain`），但会破坏 `app/__tests__/page.test.tsx` 里必修 8 新加的「—」断言，而该文件受 TG 冻结约束，故本轮只去掉了更严重的虚假方位声称（「另见右栏」——判词其实在卡**下方**）。
-  ② **首页的日期与候来自两个不同时钟** → 归 **C2**（C2 本就要动 core 侧）。`solarHou` 留服务端（UTC + ISR 1h）、`today` 在客户端算（访客本地），跨日窗口内两者可能不属于同一天。**已量化**：UTC+8 访客约 **6.6%/年**（8/24 跨日窗口 × 1/5.07 天候边界）可能看到候标签错一档。治本需 core 新增一份**不含重依赖**的候边界表 API——现有 `getCurrentSolarHou()` 来自 `@sojan/core` 单一 barrel，直接搬到客户端会把 ~2MB 排盘依赖链打进 `/` 路由（那正是 `614e4fc` 专门修掉的）。
+- [ ] **[EP-uiv3-c1-defer] UI v3 C1 终审的两条延后项**（2026-08-26，C1 已合 main，这两条**不阻塞**）——**2026-08-28 打磨批均已闭环**：
+  ① ~~**首页风铃 alt 在无档案态是病句**~~ —— 打磨批指令 2 后**无档案不再渲染今日卡**，「—」空态记号与病句载体一并消失，闭环。
+  ② ~~**首页的日期与候来自两个不同时钟**~~ —— 打磨批已治本（不是按原设想的「core 导出轻量候边界表」，而是新增 server action `solarHouAction(dateStr)`，候按访客本地日历日在服务端算，lunar 仍不进 `/` 客户端 chunk）；挂载后首页卡与候标尺都用它覆盖，`revalidate=3600` 的 UTC 快照只剩 SSR 首帧/兜底用途，6.6% 错位窗口消除。
 
 - [ ] **[EP-uiv3-c2-2-defer] UI v3 C2-2 终审延后项（11 条，均不阻塞）** —— 2026-08-27，C2-2 已完成并过终审+一轮修复，这些是明确判为「不阻塞、可后续」的
   **测试补强（3 条）**

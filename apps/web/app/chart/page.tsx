@@ -250,10 +250,13 @@ export default function ChartPage() {
         id="reading-tabs"
         data-testid="reading-tabs-anchor"
         label={t("chart.readingTitle")}
-        // 右列第一块：桌面上与左列頭部对齐，去掉自己的上边距/分隔线/上内边距
-        // （I3）——移动端单列态紧接在 ChartToc 之后，那条线仍是有意义的分隔，
-        // 必须断点门控，不能无条件去掉。
-        className="xl:mt-0 xl:border-t-0 xl:pt-0"
+        // 右列第一块：桌面上去掉自己的分隔线/上内边距，外边距对齐左列首元素
+        // ChartIdentity 的 `xl:mt-6`（24px），而不是 `xl:mt-0`——C2-2 终审 I4
+        // 实测过 `xl:mt-0`：1440×900 下页头底线 y=176、右列首个 <h2> 也是 y=176
+        // （gap 0），左列首元素却是 y=200（gap 24），两列头部并不齐，此前这条
+        // 注释写的「与左列頭部对齐」是错的。移动端单列态紧接在 ChartToc 之后，
+        // 那条分隔线仍是有意义的分隔，必须断点门控，不能无条件去掉。
+        className="xl:mt-6 xl:border-t-0 xl:pt-0"
       >
         {!inTg && !reading && !streaming && (
           <button

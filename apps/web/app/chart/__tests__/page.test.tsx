@@ -186,6 +186,24 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
     expect(arrow.className).not.toMatch(/hover:text-/);
   });
 
+  // I4（C2-2 终审）：右列首块此前用 `xl:mt-0`，实测 1440×900 下页头底线与右列首个
+  // <h2> 同为 y=176（gap 0），而左列首元素 ChartIdentity 是 y=200（gap 24）——
+  // 两列头部并不齐，尽管当时的注释写着「与左列頭部对齐」。左列的 24px 间距来自
+  // ChartIdentity 外层 `mt-8 xl:mt-6`；右列第一个 ChartBlock 应该用同一个
+  // `xl:mt-6`，只保留去线去内边距（`xl:border-t-0 xl:pt-0`），不该把外边距也清零。
+  it("桌面两栏头部对齐：右列首块的 xl:mt-6 与左列首元素一致（不是 xl:mt-0）", async () => {
+    await renderChart();
+    const dayMasterLine = screen.getByTestId("day-master-line");
+    const leftFirst = dayMasterLine.parentElement!; // ChartIdentity 外层 div（mt-8 xl:mt-6）
+    const rightFirst = screen.getByTestId("reading-tabs-anchor");
+    expect(leftFirst.className).toContain("xl:mt-6");
+    expect(rightFirst.className).toContain("xl:mt-6");
+    expect(rightFirst.className).not.toContain("xl:mt-0");
+    // 去线去内边距在断点门控下仍保留（移动端单列态那条线仍是有意义的分隔）
+    expect(rightFirst.className).toContain("xl:border-t-0");
+    expect(rightFirst.className).toContain("xl:pt-0");
+  });
+
   // M7：`<section id="reading-tabs">` 里直接套 `ChartBlock` 的 `<section>`是多余
   // 外层——id 应直接落在 ChartBlock 上，没有为了挂 id 而多包一层 section。
   it("锚点目标的 id 直接落在 ChartBlock 上，没有多余的外层 section", async () => {

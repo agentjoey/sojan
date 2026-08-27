@@ -2,7 +2,7 @@
 
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
-Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）**
+Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成，只剩 D 块过场动效）**
 Last Updated:   2026-08-27 by claude-opus-5（UI v3 C3+C4 由外部 agent kimicode 实施、claude 验收两轮；已合 main 并发 staging）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
 测试:           core 192 · llm 279 · web 813（全绿；`lint` 0 errors 已为阻塞闸门）
@@ -46,6 +46,12 @@ Last Updated:   2026-08-27 by claude-opus-5（UI v3 C3+C4 由外部 agent kimico
 | 命盘 `/chart` | 四柱/紫微/西方盘可视化 + 三段式解读(一次生成持久化、命盘冻结) + **当下时序卡**(大限/流年四化,按年缓存) |
 | 运势 `/calendar` | 每日流日(确定性五维+趋吉避祸+黄历) + **本年/本限上下文条** + 框景水墨配图 + 大字总评 + 五行干支 + 心理行为宜忌(LLM) + 轻润色 |
 | 档案 `/profiles` | Supabase 匿名+RLS 隔离、命盘触发器冻结 |
+| 掷筊 `/spirit` | 三态（筊杯卡/问事/揭晓+灵解）、危机前置拦截、真随机掷筊 |
+| 解梦 `/dream` | 输入→灵解读、最近 10 条摘要历史+可追问、不存原文 |
+| 境 `/fengshui` | 本命+房屋八方盘、生气方详情、可做的事化解清单、同住人合看 |
+| 账号 `/account` | 邮箱/Telegram 绑定、订阅与用量、危险区注销 |
+
+> **UI v3 重建（2026-08-26~27）已覆盖全部 8 个屏**（卷首/运势/命盘/解读/紫微棋盘/掷筊/解梦/我的+账号/境），依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`；仅剩 D 块（5s 七拍排盘过场）未做。详见上方叙述块与下方 Version History。
 
 ## 三层架构（详见 docs/architecture.md）
 - **@sojan/core**：三引擎 + `normalizeBirth`(真太阳时+EoT+子时sect) + `computeDailyFortune` + 引擎深化 v2 派生(见下) + 共振映射；纯函数/Zod/可缓存。
@@ -188,3 +194,4 @@ spec `docs/superpowers/specs/2026-08-15-fengshui-telegram-adaptation.md` · pact
 | 🧮 排盘金标准·调候用神 | 2026-08-21 | `EP-002-cal-2`：`deriveUsefulElements`（`packages/core/src/bazi/useful-elements.ts`）补齐 spec（`docs/specs/engine-v2-deepening.md` EP-501）标注留作 v2 的调候——月支落亥/子/丑（冬）喜火暖局、巳/午/未（夏）喜水润局，春秋不作强制微调；`method` 类型由仅 `"扶抑"` 拓宽为 `"扶抑"|"调候"|"中和"`（`packages/core/test/fengshui-*.test.ts` 此前已传入这两个值给 `elementDirections`，因 `test/` 目录不过类型检查而静默通过，现已是真正合法值，非新增分支）；调候覆盖忌神时喜忌互斥+覆盖全五行不变式仍成立（新增测试断言）。`usefulNote` 原样接入 `extractFacts`→prompt，零新增管线——季节提示自动随现有事实抵达 LLM。3 条新测试（夏/冬对照 + 春不触发）+ core 159→162、llm 262 回归绿，typecheck 干净。「对照官方计算器校验」子项 owner 决定本轮跳过（无既定校验基准），拆为独立 backlog 条目 `EP-002-cal-3`。
 | 🀄 TG 视觉贴近 web 编辑式设计 | 2026-08-21 | `EP-tg-parity`（claude brainstorming→spec→plan，kimi 在独立 worktree `feat/tg-parity` 实施，claude 逐项复核合并 `b09603f`）：`components/tg/native.tsx` 的 `Group`（去卡片边框/阴影/圆角改细线容器）/`Cell`（色块图标改纯色宋体字符）/`Segmented`（组模式贴齐既有 `OptionButtons`、tab 模式贴齐 `fengshui/page.tsx` 既有 tab 行，ARIA 契约不动）三件重新设计；首页 TG 手写页头改用共享 `PageHeader`；`SpiritPanel.tsx` 聊天气泡改用共享 `Bubble`（消灭重复实现，顺带修了一个真 bug——`--color-bg2` 只在 TG 环境有定义，`SpiritPanel` 本来就在 web 端也渲染，不改的话 web 端灵回复气泡会透明）；`DwellingForm.tsx` 删本地 `OptionButtons` 统一改 `Segmented`。其余 10 个业务页面零改动、自动获得新样式。web 470→483（新增 native.tsx 专属单测 12 条 + 首页页头结构性测试）、core159/llm262 绿，typecheck 仅剩既存 `EP-web-typecheck-debt`。过程记录：写 spec 阶段一个越权的研究 fork 编造过一句"已与 owner 确认"，claude 复核发现并改正；写计划阶段核实出 spec 里 3 处"需要更新测试断言"的判断不准确（两个文件对 TG 分支实际零覆盖）。
 | 🔧 backlog 三项收尾 | 2026-08-21 | claude 直接实施：①`EP-auth-return`——`/dream` 撞 `needLogin` 去登录后送不回原页、手动导航回来也丢草稿：`signInWithEmail`/`upgradeAnonymousToEmail` 新增可选 `next` 参数（`bind`/`next` 共用一个 `URLSearchParams` builder，替掉此前假设最多一个参数的字符串拼接），`/auth/callback` 新增 `next` 分支（`bind` 优先、同源相对路径校验防 open redirect）；`/dream` 的 `input` 换 `sessionStorage` 兜底草稿。②`EP-dream-history-2`——历史列表可点击续追问：新表列 `full_text`（迁移 0018，存灵的解读全文不存梦原文，不违 spec §5.1）；`continueDreamReply` 的 `dreamText` 改 `string | undefined`（重载区分返回类型），传 `undefined` 时不重建首轮"讲了个梦"的 user 消息、命盘事实并进 system，`priorTurns[0]` 直接是历史解读。③`EP-fs-debt`——`generateFengshuiSections` 的 `degraded` 时 `console.warn` 打出 corrections（此前到 route 边界即丢、无日志）；`ObjectQuery.color` 查证全链路死字段（表单从没收集过、i18n 键零引用）直接删；TG 首页「灵」补 `NEXT_PUBLIC_SPIRIT_ENABLED` 门控（此前无条件显示，与 `AppShell.NAV` 不一致）；`sessionStorage` polyfill 查证当前 Node/vitest 组合下不是真问题，未加不必要代码；"重试无上限"一条查无实据，"死 i18n 键"只独立验证了一个（`fengshui.group.*`，留给 `EP-fs-en` 接线不是删），两条待 owner 澄清/后续处理，backlog 已注明。web434→470/llm262/core159 绿（新增 36 测），typecheck 0，lint 0 errors（基线不变），build 通过，全部关键改动 mutation 复验。迁移 `0018_dream_history_full_text.sql` 已 apply 生产（2026-08-21，随本轮 push 一并处理，查库 `list_migrations` 确认 `dream_history_full_text` 已入库）。 |
+| 🎨 UI v3 重建（A/B/C1/C2/C3+C4） | 2026-08-26~27 | 依据新设计包全站重建，**8 屏完成**：A 地基外壳（`lib/nav.ts` 单一事实源、移动顶部胶囊+九宫格、`Emphasis` 收敛为唯一强调手法）→ B 命理可视化（`WuxingWheel`/`SeasonRuler`，core 新增七十二候索引）→ C1 桌面骨架+卷首+运势（`TwoColumn` 左定右动、`CompassWatermark` 五层水印）→ C2 命盘整页（左列 5b + 右列 3c/6b，core 新增 `deriveNayinZodiac`）→ C3+C4 掷筊/解梦/我的+账号（合并方向：两页都留只合导航）/境（外部 agent kimicode 实施，claude 验收两轮）。TG 外壳全程冻结。过程中定位并修复两个可复现的系统级坑：**Tailwind 4 自定义断点用 px 会因无法跨单位排序导致低断点反压高断点**（`--breakpoint-xl` 改 `75rem`）；**五行色系统性低于 WCAG AA**（`wood`/`earth`/`gold`/`line-strong` 纸底 1.38–3.06:1，改为文字用 `ink-2`、五行色只作装饰色点）。core 188→192 / llm 279 / web 738→813。|

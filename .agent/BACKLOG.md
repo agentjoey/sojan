@@ -88,6 +88,15 @@
   7. **puppeteer 三档断点产物未入库**：C2-1 的 402/900/1280 结论只有实施者口述。终审已从**构建产物 CSS** 独立复核过「无桌面样式泄漏到 <1200px」，但布局节奏那一档（终审的 I1–I4）正是 puppeteer 本该抓到、jsdom 抓不到的——下波把截图与结论一并写进 ledger。
   8. **R9**：`app/chart/__tests__/page.test.tsx` 的时序缓存断言排在 `findByText` 之后，注释掉时序 JSX 会先让 `findByText` 红、走不到缓存那行，**故该断言未被独立 mutation 证明**（它本身有区分力——改缓存键就会红——只是证据没隔离它）。把 `localStorage` 断言移到 `findByText` **之前**，或拆成独立用例即可。
 
+- [ ] **[EP-uiv3-c3c4-defer] UI v3 C3+C4 验收延后项（2 条，待 owner 拍板）** —— 2026-08-27，C3+C4 已完成验收（外部 agent kimicode 实施、claude 两轮验收），这两条不阻塞、需产品决策
+  1. **五行色能否作文字色的全局规则**。验收实算：`wood` 3.06:1 / `earth` 2.33:1 / `gold` 2.48:1 / `line-strong` 1.38:1，纸底全部低于 AA 4.5:1；设计包 `03-screens.md`「境」「掷筊」两节都指定五行色当文字色。C3+C4 已按临时解法落地——**文字保持 `ink`/`ink-2`（可读），五行色只降级为装饰用的小色点/边框**，不再作文字色。这条规则若 owner 认可，应写进 CLAUDE.md 与设计系统文档固化，避免 D 块与后续再犯；若不认可，需给出一组过 AA 的五行文字色值。
+  2. **`en.nav.spirit` 现在是 `"掷筊 (Jiao)"`**，与同级六项（`Home / Fortune / Chart / Feng Shui / Dream / Me`，全英文）体例不一致；该键还兼任移动端语境胶囊默认文案，中英混排在 82px 竖栏与 44px 胶囊里都最挤。建议改 `"Jiao"` 或 `"Cast Jiao"`，zh 的「掷筊」不动。
+
+- [ ] **[EP-uiv3-c3c4-minor] UI v3 C3+C4 验收记录的 Minor 项（放行未返工）** —— 均不阻塞，可顺手清
+  - 解梦「最近的梦」预告块用例只测了「首轮前在场」，未测「提交后消失」——`{turns.length === 0 && …}` 改无条件渲染仍会绿。
+  - `dream/page.tsx` 输入区一处 `border-0 border-b border-[var(--color-ink)]` 依赖 Tailwind utility 输出顺序（当前产物成立），建议直接写 `border-b` 更稳，不依赖顺序。
+  - 掷筊「最近问过的」三列短注只断言了「不允」一条，圣/笑两列短注删掉仍会绿。
+
 - [ ] **[EP-uiv3-c1-defer] UI v3 C1 终审的两条延后项**（2026-08-26，C1 已合 main，这两条**不阻塞**）
   ① **首页风铃 alt 在无档案态是病句** → 归 **C4**（C4 本就要动 i18n）。现文案单条 key 带 `{verdict}` 插值，首页无档案时插进去的是空态记号「—」，读屏读出「……当日判词为「—」」，而首页压根没有「判词」这个概念。复审建议拆成两条 key（首页用只描述图片的 `bellAltPlain`），但会破坏 `app/__tests__/page.test.tsx` 里必修 8 新加的「—」断言，而该文件受 TG 冻结约束，故本轮只去掉了更严重的虚假方位声称（「另见右栏」——判词其实在卡**下方**）。
   ② **首页的日期与候来自两个不同时钟** → 归 **C2**（C2 本就要动 core 侧）。`solarHou` 留服务端（UTC + ISR 1h）、`today` 在客户端算（访客本地），跨日窗口内两者可能不属于同一天。**已量化**：UTC+8 访客约 **6.6%/年**（8/24 跨日窗口 × 1/5.07 天候边界）可能看到候标签错一档。治本需 core 新增一份**不含重依赖**的候边界表 API——现有 `getCurrentSolarHou()` 来自 `@sojan/core` 单一 barrel，直接搬到客户端会把 ~2MB 排盘依赖链打进 `/` 路由（那正是 `614e4fc` 专门修掉的）。
@@ -110,22 +119,9 @@
   11. puppeteer 三档产物未入库。C2-2 终审已产出 1440/1280/1024/390 四档实测几何数据，可直接补进文档。
   **另**：spec §11 待定 2（「紫微棋盘每格 127px 是否够」）**可结案**——终审实测右列每格 **132px**（非估算的 127，细线格无间隙），1440 档十二宫**无一折行**，且无任何偷偷缩字号。
 
-- [ ] **[EP-nav-merge] 导航「我的」与「账号」合并成一个入口**（owner 提出 2026-08-25）。现状 `components/AppShell.tsx` 的 `NAV` 末尾是两项独立入口：`{ href: "/profiles", char: "我", key: "nav.profiles" }`（zh「我的」/ en "Me"）与 `{ href: "/account", char: "账", key: "nav.account" }`（zh「账号」/ en "Account"），都不受 flag 门控、桌面侧栏与移动底栏都渲染。
-  **⚠️ 动手前必须先定合并方向**（三种，产品后果不同，owner 未指定）：①`/account` 内容并进 `/profiles`，只留一个页面 ②反过来，`/profiles` 并进 `/account` ③两个页面都留，只合并导航入口、点进去后页内分区/分 tab。
-  **⚠️ 别把 `EP-account-login` 修好的 bug 造回来**：当初加「账」这个常驻入口，根因正是「`/account` 全站没有直接入口，唯一路径是先进 `/profiles` 再点页头里嵌的一条文字链接」——owner 因此换设备登不进自己的账号。如果合并做成「导航只留『我的』、账号藏在页内二级」，就是原样复发。合并后账号入口必须在**第一屏可见**，不能是页头文字链接。
-  **⚠️ 会翻转一条既有测试的断言**：`NAV_COMPACT = NAV.length >= 6`（导航内边距只在 ≥6 项时从 px-2 收紧到 px-1.5）。合并让 NAV 基数 −1，`components/__tests__/AppShell.test.tsx` 三条边界用例要重核：
-  | 用例 | 现 NAV.length | 合并后 | 断言变化 |
-  |---|---|---|---|
-  | 三 flag 全关（:102） | 5（照/运/盘/我/账） | 4 | 仍 <6，`px-2` 不变，只需改注释与数字 |
-  | 只开一个 flag（:114） | 6（+境，踩到门槛） | **5** | **从 `px-1.5` 翻回 `px-2`** ← 唯一真会变的一条 |
-  | 风水+灵开、梦关（:126） | 7 | 6 | 仍 ≥6，`px-1.5` 不变 |
-  这与 `EP-account-login` 当初 +1 时踩的是同一处、方向相反（那次是「不收紧」改判「收紧」）。
-  **⚠️ Telegram**（CLAUDE.md 头号教训，写计划时这四个字必须出现）：`app/page.tsx` 的 `TG_ENTRIES` 里有「档」（`/profiles`）但**从来没有 account 入口**——TG 用户至今摸不到 `/account`（已记在 `EP-tg-parity` 的「具体已知的新缺口」）。若选方向①（账号并进 `/profiles`），TG 用户会**顺带第一次拿到账号入口**，这是好事但要显式确认页面在 TG 里能用（`/account` 走浏览器侧 Supabase 会话，TG 里大概率 401，需要核）；若选②或③，要明确 TG 侧入口指向哪个 path，否则又是「web 有入口、TG 入口数为零」。
-  另：`NAV` 与 `TG_ENTRIES` 两处的门控条件必须保持一致，回归由 `app/__tests__/page.test.tsx` 守。
+- [x] ~~**[EP-nav-merge] 导航「我的」与「账号」合并成一个入口**~~ —— **2026-08-27 C4-1 交付**（owner 选方向③：两页都留，只合并导航入口）。`lib/nav.ts` 的 `profiles` 项保留（char「我」），`account`（char「账」）**已从导航移除**；`/profiles` 页首新增 `account-entry`（`data-testid`），直连 `/account`，**第一屏可见**——未复发 `EP-account-login` 修过的「换设备登不进账号」。`AppShell.test.tsx` 三条边界用例已按新基数（RAIL.length，去掉「账」后为 4/5/6）重核，用例名与断言一致。TG 侧：`TG_ENTRIES` 未受影响（本就没有 account 入口，此项未在本轮范围内解决，仍属 TG 冻结期已知缺口）。
 
-- [ ] **[EP-nav-label-2] 导航「灵」下方小字改为「掷筊」**（owner 提出 2026-08-25）。现状 `nav.spirit` 在 `lib/i18n/messages/zh.ts:22` 是「本命」——EP-jiao 把 `/spirit` 从「随便聊」收缩为「先对一件具体的事掷筊」之后，这个标签已经名实不符。改 `zh.ts` 的 `nav.spirit: "本命" → "掷筊"`。
-  **两处待 owner 定**：①**英文侧改成什么**——`en.ts:24` 现在是 `"Spirit"`。掷筊的英文没有通行译名，候选：音译 `"Jiaobei"`、意译 `"Cast Lots"` / `"Moon Blocks"`。参照 `EP-nav-label`（境→风水）当时 en 同步 `"Space"→"Feng Shui"` 的做法，这里也应同步改而不是留 `"Spirit"`。②**大字 `char` 要不要一起改**——`AppShell.NAV` 里是硬编码的「灵」（不走 i18n），配「掷筊」二字略错位；`EP-nav-label` 当时的先例是**只改小字、大字 char 不变**。owner 只说了改小字，按先例默认不动大字，若要一起改请明说。
-  改动面很小（1–2 个 i18n 键），但要跑 zh/en 键结构一致性测试；`TG_ENTRIES` 的「灵」入口已被 EP-jiao 摘除，TG 侧不受影响。
+- [x] ~~**[EP-nav-label-2] 导航「灵」下方小字改为「掷筊」**~~ —— **2026-08-27 C3 交付**。`nav.spirit`：zh「问事」→「掷筊」，en "Ask" → "掷筊 (Jiao)"（命理术语保留中文 + gloss，未采纳音译/意译候选）。大字 char「灵」按先例未动。`TG_ENTRIES` 的「灵」入口已被 EP-jiao 摘除，不受影响。⚠️ 验收发现 `en.nav.spirit` 与同级六项（全英文）体例不一致，已记 `EP-uiv3-c3c4-defer`，待 owner 定。
 
 - [x] ~~**[EP-account2-debt] 开场白计量 × SpiritPanel 每次挂载重生成且不持久化**~~ —— **随 EP-jiao 最终评审 C2/I4 修复一并解决（2026-08-25）**：这条描述的 `/chart` 页挂载即触发的通用开场白生成，其载体（`SpiritPanel` 的 `sendToSpirit([])` 分支）已随本轮重写整个删除——`SpiritPanel` 现在只承载掷筊追问、种子固定为掷筊问答，不再有「无消息 → 生成开场白」这条路径；且 `/chart` 页本身早已（EP-jiao Task 8）不再挂载 `SpiritPanel`。两个前提（挂载在 /chart、无消息时现算开场白）都已不成立，无需额外修复。
 - [ ] **[EP-account2-debt] chat 路由请求体无校验**——chart/memory/questionnaire 字段无校验/无长度上限；计量封住了成本但没封提示注入面。

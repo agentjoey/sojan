@@ -90,6 +90,18 @@ describe("ReadingTabs（3c）", () => {
     expect(screen.getByTestId("resonance-note").textContent).toContain("非硬等价");
   });
 
+  // C2-2 终审 C1：共振 tab 的 chips 是常量示例（"福德宫 ↔ 月亮 · 土星"），不是这份 chart
+  // 真正排出的盘面事实——CHART fixture 的 western 就是 null，福德宫从没被读过。之前的
+  // 条件只看 `cur.chips.length > 0`，会让「以上结论只依据下列已排定的盘面事实」这句断言
+  // 在共振段把示例字符串当成本人盘面事实展示，构成反幻觉红线。共振段只留 resonance-note
+  // 的「非硬等价」免责句诚实框定，不渲染 load-bearing-block。
+  it("共振段不渲染承重事实块（示例 chip 不是本人盘面事实），但非硬等价免责句仍在", () => {
+    renderTabs();
+    fireEvent.click(screen.getByTestId("reading-tab-共振"));
+    expect(screen.queryByTestId("load-bearing-block")).toBeNull();
+    expect(screen.getByTestId("resonance-note").textContent).toContain("非硬等价");
+  });
+
   it("摘要卡没有五行色顶边（第二种强调手法已删）", () => {
     renderTabs();
     const card = screen.getByTestId("reading-card");

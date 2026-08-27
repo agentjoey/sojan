@@ -61,7 +61,7 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
   const TABS = [
     { k: "命理" as const, label: t("chart.tabMingli"), kicker: t("chart.kickerMingli"), sec: byAccent("fire"), chips: liChips(chart) },
     { k: "心理" as const, label: t("chart.tabPsych"), kicker: t("chart.kickerPsych"), sec: byAccent("water"), chips: xinChips(chart) },
-    { k: "共振" as const, label: t("chart.tabResonance"), kicker: t("chart.kickerResonance"), sec: byAccent("metal"), chips: [t("chart.resonanceExampleChip")] },
+    { k: "共振" as const, label: t("chart.tabResonance"), kicker: t("chart.kickerResonance"), sec: byAccent("metal"), chips: [t("chart.resonanceIllustrativeChip")] },
   ];
   const progress = { 命理: "34%", 心理: "67%", 共振: "100%" }[tab];
   const cur = TABS.find((t) => t.k === tab)!;
@@ -137,8 +137,15 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
             列表为空时还显示这句等于指向空气，比不显示更糟。
             后果：`chart.western` 为 null 时（不知出生时辰/缺出生地的降级路径，`xinChips` 直接
             返回 []），心理段（tab === "心理"）会两者一起不渲染——`reading-head`/`reading-body`
-            仍照常显示，缺的只是 chip 与这条说明块。见测试「心理段在 western 为 null 时……」。 */}
-        {cur.chips.length > 0 && (
+            仍照常显示，缺的只是 chip 与这条说明块。见测试「心理段在 western 为 null 时……」。
+            ⚠️ 共振段额外**强制关闭**（`cur.k !== "共振"`），不能只靠 `chips.length > 0`：
+            共振 tab 的 chips 是常量示例（`resonanceIllustrativeChip`，取自 zh.ts「福德宫 ↔
+            月亮 · 土星」），从不是这份 chart 真正排出的盘面事实——哪怕西方盘是 null、福德宫
+            从没被读过，这枚 chip 也恒为非空。若沿用同一个条件，说明块会在 100% 的用户面前
+            把示例字符串包装成「以上结论只依据下列已排定的盘面事实」，构成反幻觉红线上的
+            断言造假。共振段改用下方 `resonance-note` 的「非硬等价」免责句诚实框定，而不是
+            造一份假事实列表。见 C2-2 终审 C1。 */}
+        {cur.k !== "共振" && cur.chips.length > 0 && (
           <div
             data-testid="load-bearing-block"
             className="mt-5 py-3"

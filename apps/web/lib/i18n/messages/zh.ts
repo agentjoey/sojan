@@ -279,6 +279,11 @@ export const zh = {
     birthMutagens: "生年四化",
     bodyPalaceSuffix: "身",
 
+    ziweiSchoolZhongzhou: "中州派",
+    ziweiSchoolDefault: "全书派",
+    bodyPalaceSame: "身宫同度",
+    ziweiBoardHint: "点任一宫查看该宫详情；空宫显示借星。",
+
     palaceDetailStars: "主星：{stars}",
     palaceDetailEmpty: "本宫无主星，借三方四正（{palaces}）之星：{stars}",
     mutagenLegendTitle: "四化",

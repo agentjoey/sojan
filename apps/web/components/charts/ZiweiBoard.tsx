@@ -80,7 +80,7 @@ function PalaceCell({
       style={{
         gridRow: pos.row,
         gridColumn: pos.col,
-        minHeight: 78,
+        minHeight: 84,
         ...CELL_LINES,
       }}
     >
@@ -299,6 +299,11 @@ export function ZiweiBoard({ ziwei }: { ziwei: ZiweiChart }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <p data-testid="ziwei-subtitle" className="text-[11px] tracking-[0.2em]" style={{ color: "var(--color-muted)" }}>
+        {ziwei.bodyPalaceBranch === ziwei.soulPalaceBranch && <>{t("chart.bodyPalaceSame")} · </>}
+        {t(ziwei.school === "zhongzhou" ? "chart.ziweiSchoolZhongzhou" : "chart.ziweiSchoolDefault")}
+      </p>
+
       <div
         data-testid="ziwei-grid"
         role="group"
@@ -326,6 +331,10 @@ export function ZiweiBoard({ ziwei }: { ziwei: ZiweiChart }) {
       {selectedPalace && <PalaceDetail palace={selectedPalace} palaces={ziwei.palaces} />}
 
       <MutagenLegend />
+
+      <p data-testid="ziwei-hint" className="text-[11px] leading-[1.7]" style={{ color: "var(--color-muted)" }}>
+        {t("chart.ziweiBoardHint")}
+      </p>
     </div>
   );
 }

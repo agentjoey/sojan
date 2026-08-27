@@ -229,4 +229,38 @@ describe("ZiweiBoard：选中宫详情块（6b）", () => {
     expect(detail).toHaveTextContent("紫微");
     expect(detail).toHaveTextContent("天府");
   });
+
+  it("副标题标注流派；身宫与命宫同支时标「身宫同度」", () => {
+    // renderBoard 的实际签名是 renderBoard(chart: ZiweiChart = ziwei)——吃整份 chart，
+    // 不是 overrides 对象。用扩展既有 fixture 的写法。
+    renderBoard({ ...ziwei, soulPalaceBranch: "丑", bodyPalaceBranch: "丑" });
+    const sub = screen.getByTestId("ziwei-subtitle");
+    expect(sub.textContent).toContain("中州派");
+    expect(sub.textContent).toContain("身宫同度");
+  });
+
+  it("流派取自 chart.school，不是硬编码（切到 default 派要跟着变）", () => {
+    renderBoard({ ...ziwei, school: "default" });
+    const sub = screen.getByTestId("ziwei-subtitle");
+    expect(sub.textContent).not.toContain("中州派");
+    expect(sub.textContent).toContain("全书派");
+  });
+
+  it("身宫与命宫不同支时不标「身宫同度」（防无条件渲染）", () => {
+    renderBoard({ ...ziwei, soulPalaceBranch: "丑", bodyPalaceBranch: "未" });
+    expect(screen.getByTestId("ziwei-subtitle").textContent).not.toContain("身宫同度");
+  });
+
+  it("格高 ≥84px（6b 要求）", () => {
+    renderBoard();
+    const cell = screen.getByTestId("ziwei-palace-丑");
+    const mh = (cell.getAttribute("style") ?? "").match(/min-height:\s*(\d+)px/);
+    expect(mh).not.toBeNull();
+    expect(Number(mh![1])).toBeGreaterThanOrEqual(84);
+  });
+
+  it("有交互说明一句", () => {
+    renderBoard();
+    expect(screen.getByTestId("ziwei-hint").textContent).toContain("点任一宫");
+  });
 });

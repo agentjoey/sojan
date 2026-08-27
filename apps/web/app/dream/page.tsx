@@ -204,13 +204,16 @@ export default function DreamPage() {
       <div className="mt-6">
         {turns.length === 0 && (
           <>
-            {/* 6a（03-screens 解梦节）：输入区 serif 18px、底 1px 墨线、右下字数。 */}
+            {/* 6a（03-screens 解梦节）：输入区 serif 18px、底 1px 墨线、右下字数。
+                不写 border-0——Tailwind 4 的 preflight 已把全元素 border-width 归零，
+                再写 border-0 反而引入「border-0 与 border-b 同层同特异度、靠源序
+                分胜负」的不确定性（验收 Minor）。 */}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("dream.placeholder")}
               rows={5}
-              className="w-full resize-none border-0 border-b border-[var(--color-ink)] bg-transparent px-0 py-3 font-serif text-[18px] leading-[1.9] text-ink outline-none placeholder:font-sans placeholder:text-[14px] placeholder:text-muted focus:border-[var(--color-cinnabar)]"
+              className="w-full resize-none border-b border-[var(--color-ink)] bg-transparent px-0 py-3 font-serif text-[18px] leading-[1.9] text-ink outline-none placeholder:font-sans placeholder:text-[14px] placeholder:text-muted focus:border-[var(--color-cinnabar)]"
             />
             <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted">
               <span>{tooLong ? t("dream.errorTooLong") : ""}</span>
@@ -310,16 +313,17 @@ export default function DreamPage() {
                     >
                       {h.summary}
                     </button>
-                    {/* 6a：最近的梦＝摘要 + 日期（Cormorant）。createdAt 是 ISO 串，
-                        取日期前缀即可（纯展示层截取，非命理推算）。 */}
-                    <span className="shrink-0 font-latin text-[11px] text-muted">{h.createdAt.slice(0, 10)}</span>
+                    {/* 6a：最近的梦＝摘要 + 日期（Cormorant）。en-CA 给 YYYY-MM-DD，
+                        按本地时区取日——直接 slice(0,10) 是 UTC 日，UTC+8 用户
+                        跨午夜会差一天（验收 Minor）。 */}
+                    <span className="shrink-0 font-latin text-[11px] text-muted">{new Date(h.createdAt).toLocaleDateString("en-CA")}</span>
                   </li>
                 ) : (
                   // 迁移 0018 之前写入的旧行没有 full_text，续接功能对它降级不可用——
                   // 只当摘要展示，不做成看起来能点的样子。
                   <li key={h.id} className="flex items-baseline justify-between gap-3 text-[13px] leading-relaxed text-ink-2">
                     <span className="min-w-0 flex-1">{h.summary}</span>
-                    <span className="shrink-0 font-latin text-[11px] text-muted">{h.createdAt.slice(0, 10)}</span>
+                    <span className="shrink-0 font-latin text-[11px] text-muted">{new Date(h.createdAt).toLocaleDateString("en-CA")}</span>
                   </li>
                 ),
               )}

@@ -481,6 +481,8 @@ export const en: Messages = {
     bestDirection: "生气方 (Sheng Chi / life-generating direction)",
     tabs: { chart: "Chart", remedy: "Remedies", object: "Add" },
     directionsTitle: "The eight directions",
+    // UI v3 C4-2 (03-screens fengshui 6d): one-line summary of the four auspicious directions under the wheel.
+    fourAuspicious: "四吉方 (Four Auspicious Directions)",
     affinityTitle: "Colors & materials that suit you",
     remedyTitle: "Things you can try",
     personalTitle: "Your natal directions",

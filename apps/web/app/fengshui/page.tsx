@@ -15,8 +15,9 @@ import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 import { BaguaWheel } from "@/components/charts/BaguaWheel";
 import { CastingOverlay } from "@/components/CastingOverlay";
 import { Markdown } from "@/components/Markdown";
-import { Card } from "@/components/ui";
+import { Card, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
+import { TwoColumn } from "@/components/TwoColumn";
 import { Group, Cell, Segmented } from "@/components/tg/native";
 import { Paywall } from "@/components/Paywall";
 import { supabase } from "@/lib/supabase";
@@ -562,6 +563,13 @@ export default function FengshuiPage() {
   // 化解 tab 同理：宅层分级化解属会员功能，而 f.remedies 在未放行时本来就只含
   // 个人层（fs 是 Layer 0）——不再需要单独算一份 personalOnlyRemedies 兜底。
 
+  // 生气方（6d 详情块）：当前视角下 star === "生气" 的那一格——八宅表每卦每星
+  // 恰占一格（core 的 BY_STAR 是卦↔星的双射，见 eight-mansions.ts），find 必中。
+  const shengQiDir = DIRECTIONS.find((d) => activeVerdicts[d].star === "生气")!;
+  // 四吉方一行说明（6d）：当前视角的四吉，按 rank（吉序 1→4）排列。
+  const auspiciousDirs = DIRECTIONS.filter((d) => activeVerdicts[d].auspicious)
+    .sort((a, b) => activeVerdicts[a].rank - activeVerdicts[b].rank);
+
   // 是否真的登记了朝向已知的居所（**与会员状态无关**）。UI 靠它区分三种对用户
   // 完全不同的情形，而不再靠"手里有没有算好的 Layer 1 命盘"（修复单 Important 2）。
   const hasDwellingChart = !!dwellingInput;
@@ -589,6 +597,15 @@ export default function FengshuiPage() {
     : [];
 
   /** 化解清单（TG=Group+Cell / web=Card 列表）。两个宿主共享同一份条目。 */
+  // 6d：成本分级标签按档着色——零成本 wood / 挪动 earth / 添置与装修 line-strong
+  // （6d 只给了三档；装修是 core Effort 的第四档，归并进 line-strong 一档，见报告）。
+  // 键是 core 数据里的 canonical effort 值（与 locale 无关），不是翻译后的标签。
+  const EFFORT_COLOR: Record<string, string> = {
+    零成本: "var(--color-wood)",
+    挪动: "var(--color-earth)",
+    添置: "var(--color-line-strong)",
+    装修: "var(--color-line-strong)",
+  };
   function renderRemedyList(items: typeof f.remedies) {
     return inTg ? (
       // TG：化解清单用原生 Group+Cell。诚实标注（传统象征 vs 传统+现代）与
@@ -644,7 +661,7 @@ export default function FengshuiPage() {
                 )}
                 <span
                   className="ml-auto shrink-0 text-[11px] tracking-[0.1em]"
-                  style={{ color: "var(--color-muted)" }}
+                  style={{ color: EFFORT_COLOR[r.effort] ?? "var(--color-muted)" }}
                 >
                   {t(`fengshui.effortLabel.${r.effort}`)}
                 </span>
@@ -674,16 +691,48 @@ export default function FengshuiPage() {
     );
   }
 
-  return (
-    <main className="mx-auto max-w-[720px] px-4 pb-8 pt-6">
-      {revealing && profile && (
-        <CastingOverlay
-          title={t("fengshui.castingTitle")}
-          hint={t("common.casting")}
-          mode="brief"
-        />
-      )}
+  // 6d + 06-desktop §3（境：左列 440px 两栏）：tab 行放 TwoColumn 的 header 槽
+  // （页首之下、两栏之上）；左列＝「盘」tab 的确定性骨架（宅盘 → 生气方/基调/叙述 →
+  // 本命盘 → 引导语）+ 四吉方一行说明；右列＝化解/添置 tab 内容 + 同住人对照 + 免责。
+  // ⚠️ 左列内部顺序（房屋八方 → 一句话基调 → 本命八方）是既有测试用
+  // compareDocumentPosition 钉死的（评审后续 #4/#6）——把基调/叙述挪去右列会让
+  // DOM 序变成「本命盘 → 基调」，当场撞红那两条，所以「盘」tab 的全部内容作为
+  // 一个整体留在左列，不按「左盘右文」硬切（详见实施报告）。
+  const tabRow = inTg ? (
+    <div className="mt-5">
+      <Segmented
+        options={TABS.map((tb) => ({ value: tb, label: t(`fengshui.tabs.${tb}`) }))}
+        value={tab}
+        onChange={setTab}
+        idBase="fs"
+        ariaLabel={t("fengshui.title")}
+      />
+    </div>
+  ) : (
+    <div className="mt-5 flex gap-1 border-b" style={{ borderColor: "var(--color-line)" }}>
+      {TABS.map((tb) => (
+        <button
+          key={tb}
+          type="button"
+          onClick={() => setTab(tb)}
+          className="px-3 py-2 text-[14px]"
+          style={{
+            color: tab === tb ? "var(--color-cinnabar)" : "var(--color-ink-2)",
+            borderBottom: tab === tb ? "2px solid var(--color-cinnabar)" : "2px solid transparent",
+            // 6d：当前 tab serif 700 + 2px 朱砂下划线（下划线即上面的 borderBottom）。
+            ...(tab === tb ? { fontFamily: "var(--font-serif)", fontWeight: 700 } : {}),
+          }}
+        >
+          {t(`fengshui.tabs.${tb}`)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const header = (
+    <>
       <PageHeader
+        as="div"
         kicker={t("fengshui.kicker")}
         title={hasDwellingChart ? t("fengshui.dwellingHeroTitle") : t("fengshui.title")}
         annotation={
@@ -698,36 +747,12 @@ export default function FengshuiPage() {
             : t("fengshui.subtitle")
         }
       />
+      {tabRow}
+    </>
+  );
 
-      {inTg ? (
-        <div className="mt-5">
-          <Segmented
-            options={TABS.map((tb) => ({ value: tb, label: t(`fengshui.tabs.${tb}`) }))}
-            value={tab}
-            onChange={setTab}
-            idBase="fs"
-            ariaLabel={t("fengshui.title")}
-          />
-        </div>
-      ) : (
-        <div className="mt-5 flex gap-1 border-b" style={{ borderColor: "var(--color-line)" }}>
-          {TABS.map((tb) => (
-            <button
-              key={tb}
-              type="button"
-              onClick={() => setTab(tb)}
-              className="px-3 py-2 text-[14px]"
-              style={{
-                color: tab === tb ? "var(--color-cinnabar)" : "var(--color-ink-2)",
-                borderBottom: tab === tb ? "2px solid var(--color-cinnabar)" : "2px solid transparent",
-              }}
-            >
-              {t(`fengshui.tabs.${tb}`)}
-            </button>
-          ))}
-        </div>
-      )}
-
+  const left = (
+    <>
       {tab === "chart" && (
         <div {...panelProps("chart")}>
           {/* 主视觉顺序（评审后续 #4）：登记了朝向已知的居所时，居所盘先出现、
@@ -803,7 +828,16 @@ export default function FengshuiPage() {
               全部是这个原因，不是断言过时）。只有 render 回调返回的成功态内容
               才根据 narrativeExpanded 决定「现在要不要摆在屏幕上」。 */}
           <section className={hasDwellingChart ? "mt-8" : undefined}>
-            <p className="text-[15px] leading-[1.8]" style={{ color: "var(--color-ink)" }}>{tagline}</p>
+            {/* 生气方详情块（6d）：全站唯一强调手法 Emphasis，块内那句确定性基调
+                正是「把八字用神与方位连起来」的文字（deriveFengshuiTagline：日主五行
+                × 宜用五行 × 生气方）。基调句的文案与 DOM 位置被既有测试钉死（评审
+                后续 #4/#6），这里只外包一层强调块、一个字没动。 */}
+            <Emphasis data-testid="shengqi-block">
+              <h2 className="font-serif text-[15px] font-semibold text-ink">
+                {t("fengshui.bestDirection")} · <span className="text-cinnabar">{DIRECTION_LABEL[shengQiDir]}</span>
+              </h2>
+              <p className="mt-2 text-[15px] leading-[1.8]" style={{ color: "var(--color-ink)" }}>{tagline}</p>
+            </Emphasis>
             {sections && !degraded && (
               <button
                 type="button"
@@ -876,28 +910,6 @@ export default function FengshuiPage() {
                 {t("fengshui.mingGua")}：{activeMingGua.guaName}{activeMingGua.gua}（{activeMingGua.group}）
               </p>
             </div>
-
-            {activeCohabitant && (activeCohabitant.sharedGood.length > 0 || activeCohabitant.conflicts.length > 0) && (
-              <div className="mt-3 p-3" style={{ borderRadius: "var(--radius-card)", background: "var(--color-tint)" }}>
-                <h3 className="text-[13px] text-ink">{t("fengshui.cohabitantsTitle")}</h3>
-                {activeCohabitant.sharedGood.length > 0 && (
-                  <p className="mt-1 text-[13px] text-ink-2">
-                    {t("fengshui.sharedGoodNote", {
-                      name: activeCohabitant.name,
-                      directions: activeCohabitant.sharedGood.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
-                    })}
-                  </p>
-                )}
-                {activeCohabitant.conflicts.length > 0 && (
-                  <p className="mt-1 text-[13px] text-ink-2">
-                    {t("fengshui.conflictsNote", {
-                      name: activeCohabitant.name,
-                      directions: activeCohabitant.conflicts.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
-                    })}
-                  </p>
-                )}
-              </div>
-            )}
           </section>
 
           {/* 「还没登记居所 / 朝向未确定 / 读取失败」三条引导语。判据是**有没有登记
@@ -932,6 +944,17 @@ export default function FengshuiPage() {
           )}
         </div>
       )}
+      {/* 四吉方一行说明（6d）：左列常驻——「盘」tab 里它是本命盘的文字版摘要，
+          「化解」tab 里它是方位过滤的参照（点卦字筛选后不用切回盘 tab 核对）。 */}
+      <p data-testid="four-auspicious" className="mt-6 text-[12px] leading-relaxed text-muted">
+        {t("fengshui.fourAuspicious")} ·{" "}
+        {auspiciousDirs.map((d) => `${DIRECTION_LABEL[d]}（${activeVerdicts[d].star}）`).join(" · ")}
+      </p>
+    </>
+  );
+
+  const right = (
+    <>
       {tab === "remedy" && (
         <section className="mt-6" {...panelProps("remedy")}>
           <h2 className="text-[18px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.remedyTitle")}</h2>
@@ -992,7 +1015,44 @@ export default function FengshuiPage() {
         </section>
       )}
 
+      {/* 同住人对照（6d 右列常驻块）：从「本命八方」区块挪到右列——渲染条件与此前
+          完全一致（Layer 1 且选中了某位同住人），只是位置从本命盘下方改到右列。 */}
+      {activeCohabitant && (activeCohabitant.sharedGood.length > 0 || activeCohabitant.conflicts.length > 0) && (
+        <div className="mt-6 p-3" style={{ borderRadius: "var(--radius-card)", background: "var(--color-tint)" }}>
+          <h3 className="text-[13px] text-ink">{t("fengshui.cohabitantsTitle")}</h3>
+          {activeCohabitant.sharedGood.length > 0 && (
+            <p className="mt-1 text-[13px] text-ink-2">
+              {t("fengshui.sharedGoodNote", {
+                name: activeCohabitant.name,
+                directions: activeCohabitant.sharedGood.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
+              })}
+            </p>
+          )}
+          {activeCohabitant.conflicts.length > 0 && (
+            <p className="mt-1 text-[13px] text-ink-2">
+              {t("fengshui.conflictsNote", {
+                name: activeCohabitant.name,
+                directions: activeCohabitant.conflicts.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
+              })}
+            </p>
+          )}
+        </div>
+      )}
+
       <p className="mt-8 text-[12px] text-muted">{t("fengshui.disclaimer")}</p>
+    </>
+  );
+
+  return (
+    <main>
+      {revealing && profile && (
+        <CastingOverlay
+          title={t("fengshui.castingTitle")}
+          hint={t("common.casting")}
+          mode="brief"
+        />
+      )}
+      <TwoColumn leftWidth={440} header={header} left={left} right={right} />
     </main>
   );
 }

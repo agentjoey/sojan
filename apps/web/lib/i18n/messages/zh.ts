@@ -487,6 +487,8 @@ export const zh = {
     bestDirection: "生气方",
     tabs: { chart: "盘", remedy: "化解", object: "添置" },
     directionsTitle: "八方吉凶",
+    // UI v3 C4-2（03-screens 境 6d）：八方盘下方的四吉方一行说明。
+    fourAuspicious: "四吉方",
     affinityTitle: "宜用色与材",
     remedyTitle: "可做的事",
     // Task 9（EP-fs-15）：宅八方 + 合看 chips。dwellingTitle/personalTitle 分开标注

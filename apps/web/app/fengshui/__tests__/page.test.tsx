@@ -1730,3 +1730,80 @@ describe("评审后续 #4/#6：主视觉顺序反转 + 一句话基调", () => {
     expect(screen.queryByText("展开完整解读 →")).toBeNull();
   });
 });
+
+/**
+ * UI v3 C4-2（03-screens 境 6d + 06-desktop §3）：版式断言。
+ * 每条对应一个可独立回退的实现点（生气方 Emphasis 详情块 / 四吉方一行说明 /
+ * TwoColumn 440 左列 / 当前 tab serif 700 / 成本分级标签着色），删掉对应实现即
+ * 只有对应用例变红（mutation 复验输出见实施报告）。fixture 是 1990-06-15 男＝坎1，
+ * 期望值按 core 八宅表逐格核对后硬编码（坎：生气=巽/东南、天医=震/东、延年=离/南、
+ * 伏位=坎/北），不从被测渲染路径反推。
+ */
+describe("UI v3 C4-2：境 6d 版式", () => {
+  it("生气方详情块：Emphasis 强调（2px 朱砂左线）+ 精确方位「生气方 · 东南」+ 基调句在块内", async () => {
+    await renderPage();
+    const block = (await screen.findByTestId("shengqi-block")) as HTMLElement;
+    expect(block).toHaveStyle({ borderLeft: "2px solid var(--color-cinnabar)" });
+    // 方位必须精确匹配——中文方位名互为子串（北⊂东北、东⊂东南），本仓库已咬过三次；
+    // heading 的 textContent 整体比对，「生气方 · 东」或「生气方 · 东北」都过不了。
+    const heading = within(block).getByText(
+      (_, el) => el?.tagName === "H2" && el.textContent === "生气方 · 东南",
+    );
+    expect(heading).toBeInTheDocument();
+    expect(block.textContent).toContain("金命之人，宜近土——你的生气在东南。");
+  });
+
+  it("四吉方一行说明：恰列出坎1 的四吉（东南生气/东天医/南延年/北伏位），不含凶方星名", async () => {
+    await renderPage();
+    const line = (await screen.findByTestId("four-auspicious")) as HTMLElement;
+    expect(line.textContent).toContain("四吉方");
+    expect(line.textContent).toContain("东南（生气）");
+    expect(line.textContent).toContain("东（天医）");
+    expect(line.textContent).toContain("南（延年）");
+    expect(line.textContent).toContain("北（伏位）");
+    // 两侧都钉：凶方星名不进这一行（坎1 四凶＝绝命/五鬼/六煞/祸害，抽查两个）
+    expect(line.textContent).not.toContain("绝命");
+    expect(line.textContent).not.toContain("五鬼");
+  });
+
+  it("桌面两栏骨架：TwoColumn 左列宽 440px（06-desktop §3「境 440px」）", async () => {
+    await renderPage();
+    await screen.findByLabelText("八方吉凶盘");
+    const grid = screen.getByTestId("two-col-grid") as HTMLElement;
+    expect(grid.style.getPropertyValue("--two-col-left")).toBe("440px");
+  });
+
+  it("tab 行：当前项 serif 700 + 2px 朱砂下划线，非当前项既不是 serif 700 也无下划线（6d）", async () => {
+    await renderPage();
+    await screen.findByLabelText("八方吉凶盘");
+    const chartTab = screen.getByRole("button", { name: "盘" }) as HTMLElement;
+    expect(chartTab.style.fontWeight).toBe("700");
+    expect(chartTab.style.fontFamily).toContain("serif");
+    expect(chartTab.style.borderBottom).toContain("var(--color-cinnabar)");
+    const remedyTab = screen.getByRole("button", { name: "化解" }) as HTMLElement;
+    expect(remedyTab.style.fontWeight).toBe("");
+    expect(remedyTab.style.borderBottom).toContain("transparent");
+    // 切到化解后两侧翻转——钉的是「状态绑定」而不是一次性初值
+    fireEvent.click(remedyTab);
+    expect((screen.getByRole("button", { name: "化解" }) as HTMLElement).style.fontWeight).toBe("700");
+    expect((screen.getByRole("button", { name: "盘" }) as HTMLElement).style.fontWeight).toBe("");
+  });
+
+  it("可做的事：成本分级标签按档着色（零成本 wood / 挪动 earth / 添置 line-strong），不是同一色", async () => {
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "化解" }));
+    await screen.findByText("可做的事");
+    // 前提校验：fixture 化解集里三档都在（fixture 变了就光明正大失败，不悄悄失去判别力）
+    const zero = fs.remedies.find((r) => r.effort === "零成本")!;
+    const move = fs.remedies.find((r) => r.effort === "挪动")!;
+    const add = fs.remedies.find((r) => r.effort === "添置")!;
+    expect(zero).toBeTruthy();
+    expect(move).toBeTruthy();
+    expect(add).toBeTruthy();
+    const tagOf = (r: typeof zero) =>
+      within(screen.getByText(r.action).closest("li")!).getByText(r.effort, { exact: true }) as HTMLElement;
+    expect(tagOf(zero).style.color).toBe("var(--color-wood)");
+    expect(tagOf(move).style.color).toBe("var(--color-earth)");
+    expect(tagOf(add).style.color).toBe("var(--color-line-strong)");
+  });
+});

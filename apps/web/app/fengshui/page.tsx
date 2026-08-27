@@ -217,31 +217,22 @@ export default function FengshuiPage() {
   // 每次进页面/切档案都重新收起，不持久化「用户上次展开过」这种细节状态。
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
 
-  // 首揭仪式（2026-08 创意 B / critique P1）：每会话每档案一次——复用 calendar 的
-  // CastingOverlay（品牌风铃主角过场），盘扇区随后按吉凶 rank 错峰入场。用户第一次看到
-  // 「自己的八方吉凶」是这条产品线的存在理由，不能是一个 SVG 瞬间出现。
-  const [revealing, setRevealing] = useState(false);
+  // 盘扇区错峰入场（原「首揭仪式」的下半截）：owner 打磨批指令 7 把过场全局化
+  // （路由切换播短版），页级的每会话每档案 CastingOverlay 与 zj.fsReveal 门控
+  // 随之删除；错峰入场保留——每次档案落定后播一次，2100ms 后复位。
   const [staggerIn, setStaggerIn] = useState(false);
   // 盘即导航（创意 A）：点本命盘扇区 → 化解 tab 按方位过滤；再点同一扇区取消过滤。
   const [dirFilter, setDirFilter] = useState<Direction | null>(null);
 
   useEffect(() => {
     if (!ENABLED || !profile) return;
-    try {
-      const key = `zj.fsReveal.${profile.id}`;
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, "1");
-    } catch {
-      return; // sessionStorage 不可用（隐私模式等）→ 不播过场，不挡内容
-    }
-    setRevealing(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 档案落定即开播错峰入场（原首揭仪式同款时序，评审 I1）
     setStaggerIn(true);
     const timer = setTimeout(() => {
-      setRevealing(false);
-      // 错峰入场与过场同属「首揭仪式」，必须在同一定时器里一并复位（评审 I1）：
-      // 盘挂在 tab 条件渲染下，点扇区会切到化解 tab——staggerIn 不复位的话，
-      // 切回命盘 tab 时盘重新挂载、staggerIn 仍为 true，会在没有 CastingOverlay
-      // 解释的情况下重放一次错峰淡入（BaguaWheel 的 prop 文档写明「仅首次渲染时传 true」）。
+      // 错峰必须在播完后复位（评审 I1）：盘挂在 tab 条件渲染下，点扇区会切到
+      // 化解 tab——staggerIn 不复位的话，切回命盘 tab 时盘重新挂载、staggerIn
+      // 仍为 true，会无解释地重放一次错峰淡入（BaguaWheel 的 prop 文档写明
+      // 「仅首次渲染时传 true」）。
       setStaggerIn(false);
     }, 2100);
     return () => clearTimeout(timer);
@@ -535,7 +526,7 @@ export default function FengshuiPage() {
   }
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <Centered>{t("fengshui.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>
@@ -1070,13 +1061,6 @@ export default function FengshuiPage() {
 
   return (
     <main>
-      {revealing && profile && (
-        <CastingOverlay
-          title={t("fengshui.castingTitle")}
-          hint={t("common.casting")}
-          mode="brief"
-        />
-      )}
       <TwoColumn leftWidth={440} header={header} left={left} right={right} />
     </main>
   );

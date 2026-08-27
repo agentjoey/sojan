@@ -6,7 +6,6 @@ export const en: Messages = {
     loading: "Loading…",
     cancel: "Cancel",
     confirm: "Confirm",
-    casting: "Casting",
     save: "Save",
     delete: "Delete",
     edit: "Edit",
@@ -33,9 +32,9 @@ export const en: Messages = {
     home: "Home",
     calendar: "Fortune",
     chart: "Chart",
-    // EP-nav-label-2 (UI v3 C3): /spirit nav label is now 掷筊; the seal char 灵
-    // stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
-    spirit: "掷筊 (Jiao)",
+    // UI v3 polish batch (owner directive 6): /spirit nav label is now 问事; the seal
+    // char 灵 stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
+    spirit: "问事 (Jiao)",
     fengshui: "Feng Shui",
     dream: "Dream",
     profiles: "Me",
@@ -112,8 +111,10 @@ export const en: Messages = {
   },
   home: {
     heroTitle1: "Your chart,",
+    // kickerHero is no longer used by the web hero (polish batch directive 5) but
+    // the TG homepage PageHeader still consumes it — TG is frozen, key stays.
+    // kickerToc is fully dead, removed.
     kickerHero: "Prologue",
-    kickerToc: "Contents",
     footerBrand: "Sojan · Eastern Mingli",
     ctaSecondary: "See today’s reading →",
     heroTitle2: "is a mirror",
@@ -127,12 +128,6 @@ export const en: Messages = {
       spirit: { title: "Guardian Spirit", sub: "Guardian spirit & yearly guidance" },
       reading: { title: "Cast chart", sub: "Birth info instant chart" },
       dream: { title: "Dreams", sub: "Dream mirror · psychological reflection" },
-    },
-    today: {
-      weekday: "{day}",
-      emptyVerdict: "—",
-      polish: "Observe the moment before you act — your full daily reading is one tap away.",
-      meta: "Add your birth info to unlock your personalized daily reading",
     },
     cards: {
       east: {
@@ -339,17 +334,12 @@ export const en: Messages = {
       still: "宜守静 (Favorable for stillness)",
     },
 
-    yi: "宜 (Favorable)",
-    ji: "忌 (Unfavorable)",
     favorableToday: "今日喜用 (Today’s favorables)",
     interaction: "流日{kind}命{withPillar}支 (Daily flow {kind} on {withPillar} branch)",
     todayYi: "今日宜 (Favorable today)",
     todayJi: "今日忌 (Unfavorable today)",
     auspiciousYi: "趋吉 · 宜 (Auspicious · Do)",
     cautionJi: "避祸 · 忌 (Avoid harm · Don’t)",
-
-    almanac: "黄历 (Almanac)",
-    none: "—",
 
     dims: {
       career: "事业 (Career)",
@@ -517,7 +507,6 @@ export const en: Messages = {
     narrativeFailed: "The narrative couldn't be generated right now — the chart and suggestions below are unaffected.",
     narrativeDegraded: "This narrative got a direction wrong and was auto-corrected, so it isn't shown — the chart and suggestions below are unaffected.",
     regenerate: "Regenerate narrative",
-    castingTitle: "Casting your eight directions",
     filterByDirection: "Only {direction}",
     filterClear: "Clear filter",
     filterEmpty: "No remedies for this direction yet.",

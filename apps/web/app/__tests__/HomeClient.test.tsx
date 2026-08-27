@@ -1,36 +1,26 @@
 import React, { act } from "react";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import HomeClient from "../HomeClient";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { BirthInputSchema, computeUnifiedChart, type DailyFortune } from "@sojan/core";
 
 /**
- * 终审必修 1（Critical）回归测试——收口版。
+ * 卷首「今日日期」纪律的回归测试（终审必修 1 / 复审 M6 的收口版，
+ * owner 打磨批指令 2 后改写）。
  *
- * 根因（第一版遗留缺口）：`/` 是全静态预渲染路由，但 `HomeClient` 虽是
- * `"use client"`，照样会被服务端预渲染进静态 HTML（`.next/server/app/index.html`
- * 里能 grep 到烤死的日期）。第一版方案让 `HomeClient` 直接在渲染时调用
- * `new Date()`，服务端预渲染用的是部署/ISR 机器的 UTC 时刻、客户端 hydrate 用
- * 访客本地时钟——两者不一致的时长等于时区偏移量（华裔用户每天本地 00:00–07:59、
- * 美西用户每天本地 17:00–23:59 都会踩到），是**常态性** hydration mismatch，
- * 不是「边界时刻」；React 19 会把它当 recoverable error 处理、报 console 错误，
- * 不是「静默换值」。
+ * 指令 2 之前：今日卡是 SSR 静态卡，日期/星期直接渲染进首帧 HTML，
+ * 所以本文件钉「首帧文本 = 服务端 prop（防 hydration mismatch）」。
+ * 指令 2 之后：今日卡改为有档案才渲染、数据经 server action 异步到达，
+ * **首帧 HTML 里根本没有日期文本**（首帧只有等待过场 + 静态 Hero），
+ * 日期只在客户端数据落定后出现——hydration mismatch 的载体随之消失。
  *
- * 收口后的三段式：
- * 1）`page.tsx` 服务端算一次「ISR 重新生成时刻」的日期/星期索引，当 **初值**
- *    props（`today`）传给 `HomeClient`；
- * 2）`HomeClient` 用这个 prop 作 `useState` 初值——服务端渲染与客户端首次渲染
- *    逐字节一致，mismatch 从根上不存在；
- * 3）挂载后的 `useEffect`（服务端不执行）用访客本地时钟重算、`setState` 覆盖。
- *
- * 本文件因此钉两件事：
- * - 「首次渲染值 = 服务端传入的 prop」（防 mismatch 的关键点，见下面第一组 it）；
- * - 「最终显示值以访客本地时钟为准」（挂载后 effect 纠偏，第二组 it，语义沿用
- *   第一版就有的断言，只是底层实现从「直接 new Date()」改成「prop 初值 + effect
- *   覆盖」，所以要把 `today` 初值特意设成一个陈旧占位值，证明是 effect 把它
- *   纠正过来的，而不是 prop 本身碰巧等于系统时间）。
+ * 本文件现在钉三件事：
+ * - SSR→hydrate 全程无 hydration 报错（首帧只剩静态内容 + 过场，仍要守住）；
+ * - 卡上日期以**访客本地时钟**为准（effect 纠偏陈旧 prop，不是读死值）；
+ * - 长驻标签页跨本地午夜自动纠偏（M6），且纠偏后取数日期也跟着变。
  */
 
 vi.mock("next/navigation", () => ({
@@ -41,11 +31,39 @@ vi.mock("@/lib/tg/ui", () => ({
   useIsTelegram: () => false,
 }));
 
+const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
+const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart: computeUnifiedChart(birth), createdAt: "", reading: null };
+const fortune: DailyFortune = {
+  date: "2026-08-26",
+  dayGanZhi: "甲子",
+  dayElement: "水",
+  dayBranchElement: "水",
+  masterElement: "木",
+  relation: "印",
+  scores: { overall: 7, career: 6, wealth: 5, love: 6, health: 7, travel: 5 },
+  tone: "今日总评占位",
+  auspicious: ["宜静心"],
+  caution: ["忌争执"],
+  almanacYi: [],
+  almanacJi: [],
+  lunarDate: "七月十三",
+  interactions: [],
+  favorableToday: true,
+};
+const dailyFortuneActionMock = vi.fn(async (..._a: unknown[]) => fortune);
+vi.mock("@/lib/profiles", () => ({
+  getActiveProfile: vi.fn(async () => profile),
+}));
+vi.mock("@/app/actions", () => ({
+  dailyFortuneAction: (...a: unknown[]) => dailyFortuneActionMock(...a),
+  dailyPolishAction: async (): Promise<string | null> => null,
+  solarHouAction: async () => ({ hou: "测试候", wuHou: "测试物候", index: 42, term: "测试节气" }),
+}));
+
 const solarHou = { hou: "处暑 · 初候", wuHou: "鹰乃祭鸟", index: 41 };
 
-// 刻意设成一个陈旧占位值（模拟「ISR 上次重新生成时刻」早已过去）——
-// 用它而不是「恰好等于系统时间」的值，才能证明后续测试里显示值的变化
-// 确实来自 useEffect 的纠偏，而不是 prop 本身就对。
+// 刻意设成陈旧占位值（模拟「ISR 上次重新生成时刻」早已过去）——证明显示值
+// 来自挂载后的 effect 纠偏，而不是 prop 本身碰巧等于系统时间。
 const staleToday = { date: "2000.01.01", dayIndex: 6 };
 
 function renderHome(locale: "zh" | "en" = "zh", today = staleToday) {
@@ -56,129 +74,108 @@ function renderHome(locale: "zh" | "en" = "zh", today = staleToday) {
   );
 }
 
-describe("HomeClient：今日日期/星期（终审必修 1，收口版）", () => {
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-  });
+beforeEach(() => {
+  localStorage.clear();
+  dailyFortuneActionMock.mockClear();
+});
 
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+describe("HomeClient：今日日期（终审必修 1 / M6，指令 2 收口版）", () => {
   it("HomeClientProps 携带 solarHou 与 today（服务端算好的初值，用于防 hydration mismatch）", () => {
     const props: import("../HomeClient").HomeClientProps = { solarHou, today: staleToday };
     expect(Object.keys(props).sort()).toEqual(["solarHou", "today"]);
   });
 
-  describe("首次渲染值 = 服务端传入的 today prop（防 mismatch 的关键点）", () => {
-    it("用 renderToString 模拟服务端预渲染的 HTML，再用不同系统时间 hydrate 同一份 prop：不触发 React hydration mismatch，首帧文本 = prop", () => {
-      // 三个时刻刻意互不相同，才能真正区分「读 prop」与「读 new Date()」：
-      // - prerenderClock：模拟 ISR 重新生成机器当时的系统时钟
-      // - staleToday（date: 2000.01.01）：那一刻服务端算出来、传给 HomeClient 的 prop
-      // - hydrateClock：访客本地时钟，跟前两者都不同
-      // 若组件首次渲染（无论服务端还是客户端 hydrate 的第一帧）不是读这份 prop
-      // 而是各自读当时的 new Date()，两次渲染的文本就会对不上，React 会在
-      // hydrate 阶段报 hydration mismatch 错误——这正是本测试要抓的。
-      vi.useFakeTimers({ toFake: ["Date"] });
+  it("SSR→hydrate 全程无 hydration 报错（指令 2 后首帧只剩静态 Hero + 等待过场）", () => {
+    // 三个时刻刻意互不相同（预渲染时钟 / prop / hydrate 时钟），若组件首帧
+    // 偷偷读了 new Date()，SSR HTML 与 hydrate 首帧就会对不上而报错。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(2010, 4, 5, 8, 0, 0)); // prerenderClock
+      const jsx = (
+        <I18nProvider locale="zh">
+          <HomeClient solarHou={solarHou} today={staleToday} />
+        </I18nProvider>
+      );
+      // 用 renderToString（不是 renderToStaticMarkup）——后者不带 hydration
+      // 标记，拿它 hydrate 会在无关的地方假警报（本测试第一版踩过）。
+      const html = renderToString(jsx);
+      // 首帧不再含任何日期文本（卡未渲染）——这是指令 2 之后的结构前提。
+      expect(html).not.toContain("2000.01.01");
+
+      const container = document.createElement("div");
+      container.innerHTML = html;
+      document.body.appendChild(container);
+
+      vi.setSystemTime(new Date(2026, 7, 26, 10, 0, 0)); // hydrateClock
+
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       try {
-        vi.setSystemTime(new Date(2010, 4, 5, 8, 0, 0)); // prerenderClock：与 prop、hydrateClock 均不同
-        const jsx = (
-          <I18nProvider locale="zh">
-            <HomeClient solarHou={solarHou} today={staleToday} />
-          </I18nProvider>
+        act(() => {
+          hydrateRoot(container, jsx);
+        });
+        // ⚠️ I2(a)：React 把 hydration mismatch 诊断以单个 Error 对象传给
+        // console.error（不是纯字符串参数），统一转文本再正则匹配。
+        const asText = (a: unknown): string =>
+          a instanceof Error ? a.message : typeof a === "string" ? a : String(a);
+        const mismatchLogged = consoleError.mock.calls.some((args) =>
+          args.some((a) => /hydrat/i.test(asText(a))),
         );
-        // 用 `renderToString`（不是 `renderToStaticMarkup`）——后者不带 hydration
-        // 标记（给纯静态、不会被 hydrate 的页面用），拿它生成的 HTML 去 hydrateRoot
-        // 会因为缺标记而在无关的地方假警报（本测试第一版踩过：TodayCard 里
-        // `{date} · {dateNote}` 两个相邻文本表达式，`renderToStaticMarkup` 合并
-        // 成一个文本节点，`renderToString` 会保留 hydration 所需的节点边界）。
-        const html = renderToString(jsx);
-        expect(html).toContain("2000.01.01"); // 服务端这一帧确实是 prop，不是 prerenderClock
-
-        const container = document.createElement("div");
-        container.innerHTML = html;
-        document.body.appendChild(container);
-
-        vi.setSystemTime(new Date(2026, 7, 26, 10, 0, 0)); // hydrateClock：访客本地时钟
-
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-        try {
-          act(() => {
-            hydrateRoot(container, jsx);
-          });
-          // ⚠️ I2(a)（复审 Important）：React 把 hydration mismatch 的诊断信息
-          // 以**单个 Error 对象**传给 console.error（不是纯字符串参数），此前
-          // `typeof a === "string"` 恒为 false，`mismatchLogged` 恒为 false，
-          // 这条断言是同义反复——mutation 复验见下方注释。`asText` 把 Error/
-          // 字符串/其他任意值统一转成可正则匹配的文本。
-          const asText = (a: unknown): string =>
-            a instanceof Error ? a.message : typeof a === "string" ? a : String(a);
-          const mismatchLogged = consoleError.mock.calls.some((args) =>
-            args.some((a) => /hydrat/i.test(asText(a))),
-          );
-          expect(mismatchLogged).toBe(false);
-          // act() 内部会把 hydrate 之后的 useEffect 也同步 flush 掉，所以这里已经是
-          // effect 纠偏后的下一帧——最终文本是 hydrateClock 对应的日期，不再是
-          // prop 的 2000.01.01（是否真的「先无 mismatch 地 hydrate、再被 effect
-          // 覆盖」由上面 mismatchLogged 断言 + 本用例开头 `expect(html).toContain
-          // ("2000.01.01")` 共同保证，不是这一条单独证明的）。
-          expect(container.textContent).toContain("2026.08.26");
-          expect(container.textContent).not.toContain("2000.01.01");
-        } finally {
-          consoleError.mockRestore();
-          container.remove();
-        }
+        expect(mismatchLogged).toBe(false);
       } finally {
-        vi.useRealTimers();
+        consoleError.mockRestore();
+        container.remove();
       }
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  describe("挂载后：最终显示值以访客本地时钟为准（useEffect 纠偏）", () => {
-    it("2026-08-26（周三）：挂载后 effect 用系统时钟覆盖了陈旧的 prop 初值", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2026, 7, 26, 10, 0, 0)); // 本地时间 2026-08-26 周三
-      renderHome("zh");
-      expect(screen.getByText(/2026\.08\.26/)).toBeInTheDocument();
-      expect(screen.getByText(/周三/)).toBeInTheDocument();
-      expect(screen.queryByText(/2000\.01\.01/)).toBeNull();
+  it("挂载后卡上日期 = 访客本地时钟（effect 覆盖了陈旧的 prop 初值）", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 26, 10, 0, 0)); // 本地 2026-08-26
+    renderHome("zh");
+    await act(async () => {}); // flush getActiveProfile/dailyFortuneAction 的微任务
+    // fake timers 下 findBy* 的轮询定时器也被冻结——微任务已 flush，直接同步取。
+    const card = screen.getByTestId("today-card");
+    expect(card.textContent).toContain("2026.08.26");
+    expect(card.textContent).not.toContain("2000.01.01");
+  });
+
+  it("换一个系统时间（次日），卡上日期跟着变——证明不是从固定 prop 读的", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 27, 10, 0, 0)); // 2026-08-27
+    renderHome("zh");
+    await act(async () => {});
+    const card = screen.getByTestId("today-card");
+    expect(card.textContent).toContain("2026.08.27");
+    expect(card.textContent).not.toContain("2026.08.26");
+  });
+
+  /**
+   * 复审 Minor M6：长驻标签页跨过本地午夜后要自动纠偏，不需要手动刷新——
+   * 指令 2 之后这条还要更进一步：日期纠偏会改变 `todayIso`，取数（流日/候）
+   * 也必须跟着用新日期，否则卡面日期变了、内容还是昨天的。
+   */
+  it("长驻标签页跨过本地午夜后：卡日期与取数日期都自动纠偏（M6）", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 26, 23, 59, 50)); // 2026-08-26 23:59:50 本地
+    renderHome("zh");
+    await act(async () => {});
+    expect(screen.getByTestId("today-card").textContent).toContain("2026.08.26");
+    expect(dailyFortuneActionMock).toHaveBeenCalledWith({ bazi: profile.chart.bazi }, "2026-08-26");
+
+    await act(async () => {
+      vi.advanceTimersByTime(20_000); // 跨过午夜 + 5s 缓冲
     });
 
-    it("换一个系统时间（次日周四），渲染结果跟着变——证明不是从固定 prop 读的", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2026, 7, 27, 10, 0, 0)); // 2026-08-27 周四
-      renderHome("zh");
-      expect(screen.getByText(/2026\.08\.27/)).toBeInTheDocument();
-      expect(screen.getByText(/周四/)).toBeInTheDocument();
-      expect(screen.queryByText(/2026\.08\.26/)).toBeNull();
-    });
-
-    it("en locale 下星期文案也随系统时间变化（Wed）", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2026, 7, 26, 10, 0, 0));
-      renderHome("en");
-      expect(screen.getByText(/2026\.08\.26/)).toBeInTheDocument();
-      expect(screen.getByText(/Wed/)).toBeInTheDocument();
-    });
-
-    /**
-     * 复审 Minor M6：此前的 `useEffect(..., [])` 只在挂载时纠偏一次——长驻
-     * 标签页（不刷新、不切走再切回）跨过本地午夜后，`today` 会一直停在挂载
-     * 那一刻，日期/星期整整错一天。补了一个到「下一次本地 00:00」的
-     * `setTimeout`，到点重算并重新调度下一次。这里不刷新、不重新挂载，只
-     * 推进系统时钟越过午夜，钉住页面会自己纠偏。
-     */
-    it("长驻标签页跨过本地午夜后自动纠偏，不需要用户手动刷新（M6）", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2026, 7, 26, 23, 59, 50)); // 2026-08-26 23:59:50 本地
-      renderHome("zh");
-      expect(screen.getByText(/2026\.08\.26/)).toBeInTheDocument();
-      expect(screen.getByText(/周三/)).toBeInTheDocument();
-
-      act(() => {
-        vi.advanceTimersByTime(20_000); // 跨过午夜 + 5s 缓冲
-      });
-
-      expect(screen.getByText(/2026\.08\.27/)).toBeInTheDocument();
-      expect(screen.getByText(/周四/)).toBeInTheDocument();
-      expect(screen.queryByText(/2026\.08\.26/)).toBeNull();
-    });
+    const card = screen.getByTestId("today-card");
+    expect(card.textContent).toContain("2026.08.27");
+    expect(card.textContent).not.toContain("2026.08.26");
+    expect(dailyFortuneActionMock).toHaveBeenCalledWith({ bazi: profile.chart.bazi }, "2026-08-27");
   });
 });

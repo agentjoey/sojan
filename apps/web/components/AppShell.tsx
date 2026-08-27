@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n/I18nProvider";
 import { enabled, isActive, RAIL_ORDER } from "@/lib/nav";
 import { ShellProvider } from "@/components/ShellContext";
 import { MobileShell } from "@/components/MobileShell";
+import { RouteCasting } from "@/components/RouteCasting";
 
 // Task 2：项集改为 RAIL_ORDER（运/盘/灵/境/梦/起/我）。「照」由顶部铜铃承担、不占项；
 // 「账」已并入「我的」（/profiles），不再作为独立导航项常驻。
@@ -66,6 +67,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* 移动：Task 6——顶部语境胶囊 + 菜单键 + 九宫格覆盖层，取代旧底栏。 */}
             <MobileShell currentPath={pathname} />
+
+            {/* 路由切换短过场（owner 打磨批指令 7）：每次切页播 1.2s；TG 不播。 */}
+            <RouteCasting />
           </>
         )}
 

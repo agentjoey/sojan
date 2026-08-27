@@ -237,6 +237,12 @@ body {
   12%, 90% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* 路由切换短版（owner 打磨批指令 7）：快进快出，停顿更短。 */
+@keyframes zjCastingRoute {
+  0% { opacity: 0; }
+  18%, 78% { opacity: 1; }
+  100% { opacity: 0; }
+}
 @keyframes zjCastingBellEnter {
   from { opacity: 0; transform: translateY(10px) scale(.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -297,6 +303,10 @@ body {
 }
 .zj-casting-overlay-brief {
   animation: zjCastingBrief 2.1s ease-out both;
+}
+/* 路由切换短版（owner 打磨批指令 7）：1.2s，与 RouteCasting 的卸载定时器同步。 */
+.zj-casting-overlay-route {
+  animation: zjCastingRoute 1.2s ease-out both;
 }
 .zj-casting-bell-stage {
   display: block;
@@ -360,6 +370,7 @@ body {
   .zj-bell-clapper-cast,
   .zj-casting-overlay-pending,
   .zj-casting-overlay-brief,
+  .zj-casting-overlay-route,
   .zj-casting-bell-stage,
   .zj-casting-title,
   .zj-casting-hint,

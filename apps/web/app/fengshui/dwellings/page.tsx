@@ -9,6 +9,7 @@ import { useIsTelegram, haptics } from "@/lib/tg/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { listDwellings, deleteDwelling, type Dwelling } from "@/lib/dwellings";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { Group, Cell } from "@/components/tg/native";
 import { DwellingForm } from "../DwellingForm";
 
@@ -117,7 +118,7 @@ export default function DwellingsPage() {
   }, [editingId]);
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <Centered>{t("fengshui.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

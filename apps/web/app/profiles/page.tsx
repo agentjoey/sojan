@@ -10,6 +10,7 @@ import { useIsTelegram } from "@/lib/tg/ui";
 import { supabase } from "@/lib/supabase";
 import { Card, SealIcon, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { Group, Cell } from "@/components/tg/native";
 import { useT } from "@/lib/i18n/I18nProvider";
 
@@ -121,7 +122,8 @@ export default function ProfilesPage() {
 
       <div className="mt-8">
       {loading ? (
-        <Card><p className="text-[14px] text-muted">{t("profiles.loading")}</p></Card>
+        // owner 打磨批指令 7：加载态统一为持续版风铃过场（原为卡内一行文字）。
+        <CastingOverlay title={t("profiles.loading")} mode="pending" />
       ) : profiles.length === 0 ? (
         <Card><p className="text-[14px] text-muted">{t("profiles.empty")}</p></Card>
       ) : inTg ? (

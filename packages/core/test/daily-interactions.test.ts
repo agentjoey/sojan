@@ -34,4 +34,15 @@ describe("EP-504 每日 流日×本命 互动 + 用神（千人千日）", () =>
     const favorable = ["木", "水"].includes(f.dayElement);
     expect(f.favorableToday).toBe(favorable);
   });
+
+  it("auspicious/caution 不混入黄历宜忌词条（owner 打磨批指令 1：黄历内容全站去除）", () => {
+    // 找一个黄历非空的日期，保证断言不是「空集恒不相交」的恒真。
+    const candidates = ["2026-06-22", "2026-08-28", "2026-01-01", "2026-03-15", "2026-10-10"];
+    const f = candidates
+      .map((d) => computeDailyFortune(chart, d))
+      .find((x) => x.almanacYi.length > 0 && x.almanacJi.length > 0);
+    expect(f, "候选日期里应至少有一天黄历非空").toBeDefined();
+    for (const item of f!.auspicious) expect(f!.almanacYi).not.toContain(item);
+    for (const item of f!.caution) expect(f!.almanacJi).not.toContain(item);
+  });
 });

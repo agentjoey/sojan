@@ -68,9 +68,8 @@ async function renderCalendar(locale: "zh" | "en" = "zh") {
 beforeEach(() => {
   vi.resetModules();
   localStorage.clear();
-  // 每会话一次的测算过场（casting）与本文件的断言无关，且 2.1s setTimeout
-  // 会在 act() 作用域外触发 setState 警告——直接标记「本会话已放过」跳过它。
-  sessionStorage.setItem("zj.cast", "1");
+  // （原「每会话一次测算过场」zj.cast 已随 owner 打磨批指令 7 删除，这里不再
+  // 需要 sessionStorage 抑制；路由切换过场由全局 RouteCasting 承担。）
   dailyFortuneActionMock.mockClear();
   dailyPolishActionMock.mockClear();
   dailyBehaviorActionMock.mockClear();
@@ -135,9 +134,14 @@ describe("UI v3 运势（8a）", () => {
     expect(yiji.tagName).not.toBe("UL");
   });
 
-  it("黄历只在移动端出（桌面容器带 xl:hidden）", async () => {
+  it("黄历块已全站去除（owner 打磨批指令 1），降级宜忌也不含黄历词条", async () => {
     await renderCalendar();
-    expect((await screen.findByTestId("huangli")).className).toContain("xl:hidden");
+    // 先确认页面本体渲染出来了，否则「不存在」会因整页缺席而恒真。
+    expect(await screen.findByTestId("yiji-grid")).toBeInTheDocument();
+    expect(screen.queryByTestId("huangli")).toBeNull();
+    // mock 数据里 almanacYi/almanacJi 是「祭祀/祈福/动土」——这些词不得出现在
+    // 页面上任何地方（含降级版趋吉/避祸两栏）。
+    expect(screen.queryByText(/祭祀|祈福|动土/)).toBeNull();
   });
 
   it("候标尺的 index 来自 getCurrentSolarHou，不是硬编码", async () => {

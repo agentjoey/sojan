@@ -12,6 +12,7 @@ import { listJiaoHistory, appendJiaoHistory, type JiaoHistoryEntry } from "@/lib
 import { JiaoThrow, JiaoBlocksStatic } from "@/components/JiaoThrow";
 import { SpiritPanel } from "@/app/chart/SpiritPanel";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { Button, Emphasis } from "@/components/ui";
 import { Paywall } from "@/components/Paywall";
 import { TwoColumn } from "@/components/TwoColumn";
@@ -228,7 +229,7 @@ export default function SpiritPage() {
   }
 
   if (!ENABLED) return <Centered><p className="text-muted">{t("spirit.notEnabled")}</p></Centered>;
-  if (profile === undefined) return <Centered>{t("spirit.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("spirit.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>

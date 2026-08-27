@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { BirthInputSchema, computeUnifiedChart, type DailyFortune } from "@sojan/core";
 
 /**
  * 首页 TG 入口列表（`TG_ENTRIES`）的回归测试。
@@ -33,6 +34,46 @@ vi.mock("@/components/DarkImage", () => ({
   default: () => null,
 }));
 
+// —— owner 打磨批指令 2：卷首今日卡复用运势数据流（lib/profiles + server actions）。
+// 以下 mock 只影响 web 臂新引入的取数；TG 臂不消费它们，TG 断言逐字未动。
+const homeBirth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
+const homeProfile = {
+  id: "p1",
+  nickname: "阿甲",
+  birthInput: homeBirth,
+  chart: computeUnifiedChart(homeBirth),
+  createdAt: "",
+  reading: null,
+};
+const homeFortune: DailyFortune = {
+  date: "2026-08-28",
+  dayGanZhi: "甲子",
+  dayElement: "水",
+  dayBranchElement: "水",
+  masterElement: "木",
+  relation: "印",
+  scores: { overall: 7, career: 6, wealth: 5, love: 6, health: 7, travel: 5 },
+  tone: "今日总评占位",
+  auspicious: ["宜静心"],
+  caution: ["忌争执"],
+  almanacYi: [],
+  almanacJi: [],
+  lunarDate: "七月十六",
+  interactions: [],
+  favorableToday: true,
+};
+/** 候 fixture 刻意用真表里不可能出现的字符串，防止「断言碰巧命中真实值」的恒真。 */
+const homeHou = { hou: "测试候", wuHou: "测试物候", index: 42, term: "测试节气" };
+const activeProfileMock = vi.fn(async (): Promise<typeof homeProfile | null> => homeProfile);
+vi.mock("@/lib/profiles", () => ({
+  getActiveProfile: () => activeProfileMock(),
+}));
+vi.mock("@/app/actions", () => ({
+  dailyFortuneAction: async () => homeFortune,
+  dailyPolishAction: async (): Promise<string | null> => "风从东来，宜收敛",
+  solarHouAction: async () => homeHou,
+}));
+
 /**
  * ⚠️ `page.tsx` 顶层 `const ENABLED = process.env.NEXT_PUBLIC_* === "1"` 在**模块加载时**
  * 求值，所以必须 `resetModules()` 之后再动态 import；而 `I18nProvider` 必须出自**同一次**
@@ -52,6 +93,7 @@ beforeEach(() => {
   vi.resetModules();
   tgEnv.inTg = true;
   routerPush.mockReset();
+  activeProfileMock.mockClear();
   vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
   // EP-fs-debt：「灵」此前无条件显示（TG_ENTRIES 里没有 flag 门控，AppShell.NAV
   // 却有），默认开着让既有用例（假设「本命之灵」在场）继续成立，专门的开关测试见
@@ -215,18 +257,50 @@ describe("UI v3 卷首（5a）", () => {
     expect(container.querySelector('[data-testid="compass-ticks"]')).not.toBeNull();
   });
 
-  it("今日卡在页面上，且卡脚指向 /calendar", async () => {
-    await renderHome();
-    const card = screen.getByTestId("today-card-left");
-    expect(card).toBeInTheDocument();
-    expect(screen.getByText(/展开今日日签/).closest("a")!.getAttribute("href")).toBe("/calendar");
+  it("转盘水印整体不透明度已加深（owner 打磨批指令 5：0.14 → 0.22）", async () => {
+    const { container } = await renderHome();
+    const svg = container.querySelector<HTMLElement>('[data-testid="compass-ticks"]')!.closest("svg")!;
+    expect(svg.style.opacity).toBe("0.22");
   });
 
-  it("七十二候标尺的 index 来自 getCurrentSolarHou，不是硬编码", async () => {
+  it("Hero 不再有独立 logo+「照见」行（owner 打磨批指令 3：品牌词已上移进胶囊）", async () => {
     await renderHome();
-    const label = screen.getByRole("img", { name: /候/ }).getAttribute("aria-label")!;
-    const { getCurrentSolarHou } = await import("@sojan/core");
-    expect(label).toContain(String(getCurrentSolarHou().index));
+    // web 臂内「照见」只应剩页脚 footerBrand（带空格的「照 见 · 东 方 命 理」，精确匹配撞不上）。
+    expect(screen.queryByText("照见")).toBeNull();
+  });
+
+  it("「卷 首」「目 录」两枚眉标已去除（owner 打磨批指令 5）", async () => {
+    await renderHome();
+    expect(screen.queryByText("卷 首")).toBeNull();
+    expect(screen.queryByText("目 录")).toBeNull();
+  });
+
+  it("目录五入口印章统一朱文 zhu（纸底朱字，owner 打磨批指令 5）", async () => {
+    await renderHome();
+    const rows = screen.getAllByTestId("toc-row");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const seal = row.querySelector<HTMLElement>("span[aria-hidden]")!;
+      expect(seal.style.color).toBe("var(--color-seal)");
+      expect(seal.style.background).toBe("var(--color-paper)");
+    }
+  });
+
+  it("今日卡在页面上，且卡脚指向 /calendar", async () => {
+    await renderHome();
+    // owner 打磨批指令 2：今日卡改为有档案才渲染（数据经 server action 异步到达），
+    // 所以这里用 findBy* 等它出现，不再是同步 getBy*。
+    const card = await screen.findByTestId("today-card-left");
+    expect(card).toBeInTheDocument();
+    expect((await screen.findByText(/展开今日日签/)).closest("a")!.getAttribute("href")).toBe("/calendar");
+  });
+
+  it("七十二候标尺挂载后经 solarHouAction 覆盖为访客本地日期的候（不再是服务端 UTC 快照）", async () => {
+    await renderHome();
+    const label = screen.getByRole("img", { name: /候/ });
+    // fixture 候名是真实候名表里不可能出现的字符串——断言变绿只能来自 action 覆盖。
+    await waitFor(() => expect(label.getAttribute("aria-label")!).toContain("测试候"));
+    expect(label.getAttribute("aria-label")!).toContain("42");
   });
 
   it("目录 4 行，各带朱文方印字符", async () => {
@@ -234,45 +308,42 @@ describe("UI v3 卷首（5a）", () => {
     expect(screen.getAllByTestId("toc-row")).toHaveLength(4);
   });
 
-  /**
-   * 终审必修 5：TodayCard 卡头/卡脚此前是组件内写死的中文（「今 日」/
-   * 「展开今日日签 →」），测试一直用 locale="zh" 渲染所以红灯没机会亮。
-   * 换成 en locale 断言这两处确实随 i18n 切换——若哪天有人把它们改回写死
-   * 中文，这条会在 en 分支下直接红。
-   */
   it("en locale 下卡头/卡脚文案走 i18n，不是写死的中文（终审必修 5）", async () => {
     await renderHome("en");
-    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(await screen.findByText("Today")).toBeInTheDocument();
     expect(screen.getByText(/Open today.s reading/)).toBeInTheDocument();
     expect(screen.queryByText("今 日")).toBeNull();
     expect(screen.queryByText(/展开今日日签/)).toBeNull();
   });
 
   /**
-   * 终审必修 6：卷首这份 TodayCard 传的是星期（不是农历），prop 已改名为
-   * 诚实的 `dateNote`——这里钉住卷首实际显示的是星期文案，不是随便什么值。
+   * owner 打磨批指令 2：卷首今日卡与运势页同一数据流（dailyFortuneAction +
+   * polish 缓存），dateNote 随之从「星期」变成与运势页一致的农历日——
+   * 「两处今日卡内容不一致」的修复本体。
    */
-  it("今日卡的 dateNote 在卷首是星期，不是农历（终审必修 6：prop 改名为诚实的 dateNote）", async () => {
+  it("今日卡 dateNote 是农历日（与运势页一致），不再是星期", async () => {
     await renderHome("zh");
-    const weekDayPattern = /^周[日一二三四五六]$/;
-    const dateLine = screen.getAllByText((_, node) => {
-      const text = node?.textContent ?? "";
-      return /^\d{4}\.\d{2}\.\d{2} · /.test(text) && weekDayPattern.test(text.split(" · ")[1] ?? "");
-    });
-    expect(dateLine.length).toBeGreaterThan(0);
+    expect(await screen.findByText(/七月十六/)).toBeInTheDocument();
+  });
+
+  it("今日卡正文来自运势数据流：meta 是「干支 · 十神」、polish 是 LLM 润色句", async () => {
+    await renderHome("zh");
+    expect(await screen.findByText("甲子 · 休整蓄力")).toBeInTheDocument();
+    expect(screen.getByText("风从东来，宜收敛")).toBeInTheDocument();
   });
 
   /**
-   * 终审必修 8：无档案态不该有一个像判词的字（旧值「观」）跟卡片 meta 的
-   * 「你还没建档」互相拆台，也不该被用户/读屏软件误当成设计包四档之外的
-   * 第五档。改成明确的空态记号「—」——钉住风铃 alt 文案里确实是这个记号，
-   * 不是「观」/"Watch"。
+   * owner 打磨批指令 2：无档案访客不显示今日卡（原为静态文案卡 + 空态记号
+   * 「—」，终审必修 8 的那条断言随之作废——卡都不在了，记号无从谈起）。
+   * 判别信号：profile 落定后等待过场（role=status）撤下，卡仍不在场。
    */
-  it("无档案态用空态记号「—」，不是像判词的「观」（终审必修 8）", async () => {
+  it("无档案时不渲染今日卡", async () => {
+    activeProfileMock.mockResolvedValueOnce(null);
     await renderHome("zh");
-    const bell = screen.getByTestId("wind-bell");
-    const alt = bell.querySelector("img")!.getAttribute("alt") ?? "";
-    expect(alt).toContain("—");
-    expect(alt).not.toContain("观");
+    // 页面本体渲染完成 + 档案请求已落定（过场撤下），否则「卡不在」会因
+    // 「数据还没到」而恒真。
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.queryByTestId("today-card")).toBeNull();
   });
 });

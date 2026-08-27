@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
-import { dailyFortuneAction, dailyPolishAction, dailyBehaviorAction, ziweiHoroscopeAction } from "@/app/actions";
+import { dailyBehaviorAction, ziweiHoroscopeAction } from "@/app/actions";
 import { matchFortuneImage, MOOD_LABEL } from "@/lib/fortune-images";
 import { Emphasis, GanzhiBadge } from "@/components/ui";
 import { ScoreRing } from "@/components/ScoreRing";
@@ -16,26 +16,12 @@ import { SeasonRuler } from "@/components/charts/SeasonRuler";
 import { TwoColumn } from "@/components/TwoColumn";
 import { AskToday } from "./AskToday";
 import { useT } from "@/lib/i18n/I18nProvider";
-import { getCurrentSolarHou, type DailyFortune, type ZiweiHoroscope } from "@sojan/core";
+import { useDailyFortune, cacheGet, cacheSet, gradeOf } from "@/lib/useDailyFortune";
+import { getCurrentSolarHou, type ZiweiHoroscope } from "@sojan/core";
 
-// 按 (档案,日期,kind) 缓存 LLM 结果到 localStorage，避免重复调用。
-// ⚠️ 键前缀 `zhaojian.` 刻意保留旧品牌名、不随 2026-08-25 更名 Sojan 而改（owner 决策）：
-// 这是用户浏览器里已存在的键，改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度，
-// 而用户根本看不到这个字符串。同理见 lib/access.ts 的 SYNTHETIC_EMAIL_DOMAIN。
-function cacheGet(kind: string, pid: string, date: string): string | null {
-  try { return localStorage.getItem(`zhaojian.${kind}.${pid}.${date}`); } catch { return null; }
-}
-function cacheSet(kind: string, pid: string, date: string, v: string): void {
-  try { localStorage.setItem(`zhaojian.${kind}.${pid}.${date}`, v); } catch { /* ignore */ }
-}
-
-// 综合分 → 大字总评（返回 i18n key）
-function gradeOf(overall: number): "auspicious" | "smooth" | "neutral" | "cautious" {
-  if (overall >= 8) return "auspicious";
-  if (overall >= 6) return "smooth";
-  if (overall >= 4) return "neutral";
-  return "cautious";
-}
+// 按 (档案,日期,kind) 的 localStorage 缓存、gradeOf、流日+polish 取数逻辑均已
+// 移入 `lib/useDailyFortune.ts`（owner 打磨批指令 2：卷首今日卡复用同一份，
+// 两处逐字同源）。本页只保留自己独有的 behavior/horoscope 两块。
 
 /**
  * 判词强调块字号（终审必修 4）：`calendar.grade.*` 中文只有单字（吉/顺/平/谨），
@@ -83,12 +69,8 @@ export default function CalendarPage() {
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [today] = useState(() => new Date());
   const [selected, setSelected] = useState(() => ymd(new Date()));
-  const [fortune, setFortune] = useState<DailyFortune | null>(null);
-  const [polish, setPolish] = useState<string | null>(null);
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [horoscope, setHoroscope] = useState<ZiweiHoroscope | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [casting, setCasting] = useState(false); // 进入运势的品牌化过场（每会话一次）
   const [dark, setDark] = useState(false);
   const [fortuneImgError, setFortuneImgError] = useState(false);
   const selYear = selected.slice(0, 4);
@@ -117,16 +99,8 @@ export default function CalendarPage() {
     })();
   }, []);
 
-  // 测算过场：每会话首次进入运势播 ~2.1s
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem("zj.cast")) return;
-      sessionStorage.setItem("zj.cast", "1");
-    } catch { /* ignore */ }
-    setCasting(true);
-    const t = setTimeout(() => setCasting(false), 2100);
-    return () => clearTimeout(t);
-  }, []);
+  // （原「每会话一次测算过场」zj.cast 已随 owner 打磨批指令 7 删除——
+  // 路由切换过场已全局化，见 components/RouteCasting.tsx。）
 
   // 本年/本限 时序上下文（确定性，按年取）
   useEffect(() => {
@@ -137,37 +111,30 @@ export default function CalendarPage() {
     return () => { alive = false; };
   }, [profile, selYear]);
 
+  // 流日 + 轻润色：与卷首今日卡共用同一个 hook（lib/useDailyFortune.ts，只搬位置不改逻辑）。
+  const { fortune, polish, loading } = useDailyFortune(profile, selected);
+
+  // 心理行为宜忌（本页独有）：各自缓存未命中才调 LLM。⚠️ 必须等
+  // `fortune.date === selected`——hook 里 fortune 在新日期到达前仍是旧日期的值，
+  // 不钉这一条会把「旧日期的 fortune」算出的宜忌缓存进新日期的键。
   useEffect(() => {
     const p = profile;
     if (!p) return;
     let alive = true;
-    setLoading(true);
-    setPolish(cacheGet("polish", p.id, selected)); // 命中缓存先显示
     const bCache = cacheGet("behavior", p.id, selected);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 同步 localStorage 缓存到 state（与 HomeClient 挂载纠偏同类的既有认可模式）
     setBehavior(bCache ? (JSON.parse(bCache) as Behavior) : null);
-    dailyFortuneAction({ bazi: p.chart.bazi }, selected)
-      .then((f) => {
-        if (!alive) return;
-        setFortune(f);
-        // 轻润色 + 心理行为宜忌：各自缓存未命中才调 LLM
-        if (!cacheGet("polish", p.id, selected)) {
-          dailyPolishAction(f, p.nickname).then((line) => {
-            if (alive && line) { setPolish(line); cacheSet("polish", p.id, selected, line); }
-          });
-        }
-        if (!cacheGet("behavior", p.id, selected)) {
-          dailyBehaviorAction(f, p.nickname).then((b) => {
-            if (alive && b) { setBehavior(b); cacheSet("behavior", p.id, selected, JSON.stringify(b)); }
-          });
-        }
-      })
-      .finally(() => alive && setLoading(false));
+    if (!bCache && fortune && fortune.date === selected) {
+      dailyBehaviorAction(fortune, p.nickname).then((b) => {
+        if (alive && b) { setBehavior(b); cacheSet("behavior", p.id, selected, JSON.stringify(b)); }
+      });
+    }
     return () => {
       alive = false;
     };
-  }, [profile, selected]);
+  }, [profile, selected, fortune]);
 
-  if (profile === undefined) return <Centered>{t("calendar.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>
@@ -374,21 +341,13 @@ export default function CalendarPage() {
         {/* 七十二候标尺：index 来自 getCurrentSolarHou，不硬编码 */}
         <SeasonRuler index={solarHou.index} label={solarHou.hou} />
 
-        {/* 黄历：移动端保留（控制器裁定），桌面不出 */}
-        {fortune.almanacYi.length + fortune.almanacJi.length > 0 && (
-          <div data-testid="huangli" className="xl:hidden">
-            <div className="text-[11px] tracking-[0.3em] text-muted">{t("calendar.almanac")}</div>
-            <div className="mt-3 text-[13px] text-ink-2"><span style={{ color: "var(--color-wood)" }}>{t("calendar.yi")}</span>　{fortune.almanacYi.join("、") || t("calendar.none")}</div>
-            <div className="mt-1.5 text-[13px] text-ink-2"><span style={{ color: "var(--color-cinnabar)" }}>{t("calendar.ji")}</span>　{fortune.almanacJi.join("、") || t("calendar.none")}</div>
-          </div>
-        )}
+        {/* owner 打磨批指令 1：移动端黄历块（data-testid="huangli"）已全站删除。 */}
 
       </div>
     );
 
   return (
     <main>
-      {casting && <CastingOverlay title={t("calendar.calculating")} hint={t("common.casting")} mode="brief" />}
       <TwoColumn leftWidth={392} header={header} left={left} right={right} />
     </main>
   );

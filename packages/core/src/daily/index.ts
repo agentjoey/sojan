@@ -170,8 +170,12 @@ export function computeDailyFortune(chart: Pick<UnifiedChart, "bazi">, dateStr: 
     tone: prof.tone,
     interactions,
     favorableToday,
-    auspicious: [...prof.auspicious, ...almanacYi.slice(0, 2)],
-    caution: [...prof.caution, ...almanacJi.slice(0, 2)],
+    // owner 打磨批指令 1（黄历内容全站去除）：auspicious/caution 只取档案关系
+    // 自身的趋吉避祸，不再混入 almanacYi/Ji 前两条（此前降级版「趋吉 · 宜」会漏出
+    // 「祭祀/动土」这类传统黄历词条）。almanacYi/Ji 字段本身保留——TG daily
+    // 接口（api/tg/daily）的返回形状不变。
+    auspicious: [...prof.auspicious],
+    caution: [...prof.caution],
     almanacYi: almanacYi.slice(0, 6),
     almanacJi: almanacJi.slice(0, 6),
     lunarDate: `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,

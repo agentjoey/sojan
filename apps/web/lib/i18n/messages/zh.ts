@@ -4,7 +4,6 @@ export const zh = {
     loading: "加载中…",
     cancel: "取消",
     confirm: "确认",
-    casting: "排 盘 中",
     save: "保存",
     delete: "删除",
     edit: "编辑",
@@ -39,9 +38,9 @@ export const zh = {
     home: "首页",
     calendar: "运势",
     chart: "命盘",
-    // EP-nav-label-2（UI v3 C3）：/spirit 导航小字改为「掷筊」；大字方印字符「灵」
+    // UI v3 打磨批（owner 指令 6）：/spirit 导航小字改为「问事」；大字方印字符「灵」
     // 不变（lib/nav.ts 的 char），TG_ENTRIES 的对应项不动（TG 冻结）。
-    spirit: "掷筊",
+    spirit: "问事",
     fengshui: "风水",
     dream: "解梦",
     profiles: "我的",
@@ -119,8 +118,9 @@ export const zh = {
   },
   home: {
     heroTitle1: "你的命盘，",
+    // kickerHero（卷 首）web 卷首已不用（打磨批指令 5），但 TG 首页 PageHeader
+    // 仍在用（HomeClient inTg 分支）——TG 冻结，键保留。kickerToc 已全废，删。
     kickerHero: "卷 首",
-    kickerToc: "目 录",
     footerBrand: "照 见 · 东 方 命 理",
     ctaSecondary: "先看看流日 →",
     heroTitle2: "是一面镜子",
@@ -136,16 +136,6 @@ export const zh = {
     },
     // 卷首今日卡（TodayCard）的通用（非按档案个性化）文案——首页匿名可见，
     // 具体到人的判词/润色句/元数据仍在 /calendar 由 LLM 按档案生成。
-    today: {
-      weekday: "周{day}",
-      // 终审必修 8：无档案态不算真判词（展示层零推算），但同一张卡的
-      // meta 已经在说「你还没建档」，若在这里塞一个像判词的字（旧值「观」），
-      // 用户会误以为它是设计包四档（吉/顺/平/谨）之外的第五档。改成明确的
-      // 空态记号——不是「观」的翻译，是「此处无值」的通用符号。
-      emptyVerdict: "—",
-      polish: "先观其时，未必急于行动——完整流日解读，一点即达。",
-      meta: "登记出生信息，解锁你的专属流日解读",
-    },
     cards: {
       east: {
         label: "命理结构",
@@ -345,17 +335,12 @@ export const zh = {
       still: "宜守静",
     },
 
-    yi: "宜",
-    ji: "忌",
     favorableToday: "今日喜用",
     interaction: "流日{kind}命{withPillar}支",
     todayYi: "今日宜",
     todayJi: "今日忌",
     auspiciousYi: "趋吉 · 宜",
     cautionJi: "避祸 · 忌",
-
-    almanac: "黄历",
-    none: "—",
 
     dims: {
       career: "事业",
@@ -535,7 +520,6 @@ export const zh = {
     narrativeFailed: "叙述暂时生成不出来，下面的盘与建议不受影响。",
     narrativeDegraded: "本次叙述中有方位判断被系统纠正，可信度不足，已不展示；下面的盘与建议不受影响。",
     regenerate: "重新生成叙述",
-    castingTitle: "正在起你的八方盘",
     filterByDirection: "只看{direction}方",
     filterClear: "清除筛选",
     filterEmpty: "这个方位暂时没有对应的化解。",

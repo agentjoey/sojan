@@ -258,9 +258,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
   localStorage.clear();
-  // 首揭仪式（feat/fengshui-ui）：默认抑制定场，避免每条测试都被 2.1s 过场打扰；
-  // 专门的「首揭仪式」describe 会自己 removeItem。
-  sessionStorage.setItem("zj.fsReveal.p1", "1");
+  sessionStorage.clear();
   reportStore.clear();
   dwellingsFixture.current = [];
   dwellingsFixture.error = null;
@@ -1485,15 +1483,17 @@ describe("EP-fs-tg TG 会话：原生分段 Tab + 原生化解清单", () => {
  *   切回后 delay 必须不在（去掉 staggerIn 复位红）。
  */
 describe("2026-08 设计评审后续", () => {
-  it("首揭仪式：首次进入播风铃 CastingOverlay，同会话同一档案不重复播", async () => {
-    sessionStorage.removeItem("zj.fsReveal.p1");
-    const first = await renderPage();
-    await waitFor(() => expect(screen.getByText("正在起你的八方盘")).toBeInTheDocument());
-    first.unmount();
-    // 同会话第二次进入：不再播
+  it("页级首揭过场已删除（指令 7 过场全局化），盘扇区错峰入场保留", async () => {
     await renderPage();
     await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
+    // 页级 CastingOverlay（每会话每档案一次 + zj.fsReveal 门控）已随指令 7 拆除——
+    // 过场由全局 RouteCasting 承担，本页不再出现「正在起你的八方盘」。
     expect(screen.queryByText("正在起你的八方盘")).toBeNull();
+    // 错峰入场仍在：生气方（rank 1 → delay 0ms）的 animationDelay 确实接到了盘上。
+    // 这条同时是「调用点硬编码 staggerIn={false}」变异的守卫——那样这里必红。
+    const v = fs.personalDirections.SE;
+    const sectorName = `东南：${v.star}（${v.auspicious ? "吉" : "凶"}）`;
+    expect(screen.getByLabelText(sectorName).style.animationDelay).toBe("0ms");
   });
 
   it("remedyDirection 字面量断言：先长后短（中文方位名子串陷阱，评审 C2）", async () => {
@@ -1596,22 +1596,18 @@ describe("2026-08 设计评审后续", () => {
     }
   });
 
-  it("首揭仪式错峰只播一次：点扇区切走再切回命盘 tab 不重放（评审 I1）", async () => {
-    sessionStorage.removeItem("zj.fsReveal.p1");
+  it("错峰入场只播一次：点扇区切走再切回命盘 tab 不重放（评审 I1）", async () => {
     await renderPage();
-    await waitFor(() => expect(screen.getByText("正在起你的八方盘")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
 
-    // 首揭进行中：扇区带错峰 animationDelay（staggerIn=true 确实接到了盘上）。
-    // 这条同时是变异 C（调用点硬编码 staggerIn={false}）的守卫——那样首揭就
-    // 不再错峰，本断言变红。
+    // 档案刚落定：扇区带错峰 animationDelay（staggerIn=true 确实接到了盘上）。
     const v = fs.personalDirections.SE; // 生气方，rank 1 → delay 0ms
     const sectorName = `东南：${v.star}（${v.auspicious ? "吉" : "凶"}）`;
     expect(screen.getByLabelText(sectorName).style.animationDelay).toBe("0ms");
 
-    // 揭示结束：2100ms 定时器统一复位 revealing + staggerIn。用真实等待——
-    // 定时器在挂载时已按真实时钟排定，事后再开 fake timers 接管不到它；
-    // revealing/staggerIn 在同一个 setTimeout 回调里复位，overlay 消失即两者都已落定。
-    await waitFor(() => expect(screen.queryByText("正在起你的八方盘")).toBeNull(), { timeout: 4000 });
+    // 2100ms 后错峰复位。用真实等待——定时器在挂载时已按真实时钟排定，
+    // 事后再开 fake timers 接管不到它。
+    await waitFor(() => expect(screen.getByLabelText(sectorName).style.animationDelay).toBe(""), { timeout: 4000 });
 
     // 点扇区 → 化解 tab（盘随之卸载）
     fireEvent.click(screen.getByRole("button", { name: sectorName }));

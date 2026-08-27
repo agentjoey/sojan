@@ -7,6 +7,7 @@ import { hasTgSession, tgLoginWithWidget, tgLogout } from "@/lib/tg/client";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { Paywall } from "@/components/Paywall";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { Emphasis } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { LocaleSwitch } from "@/lib/i18n/switch";
@@ -433,11 +434,8 @@ export default function AccountPage() {
   }
 
   if (view.kind === "loading") {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-6" style={{ background: "var(--color-bg)" }}>
-        <p style={{ color: "var(--color-muted)" }}>{t("common.loading")}</p>
-      </main>
-    );
+    // owner 打磨批指令 7：加载态统一为持续版风铃过场（原为居中一行「加载中…」）。
+    return <CastingOverlay title={t("common.loading")} mode="pending" />;
   }
 
   const title =

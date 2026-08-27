@@ -4,10 +4,12 @@ import {
   computeUnifiedChart,
   computeDailyFortune,
   computeZiweiHoroscope,
+  getCurrentSolarHou,
   BirthInputSchema,
   type BirthInput,
   type UnifiedChart,
   type DailyFortune,
+  type SolarHou,
   type ZiweiHoroscope,
 } from "@sojan/core";
 import { polishDailyFortune, dailyBehaviorAdvice, generateTimeline, summarizeSpiritMemory, summarizeDreamEntry, summarizeJiaoEntry, generateDailySpiritGreeting, resolveLlmConfig, isLlmConfigured, type ReadingLanguage } from "@sojan/llm";
@@ -33,6 +35,17 @@ export async function dailyFortuneAction(
   dateStr: string,
 ): Promise<DailyFortune> {
   return computeDailyFortune(chart, dateStr);
+}
+
+/**
+ * 七十二候（owner 打磨批指令 2）：按调用方给的**访客本地日期**（YYYY-MM-DD）算。
+ * 首页今日卡/候标尺用——`getCurrentSolarHou` 依赖 lunar-typescript，不能进 `/`
+ * 的客户端 chunk（bundle 教训见 app/page.tsx 顶部注释），故走 server action；
+ * 由访客本地日期入参驱动，消除 ISR 服务端 UTC 快照与本地日历日的时区错位（M7）。
+ */
+export async function solarHouAction(dateStr: string): Promise<SolarHou> {
+  const [y, m, d] = dateStr.split("-").map(Number) as [number, number, number];
+  return getCurrentSolarHou(new Date(y, m - 1, d));
 }
 
 /** 运势日历轻润色：确定性流日 → 一句温和提点（EP-cal-llm）。无 key 时返回 null（静默降级）。 */

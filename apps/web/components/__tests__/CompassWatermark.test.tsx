@@ -32,4 +32,13 @@ describe("CompassWatermark 五层异速正反转", () => {
     const { container } = render(<CompassWatermark />);
     expect(container.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
   });
+
+  it("五个圆环一律用 line-strong（owner 打磨批指令 5：转盘线条加深）", () => {
+    const { container } = render(<CompassWatermark />);
+    const circles = container.querySelectorAll("circle[stroke]");
+    expect(circles.length).toBe(5);
+    for (const c of circles) {
+      expect(c.getAttribute("stroke")).toBe("var(--color-line-strong)");
+    }
+  });
 });

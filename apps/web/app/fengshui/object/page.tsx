@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { ObjectAdvisorForm } from "../ObjectAdvisorForm";
 
 const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
@@ -159,7 +160,7 @@ export default function FengshuiObjectPage() {
   const showProbeFailedNote = !!facing && probeFailed;
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <Centered>{t("fengshui.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

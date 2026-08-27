@@ -9,6 +9,7 @@ import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { timelineAction } from "@/app/actions";
 import { Card, BellLogo, cn } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 import { Markdown } from "@/components/Markdown";
 import { ReadingTabs } from "@/components/ReadingTabs";
@@ -166,7 +167,7 @@ export default function ChartPage() {
     }
   }
 
-  if (profile === undefined) return <Centered>{t("chart.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("chart.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>

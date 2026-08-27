@@ -18,4 +18,10 @@ describe("CastingOverlay 风铃主角过场", () => {
     expect(screen.queryByText("申")).toBeNull();
     expect(screen.queryByText("今")).toBeNull();
   });
+
+  it("route 模式（owner 打磨批指令 7：路由切换 1.2s 短版）", () => {
+    render(<CastingOverlay title="照见" mode="route" />);
+    expect(screen.getByRole("status")).toHaveClass("zj-casting-overlay-route");
+    expect(screen.getByText("照见")).toBeInTheDocument();
+  });
 });

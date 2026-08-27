@@ -443,6 +443,14 @@ export const zh = {
     followUpSubmit: "接着问",
     historyTitle: "最近问过的",
     newThrow: "换一件事问",
+    // UI v3 C3（03-screens 掷筊节 5c/3d/3e 新增）：
+    cardCta: "掷 筊 问 事",
+    followUpNote: "追问仍在这一卦之内 · 非预测、非诊断",
+    // 筊杯卡三列筊象释义的单字短注——不能用 OMEN_DESC_KEY 的长句：长句与揭晓屏
+    // 释义同文会让既有断言（getByText 唯一匹配）撞车，且三列卡片放不下整句。
+    omenShengShort: "允",
+    omenXiaoShort: "未明",
+    omenYinShort: "不允",
     // 危机前置拦截（EP-jiao 最终评审补项，见 lib/jiao-crisis.ts）：命中最窄一层
     // 自伤/医疗急症词表时，不掷筊，直接换成这三个键渲染的求助引导屏。文案克制、
     // 不说教，热线信息只给确知准确、长期稳定的号码（120/110 是中国大陆通用应急

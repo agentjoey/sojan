@@ -439,6 +439,14 @@ export const en: Messages = {
     followUpSubmit: "Ask more",
     historyTitle: "Recent questions",
     newThrow: "Ask about something else",
+    // UI v3 C3 (03-screens jiao 5c/3d/3e additions):
+    cardCta: "Cast the blocks",
+    followUpNote: "Follow-ups stay within this throw · not prediction, not diagnosis",
+    // One-word glosses for the card's three-omen legend — the long omen*Desc strings
+    // would collide with the reveal screen's identical text (getByText uniqueness).
+    omenShengShort: "Assent",
+    omenXiaoShort: "Unclear",
+    omenYinShort: "Dissent",
     // Crisis pre-throw guard (EP-jiao final-review gap-fill, see lib/jiao-crisis.ts):
     // when the narrow self-harm/medical-emergency wordlist hits, we skip the throw
     // entirely and swap in this guidance instead. Only numbers we're confident stay

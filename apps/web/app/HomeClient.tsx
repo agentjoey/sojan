@@ -180,7 +180,7 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
           <section className="relative overflow-hidden px-7 pt-12 lg:px-16 lg:pt-20">
             <CompassWatermark
               className="pointer-events-none absolute -right-24 top-10 w-[300px] lg:-right-16 lg:w-[380px]"
-              style={{ opacity: 0.14 }}
+              style={{ opacity: 0.22 }}
             />
 
             {/* owner 打磨批指令 3/5：独立 logo+「照见」行与「卷 首」眉标已移除

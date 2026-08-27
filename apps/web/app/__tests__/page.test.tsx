@@ -215,6 +215,12 @@ describe("UI v3 卷首（5a）", () => {
     expect(container.querySelector('[data-testid="compass-ticks"]')).not.toBeNull();
   });
 
+  it("转盘水印整体不透明度已加深（owner 打磨批指令 5：0.14 → 0.22）", async () => {
+    const { container } = await renderHome();
+    const svg = container.querySelector<HTMLElement>('[data-testid="compass-ticks"]')!.closest("svg")!;
+    expect(svg.style.opacity).toBe("0.22");
+  });
+
   it("Hero 不再有独立 logo+「照见」行（owner 打磨批指令 3：品牌词已上移进胶囊）", async () => {
     await renderHome();
     // web 臂内「照见」只应剩页脚 footerBrand（带空格的「照 见 · 东 方 命 理」，精确匹配撞不上）。

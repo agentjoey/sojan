@@ -18,8 +18,10 @@ import type { CSSProperties } from "react";
  * 既有的 `prefers-reduced-motion` 降级块（`*, *::before, *::after`
  * 通配）会把 `animation-duration` 压到 0.001ms，水印随之静止但仍可见。
  *
- * 配色一律走 CSS 变量令牌（`--color-ink` / `--color-line` /
- * `--color-line-strong` / `--color-cinnabar`），不裸写十六进制。
+ * 配色一律走 CSS 变量令牌（`--color-ink` / `--color-line-strong` /
+ * `--color-cinnabar`），不裸写十六进制。owner 打磨批指令 5：全部圆环统一
+ * `--color-line-strong`（此前地支/爻画两环用更浅的 `--color-line`，
+ * 水印整体太浅看不清），容器不透明度 0.14 → 0.22（HomeClient 处）。
  */
 
 const CX = 160;
@@ -83,7 +85,7 @@ export function CompassWatermark({ className, style }: { className?: string; sty
 
       {/* 十二地支环：190s 反转 */}
       <g data-testid="compass-branches" style={spinStyle("zjSpinRev", 190)}>
-        <circle cx={CX} cy={CY} r={124} fill="none" stroke="var(--color-line)" strokeWidth={1} />
+        <circle cx={CX} cy={CY} r={124} fill="none" stroke="var(--color-line-strong)" strokeWidth={1} />
         {EARTHLY_BRANCHES.map((ch, i) => {
           const [x, y] = polar(124, i * 30);
           return (
@@ -103,7 +105,7 @@ export function CompassWatermark({ className, style }: { className?: string; sty
 
       {/* 八卦爻画环：110s 正转 */}
       <g data-testid="compass-trigrams" style={spinStyle("zjSpinSlow", 110)}>
-        <circle cx={CX} cy={CY} r={96} fill="none" stroke="var(--color-line)" strokeWidth={1} />
+        <circle cx={CX} cy={CY} r={96} fill="none" stroke="var(--color-line-strong)" strokeWidth={1} />
         {TRIGRAMS.map((yaos, i) => {
           const deg = i * 45;
           const [bx, by] = polar(96, deg);

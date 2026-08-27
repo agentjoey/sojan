@@ -243,50 +243,55 @@ export default function ChartPage() {
   // （与 5b 入口条字面顺序相反），别「顺手改回来」。
   const right = (
     <>
-      {/* 三段式解读 */}
-      <section id="reading-tabs" data-testid="reading-tabs-anchor">
-        {/* 右列第一块：桌面上与左列頭部对齐，去掉自己的上边距/分隔线/上内边距
-            （I3）——移动端单列态紧接在 ChartToc 之后，那条线仍是有意义的分隔，
-            必须断点门控，不能无条件去掉。 */}
-        <ChartBlock label={t("chart.readingTitle")} className="xl:mt-0 xl:border-t-0 xl:pt-0">
-          {!inTg && !reading && !streaming && (
-            <button
-              onClick={generate}
-              className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"
-              style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-card)", color: "var(--color-on-ink)" }}
-            >
-              <span>
-                <span className="block text-[17px] font-semibold">{t("chart.generateReading")}</span>
-                <span className="mt-1 block text-[13px] opacity-85">{t("chart.generateReadingSub")}</span>
-              </span>
-              <span className="text-[22px] transition-transform duration-200 group-hover:translate-x-1">✦</span>
-            </button>
-          )}
-          {/* EP-motion：首字前的空等此前只有一条纯文字+闪烁光标；换成品牌风铃常驻摆动
-              （复用 CastingOverlay 同款 idle 语义），首字一到就被 ReadingTabs 的流式打字机
-              接管——这段不用全屏 CastingOverlay，因为上方八字/紫微/西方盘已经渲染在页面里，
-              全屏遮罩会让用户失去已经看到的内容。 */}
-          {streaming && !reading && (
-            <Card>
-              <p className="flex items-center gap-2 text-[14px] text-muted">
-                <BellLogo size={18} />
-                {t("chart.generating")}
-              </p>
-            </Card>
-          )}
-          {err && (
-            <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{err}</div>
-          )}
-          {reading && <ReadingTabs sections={sections} chart={chart} streaming={streaming} />}
-        </ChartBlock>
-      </section>
+      {/* 三段式解读：id/testid 直接落在 ChartBlock 本体上（M7）——此前外层多套一层
+          `<section id="reading-tabs">` 只为挂 id/testid，ChartBlock 自己又是一个
+          `<section>`，两层嵌套纯属冗余。 */}
+      <ChartBlock
+        id="reading-tabs"
+        data-testid="reading-tabs-anchor"
+        label={t("chart.readingTitle")}
+        // 右列第一块：桌面上与左列頭部对齐，去掉自己的上边距/分隔线/上内边距
+        // （I3）——移动端单列态紧接在 ChartToc 之后，那条线仍是有意义的分隔，
+        // 必须断点门控，不能无条件去掉。
+        className="xl:mt-0 xl:border-t-0 xl:pt-0"
+      >
+        {!inTg && !reading && !streaming && (
+          <button
+            onClick={generate}
+            className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"
+            style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-card)", color: "var(--color-on-ink)" }}
+          >
+            <span>
+              <span className="block text-[17px] font-semibold">{t("chart.generateReading")}</span>
+              <span className="mt-1 block text-[13px] opacity-85">{t("chart.generateReadingSub")}</span>
+            </span>
+            {/* M8：hover 只许变色，不得位移/放大/投影（06-desktop §4）——
+                此前 `group-hover:translate-x-1` 违规，改为箭头变色（on-ink → 金色）。 */}
+            <span data-testid="generate-arrow" className="text-[22px] text-[var(--color-on-ink)] transition-colors duration-200 group-hover:text-[var(--color-on-ink-gold)]">✦</span>
+          </button>
+        )}
+        {/* EP-motion：首字前的空等此前只有一条纯文字+闪烁光标；换成品牌风铃常驻摆动
+            （复用 CastingOverlay 同款 idle 语义），首字一到就被 ReadingTabs 的流式打字机
+            接管——这段不用全屏 CastingOverlay，因为上方八字/紫微/西方盘已经渲染在页面里，
+            全屏遮罩会让用户失去已经看到的内容。 */}
+        {streaming && !reading && (
+          <Card>
+            <p className="flex items-center gap-2 text-[14px] text-muted">
+              <BellLogo size={18} />
+              {t("chart.generating")}
+            </p>
+          </Card>
+        )}
+        {err && (
+          <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{err}</div>
+        )}
+        {reading && <ReadingTabs sections={sections} chart={chart} streaming={streaming} />}
+      </ChartBlock>
 
-      {/* 紫微 */}
-      <section id="ziwei-board" data-testid="ziwei-board-anchor">
-        <ChartBlock label={t("chart.ziweiTitle")}>
-          <ZiweiBoard ziwei={chart.ziwei} />
-        </ChartBlock>
-      </section>
+      {/* 紫微：id/testid 同理直接落在 ChartBlock 本体上（M7）。 */}
+      <ChartBlock id="ziwei-board" data-testid="ziwei-board-anchor" label={t("chart.ziweiTitle")}>
+        <ZiweiBoard ziwei={chart.ziwei} />
+      </ChartBlock>
 
       {/* 西方本命盘（降级隐藏） */}
       <ChartBlock label={t("chart.westernTitle")}>
@@ -332,9 +337,21 @@ export default function ChartPage() {
 // 图表区块：小标签 + 直接落纸底，区块间 1px 细线分隔（取代旧 Section 的朱砂破折号 + Card 包装）。
 // borderTop 改用 Tailwind 类而非内联 style（I3）——内联优先级恒高于类，
 // 调用方传入的 `xl:border-t-0` 等断点类压不掉内联 style，此坑本仓已踩过一次。
-function ChartBlock({ label, children, className }: { label: React.ReactNode; children: React.ReactNode; className?: string }) {
+function ChartBlock({
+  id,
+  "data-testid": testId,
+  label,
+  children,
+  className,
+}: {
+  id?: string;
+  "data-testid"?: string;
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <section className={cn("mt-10 border-t border-[var(--color-line)] pt-8", className)}>
+    <section id={id} data-testid={testId} className={cn("mt-10 border-t border-[var(--color-line)] pt-8", className)}>
       <h2 className="mb-6 text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>{label}</h2>
       {children}
     </section>

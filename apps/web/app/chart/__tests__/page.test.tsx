@@ -162,4 +162,33 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
       expect.stringContaining("Three-Part Reading"),
     ]);
   });
+
+  // M8：解读按钮的箭头 hover 此前用 `group-hover:translate-x-1`，违反
+  // 06-desktop §4「hover 只改 border-color 与文字/箭头颜色，不得投影/位移/放大」。
+  it("解读按钮 hover 只变色，不位移（06-desktop §4）", async () => {
+    await renderChart();
+    const arrow = screen.getByTestId("generate-arrow");
+    expect(arrow.className).not.toContain("translate-x");
+    expect(arrow.className).not.toContain("scale-");
+  });
+
+  // M7：`<section id="reading-tabs">` 里直接套 `ChartBlock` 的 `<section>`是多余
+  // 外层——id 应直接落在 ChartBlock 上，没有为了挂 id 而多包一层 section。
+  it("锚点目标的 id 直接落在 ChartBlock 上，没有多余的外层 section", async () => {
+    await renderChart();
+    const el = document.getElementById("reading-tabs");
+    expect(el).not.toBeNull();
+    expect(el!.tagName.toLowerCase()).toBe("section");
+    // 外层不该再套一个 section 只为挂 id（此断言本身在改前也恒真——右列的直接
+    // 父容器是 TwoColumn 的 <div data-testid="two-col-right">，不是 section，
+    // 挪 id 前后都成立，不能靠它单独判定；下两条才是真正的差异点）。
+    expect(el!.parentElement?.tagName.toLowerCase()).not.toBe("section");
+    // 真正的差异点 1：id 所在元素本身必须是 ChartBlock 的本体（带它的结构类），
+    // 而不是一个空壳 <section id="reading-tabs"> 之外再套一层 ChartBlock。
+    expect(el!.className).toContain("border-t");
+    // 真正的差异点 2：ChartBlock 自己也是 <section>——如果 id 挂在外层空壳上，
+    // 内部还会再嵌一层 ChartBlock 的 <section>；id 直接落在 ChartBlock 本体后，
+    // 内部不应再出现第二层 section。
+    expect(el!.querySelector("section")).toBeNull();
+  });
 });

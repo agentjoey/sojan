@@ -83,7 +83,9 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
     setOpen(false);
   }
 
-  const contextLabel = label ?? t(labelKeyForPath(currentPath));
+  // owner 打磨批指令 3：首页路由下胶囊不再显示「首页」，改显品牌词「照见」
+  // （卷首 Hero 里独立的 logo+「照见」行同批移除，品牌词由胶囊承担）。
+  const contextLabel = label ?? (currentPath === "/" ? t("common.brand") : t(labelKeyForPath(currentPath)));
 
   function close() {
     setOpen(false);
@@ -136,7 +138,7 @@ export function MobileShell({ currentPath }: { currentPath: string }) {
             minHeight: 44,
           }}
         >
-          <BellLogo size={17} motion="ring" />
+          <BellLogo size={17} motion="idle" />
           <span>{open ? t("common.brand") : contextLabel}</span>
         </Link>
 

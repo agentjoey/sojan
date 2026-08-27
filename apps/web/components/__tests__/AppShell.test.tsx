@@ -301,6 +301,31 @@ describe("UI v3 移动外壳", () => {
     expect(capsule).toHaveTextContent("命盘");
   });
 
+  it("首页路由下胶囊显示品牌词「照见」而非「首页」（owner 打磨批指令 3）", async () => {
+    currentPath = "/";
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule).toHaveTextContent("照见");
+    expect(capsule).not.toHaveTextContent("首页");
+    // 链接行为不变：关闭态仍链到 /profiles（R1 裁定只改了文字，没改去向）。
+    expect(capsule.getAttribute("href")).toBe("/profiles");
+  });
+
+  it("胶囊风铃常驻循环微摆（motion=idle，owner 打磨批指令 4）", async () => {
+    const { AppShell } = await import("../AppShell");
+    const { I18nProvider } = await import("@/lib/i18n/I18nProvider");
+    render(<AppShell><div /></AppShell>, {
+      wrapper: ({ children }) => <I18nProvider locale="zh">{children}</I18nProvider>,
+    });
+    const capsule = screen.getByTestId("shell-capsule");
+    expect(capsule.querySelector(".zj-bell-idle")).not.toBeNull();
+    expect(capsule.querySelector(".zj-bell-ring")).toBeNull();
+  });
+
   it("页面声明语境词时优先用声明值", async () => {
     const { AppShell } = await import("../AppShell");
     const { useShellContext } = await import("../ShellContext");

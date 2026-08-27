@@ -134,6 +134,18 @@ beforeEach(() => {
   supabaseSession.current = { access_token: "test-access-token" };
 });
 
+describe("owner 打磨批指令 7：档案读取期挂持续版过场", () => {
+  it("profile 永远 pending 时页面停在 CastingOverlay（pending），不再是 Centered 文字", async () => {
+    const { getActiveProfile } = await import("@/lib/profiles");
+    vi.mocked(getActiveProfile).mockReturnValueOnce(new Promise(() => {}));
+    await renderSpiritPage();
+    const overlay = screen.getByRole("status");
+    expect(overlay).toHaveClass("zj-casting-overlay-pending");
+    expect(overlay).toHaveTextContent("正在读取档案");
+    // 回退成 <Centered> 文字（旧实现）时没有 role=status，上面 getByRole 直接红。
+  });
+});
+
 describe("回归：/spirit 不消费 ?topic=fengshui&q=<动作文本>（该参数落入掷筊闸门，不再 bypass）", () => {
   // 修复轮（评审 Critical）：撤回 topic=portrait / topic=fengshui&q= 两条深链
   // autoSend bypass——它们曾经绕过掷筊闸门直接进对话，与 EP-jiao「/spirit 收缩为

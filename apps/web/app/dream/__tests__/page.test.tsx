@@ -109,6 +109,18 @@ afterEach(() => {
 });
 
 describe("最终评审 I-1：/dream 页面级 flag 门控", () => {
+  it("档案读取期挂持续版过场，不再是白屏（owner 打磨批指令 7：原裸 return null）", async () => {
+    // 让 getActiveProfile 永远 pending——页面必须停在 pending 过场（role=status），
+    // 而不是什么都没有。mock 在模块工厂里定义，须走可变槽位替换。
+    const { getActiveProfile } = await import("@/lib/profiles");
+    vi.mocked(getActiveProfile).mockReturnValueOnce(new Promise(() => {}));
+    await renderDreamPage();
+    const overlay = screen.getByRole("status");
+    expect(overlay).toHaveClass("zj-casting-overlay-pending");
+    // 回退成 return null 时（旧实现）这里整页空白，上面 getByRole 直接红。
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
   it("flag 开：渲染解梦输入表单（textarea 在场）", async () => {
     await renderDreamPage();
     // 等 profile 加载完、早退（return null）结束后表单出现

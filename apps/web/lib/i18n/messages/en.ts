@@ -33,9 +33,9 @@ export const en: Messages = {
     home: "Home",
     calendar: "Fortune",
     chart: "Chart",
-    // EP-nav-label-2 (UI v3 C3): /spirit nav label is now 掷筊; the seal char 灵
-    // stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
-    spirit: "掷筊 (Jiao)",
+    // UI v3 polish batch (owner directive 6): /spirit nav label is now 问事; the seal
+    // char 灵 stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
+    spirit: "问事 (Jiao)",
     fengshui: "Feng Shui",
     dream: "Dream",
     profiles: "Me",

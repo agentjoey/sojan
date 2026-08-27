@@ -47,6 +47,13 @@ describe("lib/nav：导航目录与 flag 门控的单一事实源", () => {
     expect(ids).toEqual(["calendar", "fengshui", "chart"]);
   });
 
+  it("/spirit 导航小字两个 locale 都是「问事」（en 走「中文 (English gloss)」格式）", async () => {
+    const { zh } = await import("../i18n/messages/zh");
+    const { en } = await import("../i18n/messages/en");
+    expect(zh.nav.spirit).toBe("问事");
+    expect(en.nav.spirit).toBe("问事 (Jiao)");
+  });
+
   it("目录里每一项都有 href / char / labelKey", async () => {
     const nav = await loadNav({});
     for (const [id, item] of Object.entries(nav.NAV_CATALOG)) {

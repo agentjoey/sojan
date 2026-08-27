@@ -269,7 +269,12 @@ export default function ChartPage() {
               <span className="mt-1 block text-[13px] opacity-85">{t("chart.generateReadingSub")}</span>
             </span>
             {/* M8：hover 只许变色，不得位移/放大/投影（06-desktop §4）——
-                此前 `group-hover:translate-x-1` 违规，改为箭头变色（on-ink → 金色）。 */}
+                此前 `group-hover:translate-x-1` 违规，已删除。
+                R6：hover **不变色**——箭头改金（`on-ink-gold`）会让对比度从
+                5.40:1 跌到 3.31:1（22px 常规字重不吃大字豁免）；不变色反而
+                升到 6.91:1，hover 反馈由按钮背景变深（`hover:bg-cinnabar-press`）
+                承担。别再把 `group-hover:text-[var(--color-on-ink-gold)]` 加回来——
+                见 I2 的 `not.toMatch(/hover:text-/)` 守卫。 */}
             <span data-testid="generate-arrow" className="text-[22px] text-[var(--color-on-ink)]">✦</span>
           </button>
         )}

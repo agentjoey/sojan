@@ -55,6 +55,8 @@ describe("ReadingTabs（3c）", () => {
     renderTabs();
     const bar = screen.getByTestId("reading-progress-fill");
     expect(bar.getAttribute("style")).toContain("34%");
+    fireEvent.click(screen.getByTestId("reading-tab-心理"));
+    expect(screen.getByTestId("reading-progress-fill").getAttribute("style")).toContain("67%");
     fireEvent.click(screen.getByTestId("reading-tab-共振"));
     expect(screen.getByTestId("reading-progress-fill").getAttribute("style")).toContain("100%");
   });
@@ -97,9 +99,11 @@ describe("ReadingTabs（3c）", () => {
     expect(style).not.toContain("--color-metal");
   });
 
-  it("正文用 3c 专用排版类，不是共用基类单独出现", () => {
+  it("正文同时带基类与 3c 修饰类（不是只剩 3c 类、基类被替换掉）", () => {
     renderTabs();
-    expect(screen.getByTestId("reading-body").className).toContain("reading-prose-3c");
+    const classes = screen.getByTestId("reading-body").className.split(/\s+/);
+    expect(classes).toContain("reading-prose");
+    expect(classes).toContain("reading-prose-3c");
   });
 
   it("streaming 且当前段无内容时给的是生成中提示，不是空白", () => {
@@ -109,5 +113,16 @@ describe("ReadingTabs（3c）", () => {
       </I18nProvider>,
     );
     expect(screen.getByTestId("reading-head").textContent).not.toBe("");
+  });
+
+  it("心理段在 western 为 null（不知时辰/缺出生地降级路径）时：chip 列表与承重事实块都不渲染，但结论与正文仍在", () => {
+    // CHART fixture 的 western 本就是 null——xinChips() 对此返回 []，
+    // 使得 chip 列表与 load-bearing-block 共用的 `cur.chips.length > 0` 双双为假。
+    renderTabs();
+    fireEvent.click(screen.getByTestId("reading-tab-心理"));
+    expect(screen.queryByTestId("reading-chips")).toBeNull();
+    expect(screen.queryByTestId("load-bearing-block")).toBeNull();
+    expect(screen.getByTestId("reading-head").textContent).toBe("心理结论一句。");
+    expect(screen.getByTestId("reading-body").textContent).toContain("心理正文段落");
   });
 });

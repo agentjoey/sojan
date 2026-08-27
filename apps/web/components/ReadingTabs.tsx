@@ -121,7 +121,7 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
           <div data-testid="reading-head" className="mt-2 text-[14px]" style={{ color: "var(--color-muted)" }}>{streaming ? t("chart.generating") : "—"}</div>
         )}
         {cur.chips.length > 0 && (
-          <div className="mt-3.5 flex flex-wrap gap-1.5">
+          <div data-testid="reading-chips" className="mt-3.5 flex flex-wrap gap-1.5">
             {cur.chips.map((ch, i) => (
               <Chip key={i}>{ch}</Chip>
             ))}
@@ -132,6 +132,12 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
             <Markdown text={rest} />
           </div>
         )}
+        {/* 说明块与 chip 列表共用 `cur.chips.length > 0`——这是有意的耦合，不是漏写条件：
+            文案「以上结论只依据下列已排定的盘面事实」里的「下列」需要真有一份列表才成立，
+            列表为空时还显示这句等于指向空气，比不显示更糟。
+            后果：`chart.western` 为 null 时（不知出生时辰/缺出生地的降级路径，`xinChips` 直接
+            返回 []），心理段（tab === "心理"）会两者一起不渲染——`reading-head`/`reading-body`
+            仍照常显示，缺的只是 chip 与这条说明块。见测试「心理段在 western 为 null 时……」。 */}
         {cur.chips.length > 0 && (
           <div
             data-testid="load-bearing-block"

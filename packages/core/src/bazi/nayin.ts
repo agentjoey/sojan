@@ -19,8 +19,13 @@ export function deriveNayinZodiac(yearPillar: string): { nayin: string; zodiac: 
   if (!nayin) return null;
   // LunarUtil.ZHI / SHENGXIAO 都是 1-indexed（[0] 为空串），indexOf 找不到时返回 -1
   const zhiIndex = LunarUtil.ZHI.indexOf(gz[1]);
+  // 不可达守卫：能过上面 `LunarUtil.NAYIN[gz]` 查找的 gz 必是 60 甲子里的合法
+  // 干支组合，其地支字符必在 `LunarUtil.ZHI` 里、indexOf 不可能返回 -1 或 0
+  // （[0] 是占位空串）；保留为防御，不为它硬凑测试用例。
   if (zhiIndex < 1) return null;
   const zodiac = LunarUtil.SHENGXIAO[zhiIndex];
+  // 不可达守卫：zhiIndex 已通过上面的 `>= 1` 检查，`LunarUtil.SHENGXIAO` 与
+  // `LunarUtil.ZHI` 同长同序 1-indexed，该下标必有对应生肖；保留为防御。
   if (!zodiac) return null;
   return { nayin, zodiac };
 }

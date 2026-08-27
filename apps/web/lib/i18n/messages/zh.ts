@@ -243,7 +243,10 @@ export const zh = {
     kickerResonance: "共振",
     readingSaved: "此解读已为你保存，下次回到命盘可直接查看。",
     resonanceNote: "※ 仅在「内在世界」高置信锚点谈共振，非硬等价。",
-    resonanceExampleChip: "福德宫 ↔ 月亮 · 土星",
+    resonanceIllustrativeChip: "福德宫 ↔ 月亮 · 土星",
+    loadBearingTitle: "承重事实",
+    loadBearingNote: "以上结论只依据下列已排定的盘面事实，不含模型自行推算。",
+    nextSection: "下一段 · {name} →",
 
     pillarYear: "年",
     pillarMonth: "月",
@@ -276,6 +279,11 @@ export const zh = {
     birthMutagens: "生年四化",
     bodyPalaceSuffix: "身",
 
+    ziweiSchoolZhongzhou: "中州派",
+    ziweiSchoolDefault: "全书派",
+    bodyPalaceSame: "身宫同度",
+    ziweiBoardHint: "点任一宫查看该宫详情；空宫显示借星。",
+
     palaceDetailStars: "主星：{stars}",
     palaceDetailEmpty: "本宫无主星，借三方四正（{palaces}）之星：{stars}",
     mutagenLegendTitle: "四化",
@@ -298,6 +306,7 @@ export const zh = {
     selfPortraitSubtitle: "由命盘结构与自我自陈合成的内在侧写",
     tocZiwei: "紫微十二宫",
     tocReading: "三段式解读",
+    tocAria: "命盘页内导航",
   },
   calendar: {
     kicker: "流 日",

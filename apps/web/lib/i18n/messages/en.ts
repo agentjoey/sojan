@@ -236,7 +236,10 @@ export const en: Messages = {
     kickerResonance: "Resonance · 共振",
     readingSaved: "This reading has been saved; return to Chart to view it again.",
     resonanceNote: "※ 仅在「内在世界 (inner world)」高置信锚点谈共振，非硬等价。",
-    resonanceExampleChip: "福德宫 (Life Palace) ↔ 月亮 (Moon) · 土星 (Saturn)",
+    resonanceIllustrativeChip: "福德宫 (Life Palace) ↔ 月亮 (Moon) · 土星 (Saturn)",
+    loadBearingTitle: "Load-Bearing Facts",
+    loadBearingNote: "The reading above rests only on the chart facts listed here — nothing inferred by the model.",
+    nextSection: "Next · {name} →",
 
     pillarYear: "年 (Year)",
     pillarMonth: "月 (Month)",
@@ -269,6 +272,11 @@ export const en: Messages = {
     birthMutagens: "生年四化 (Natal Four Transforms)",
     bodyPalaceSuffix: "身 (Body)",
 
+    ziweiSchoolZhongzhou: "中州派 (Zhongzhou School)",
+    ziweiSchoolDefault: "全书派 (Quanshu School)",
+    bodyPalaceSame: "身宫同度 (Body Palace conjunct)",
+    ziweiBoardHint: "Tap any palace for its detail; empty palaces show borrowed stars.",
+
     palaceDetailStars: "主星 (Major Stars): {stars}",
     palaceDetailEmpty: "This palace has no major stars — stars are borrowed from its 三方四正 (Triad) ({palaces}): {stars}",
     mutagenLegendTitle: "四化 (Four Transforms)",
@@ -291,6 +299,7 @@ export const en: Messages = {
     selfPortraitSubtitle: "An inner profile synthesized from chart structure and self-reported traits.",
     tocZiwei: "Twelve Palaces",
     tocReading: "Three-Part Reading",
+    tocAria: "Chart page sections",
   },
   calendar: {
     kicker: "Daily Fortune",

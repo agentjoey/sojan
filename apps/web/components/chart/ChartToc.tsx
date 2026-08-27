@@ -25,7 +25,11 @@ const ROWS = [
 export function ChartToc() {
   const t = useT();
   return (
-    <nav className="mt-8 xl:hidden" style={{ borderTop: "1px solid var(--color-line)" }}>
+    <nav
+      aria-label={t("chart.tocAria")}
+      className="mt-8 xl:hidden"
+      style={{ borderTop: "1px solid var(--color-line)" }}
+    >
       {ROWS.map(({ href, key }) => (
         <a
           key={href}

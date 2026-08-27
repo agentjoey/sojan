@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act, within } from "@testing-library/react";
+import { render, screen, cleanup, act, within, waitFor } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
@@ -144,12 +144,21 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
 
   // I6：当下时序缓存策略（spec §8「缓存策略与 LLM 调用逐字不动」）此前零覆盖——
   // 时序块能不能出现、算出的结果有没有按 (档案,年) 落盘缓存，全仓没有一条断言。
-  it("当下时序：mock LLM 结果渲染，且按 (档案,年) 写入 localStorage 缓存", async () => {
+  it("当下时序：mock LLM 结果渲染", async () => {
     timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
     await renderChart();
     const right = screen.getByTestId("two-col-right");
     expect(await within(right).findByText(/流年上下文占位内容/)).toBeInTheDocument();
-    expect(localStorage.getItem(`zhaojian.timeline.${profile.id}.${new Date().getFullYear()}`)).not.toBeNull();
+  });
+
+  // R9：与上一条拆成独立用例——若断言排在上一条的 findByText 之后，注释掉时序
+  // JSX 会先让 findByText 变红、走不到这里，缓存断言就没被独立 mutation 证明过。
+  // 这里用 waitFor 单独等 localStorage 落盘，不依赖任何 JSX/文本断言先行通过。
+  it("当下时序：结果按 (档案,年) 写入 localStorage 缓存", async () => {
+    timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
+    await renderChart();
+    const key = `zhaojian.timeline.${profile.id}.${new Date().getFullYear()}`;
+    await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
   });
 
   // M2：`renderChart(locale)` 的 locale 参数此前从未被传入过（死参数），spec §9
@@ -161,5 +170,57 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
       expect.stringContaining("Twelve Palaces"),
       expect.stringContaining("Three-Part Reading"),
     ]);
+  });
+
+  // M8：解读按钮的箭头 hover 此前用 `group-hover:translate-x-1`，违反
+  // 06-desktop §4「hover 只改 border-color 与文字/箭头颜色，不得投影/位移/放大」。
+  // I2（C2-2 终审）：此前只断言不位移/不放大，没断言不变色——把 R6 删掉的
+  // `group-hover:text-[var(--color-on-ink-gold)]` 原样加回去也照样全绿（金色 hover
+  // 会让对比度从 5.40:1 跌到 3.31:1，22px 常规字重不吃大字豁免，见 bf4ede9）。
+  // 补一条 `not.toMatch(/hover:text-/)` 钉死「hover 既不位移也不变色」的另一半。
+  it("解读按钮箭头 hover 既不位移也不变色（R6：变色会跌到 3.31:1）", async () => {
+    await renderChart();
+    const arrow = screen.getByTestId("generate-arrow");
+    expect(arrow.className).not.toContain("translate-x");
+    expect(arrow.className).not.toContain("scale-");
+    expect(arrow.className).not.toMatch(/hover:text-/);
+  });
+
+  // I4（C2-2 终审）：右列首块此前用 `xl:mt-0`，实测 1440×900 下页头底线与右列首个
+  // <h2> 同为 y=176（gap 0），而左列首元素 ChartIdentity 是 y=200（gap 24）——
+  // 两列头部并不齐，尽管当时的注释写着「与左列頭部对齐」。左列的 24px 间距来自
+  // ChartIdentity 外层 `mt-8 xl:mt-6`；右列第一个 ChartBlock 应该用同一个
+  // `xl:mt-6`，只保留去线去内边距（`xl:border-t-0 xl:pt-0`），不该把外边距也清零。
+  it("桌面两栏头部对齐：右列首块的 xl:mt-6 与左列首元素一致（不是 xl:mt-0）", async () => {
+    await renderChart();
+    const dayMasterLine = screen.getByTestId("day-master-line");
+    const leftFirst = dayMasterLine.parentElement!; // ChartIdentity 外层 div（mt-8 xl:mt-6）
+    const rightFirst = screen.getByTestId("reading-tabs-anchor");
+    expect(leftFirst.className).toContain("xl:mt-6");
+    expect(rightFirst.className).toContain("xl:mt-6");
+    expect(rightFirst.className).not.toContain("xl:mt-0");
+    // 去线去内边距在断点门控下仍保留（移动端单列态那条线仍是有意义的分隔）
+    expect(rightFirst.className).toContain("xl:border-t-0");
+    expect(rightFirst.className).toContain("xl:pt-0");
+  });
+
+  // M7：`<section id="reading-tabs">` 里直接套 `ChartBlock` 的 `<section>`是多余
+  // 外层——id 应直接落在 ChartBlock 上，没有为了挂 id 而多包一层 section。
+  it("锚点目标的 id 直接落在 ChartBlock 上，没有多余的外层 section", async () => {
+    await renderChart();
+    const el = document.getElementById("reading-tabs");
+    expect(el).not.toBeNull();
+    expect(el!.tagName.toLowerCase()).toBe("section");
+    // 外层不该再套一个 section 只为挂 id（此断言本身在改前也恒真——右列的直接
+    // 父容器是 TwoColumn 的 <div data-testid="two-col-right">，不是 section，
+    // 挪 id 前后都成立，不能靠它单独判定；下两条才是真正的差异点）。
+    expect(el!.parentElement?.tagName.toLowerCase()).not.toBe("section");
+    // 真正的差异点 1：id 所在元素本身必须是 ChartBlock 的本体（带它的结构类），
+    // 而不是一个空壳 <section id="reading-tabs"> 之外再套一层 ChartBlock。
+    expect(el!.className).toContain("border-t");
+    // 真正的差异点 2：ChartBlock 自己也是 <section>——如果 id 挂在外层空壳上，
+    // 内部还会再嵌一层 ChartBlock 的 <section>；id 直接落在 ChartBlock 本体后，
+    // 内部不应再出现第二层 section。
+    expect(el!.querySelector("section")).toBeNull();
   });
 });

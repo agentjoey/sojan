@@ -130,12 +130,6 @@ export const en: Messages = {
       reading: { title: "Cast chart", sub: "Birth info instant chart" },
       dream: { title: "Dreams", sub: "Dream mirror · psychological reflection" },
     },
-    today: {
-      weekday: "{day}",
-      emptyVerdict: "—",
-      polish: "Observe the moment before you act — your full daily reading is one tap away.",
-      meta: "Add your birth info to unlock your personalized daily reading",
-    },
     cards: {
       east: {
         label: "命理结构 · Mingli structure",

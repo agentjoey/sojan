@@ -81,10 +81,10 @@ export default function Home() {
   // 12–14/24 × 72/365 ≈ 9.9%–11.5%。`revalidate = 3600` 的 ISR 陈旧度另外
   // 叠加最多 ±1 小时的抖动，量级上是这条之外的次要因素。
   //
-  // 未在本轮治本：`getCurrentSolarHou()` 只能在服务端调用（core 不得进 `/`
-  // 路由客户端 chunk，见文件顶部长注释），要让客户端按自己的本地日历日「自行
-  // 跨界」，需要 core 额外导出一份不带 iztro/horoscope 依赖的候边界表给客户端
-  // 查表——这已超出本轮 Minor 修复的范围，记在这里留给候相关的下一轮任务。
+  // 治本（owner 打磨批指令 2）：`HomeClient` 挂载后调 `solarHouAction(todayIso)`
+  // （app/actions.ts，入参是访客本地日历日），用返回值覆盖这里的初值——候从此
+  // 与访客本地「今天」同源，上述 6.6% 的错位窗口消除。本处的服务端初值仍然
+  // 必要：它是 SSR 首帧（防 hydration mismatch）与 action 失败时的兜底。
   const solarHou = getCurrentSolarHou();
 
   // 「今日日期」与「星期索引」：只作为 HomeClient 的 useState 初值（防 hydration

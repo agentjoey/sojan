@@ -17,16 +17,11 @@ import { WindBell } from "./WindBell";
  * 调用方翻译好传入（终审必修 5：此前卡头「今 日」与卡脚「展开今日日签 →」
  * 是写死的中文，绕过了全站 i18n；`WindBell` 的 alt 同理）。
  *
- * ⚠️ `dateNote`（终审必修 6）：此前这个位置叫 `lunar`，但卷首传的其实是
- * **星期**（如「周三」），运势页传的才是**农历日**——同一个 prop 名在两个
- * 消费方语义不同，是「同名不同义」的隐患本身。没有直接把农历补给卷首：
- * 卷首 `page.tsx` 是服务端组件按 `export const revalidate = 3600` 做 ISR，
- * 而「今日日期」（终审必修 1）必须按访客本地时钟在客户端算，不能再服务端
- * 冻结——若农历也在服务端算，会跟客户端算的公历日期在时区边界上对不上；
- * 若改成客户端算，`lunar-typescript` 那条依赖链会把刚从 `/` 路由移出去的
- * ~2MB chunk 重新拖回来（见 `app/page.tsx` 顶部注释），两条都不可接受。
- * 所以退一步把 prop 改成诚实的名字：`dateNote`——「日期旁边的补充说明」，
- * 卷首传星期、运势页传农历，各自消费方心里有数，字面上不再暗示两处同义。
+ * ⚠️ `dateNote`：日期旁的补充说明——卷首与运势页均传农历日（`fortune.lunarDate`）。
+ * 历史上卷首传的是**星期**（prop 因此从 `lunar` 改名 `dateNote`）：彼时卷首卡
+ * 是静态文案、农历需客户端调 lunar-typescript 才能算，会把 ~2MB chunk 拖回 `/`
+ * 路由。owner 打磨批指令 2 之后卷首改走 `dailyFortuneAction` server action
+ * 取数（lunar 留在服务端），农历日由 fortune 数据自带，两处语义重新一致。
  */
 /**
  * ⚠️ I3（复审 Important）：`href`/`expandLabel` 此前是两个各自独立的可选

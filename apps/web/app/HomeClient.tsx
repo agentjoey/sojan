@@ -7,11 +7,16 @@ import { SealIcon } from "@/components/ui";
 import { CompassWatermark } from "@/components/CompassWatermark";
 import { PageHeader } from "@/components/PageHeader";
 import { TodayCard } from "@/components/TodayCard";
+import { CastingOverlay } from "@/components/CastingOverlay";
 import { SeasonRuler } from "@/components/charts/SeasonRuler";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { Group, Cell } from "@/components/tg/native";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { isNavEnabled } from "@/lib/nav";
+import { getActiveProfile, type Profile } from "@/lib/profiles";
+import { useDailyFortune, gradeOf } from "@/lib/useDailyFortune";
+import { MOOD_LABEL } from "@/lib/fortune-images";
+import { solarHouAction } from "@/app/actions";
 
 /**
  * 卷首目录（web 分支专属，UI v3 03-screens 5a §4）：朱文方印目录，4 行基线 + 「梦」
@@ -169,13 +174,42 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
     };
   }, []);
 
-  const todayDate = today.date;
-  const weekDay = t("calendar.weekDays").split(",")[today.dayIndex];
+  // owner 打磨批指令 2：今日卡复用运势数据流——有档案才渲染，与 /calendar
+  // 逐字同源（dailyFortuneAction + polish 缓存 + 本地日期的候）；无档案不显示。
+  // TG 臂不渲染今日卡，也不发起任何取数（TG 冻结）。
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  useEffect(() => {
+    if (inTg) return;
+    let alive = true;
+    getActiveProfile()
+      .then((p) => { if (alive) setProfile(p); })
+      .catch(() => { if (alive) setProfile(null); });
+    return () => { alive = false; };
+  }, [inTg]);
+
+  // 候：SSR 首帧用服务端 prop（防 hydration mismatch），挂载后按访客本地日期经
+  // server action 覆盖——消除服务端 UTC 快照与本地日历日的错位（原 M7 记录）。
+  const [hou, setHou] = useState<SolarHouProp>(solarHou);
+  const todayIso = today.date.replaceAll(".", "-");
+  useEffect(() => {
+    if (inTg) return;
+    let alive = true;
+    solarHouAction(todayIso)
+      .then((h) => { if (alive) setHou(h); })
+      .catch(() => { /* 覆盖失败则保留服务端初值 */ });
+    return () => { alive = false; };
+  }, [inTg, todayIso]);
+
+  const { fortune, polish } = useDailyFortune(inTg ? null : profile, todayIso);
 
   return (
     <main className="mx-auto w-full max-w-[480px] pb-16 lg:max-w-5xl">
       {!inTg && (
         <>
+          {/* 等待过场（owner 打磨批指令 7）：档案/流日未落定期间全屏遮盖。 */}
+          {(profile === undefined || (profile !== null && !fortune)) && (
+            <CastingOverlay title={t("common.loading")} mode="pending" />
+          )}
           {/* ===== 卷首 Hero（转盘水印 + 大标题 + 定位句，03-screens 5a §1） ===== */}
           <section className="relative overflow-hidden px-7 pt-12 lg:px-16 lg:pt-20">
             <CompassWatermark
@@ -204,29 +238,28 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
             </div>
           </section>
 
-          {/* ===== 今日卡（TodayCard，03-screens 5a §2；卡脚指向 /calendar） ===== */}
-          <div className="zj-rise relative mt-14 px-7 lg:mx-auto lg:mt-20 lg:max-w-4xl lg:px-16" style={{ animationDelay: ".4s" }}>
-            <TodayCard
-              label={t("common.todayCard.label")}
-              date={todayDate}
-              dateNote={t("home.today.weekday", { day: weekDay })}
-              term={solarHou.hou}
-              wuHou={solarHou.wuHou}
-              polish={t("home.today.polish")}
-              meta={t("home.today.meta")}
-              href="/calendar"
-              expandLabel={t("common.todayCard.expand")}
-              // 无档案态没有真实判词可算（展示层零推算）——用明确的空态记号
-              // 插值进 alt 文案，不拿一个像判词的字冒充第五档（终审必修 8）。
-              // 复审 Minor M2：alt 模板已去掉「另见右栏」这个虚假的方位声称
-              // （首页没有右栏），措辞改为对首页/运势页都成立，见 zh.ts 注释。
-              bellAlt={t("common.todayCard.bellAlt", { verdict: t("home.today.emptyVerdict") })}
-            />
-          </div>
+          {/* ===== 今日卡（owner 打磨批指令 2：与运势页同一数据流、同一组件；
+              有档案才渲染，无档案整块不出；卡脚保留指向 /calendar 的入口） ===== */}
+          {profile && fortune && (
+            <div className="zj-rise relative mt-14 px-7 lg:mx-auto lg:mt-20 lg:max-w-4xl lg:px-16" style={{ animationDelay: ".4s" }}>
+              <TodayCard
+                label={t("common.todayCard.label")}
+                date={today.date}
+                dateNote={fortune.lunarDate || ""}
+                term={hou.hou}
+                wuHou={hou.wuHou}
+                polish={polish ?? t("calendar.todayVerdict")}
+                meta={`${fortune.dayGanZhi} · ${MOOD_LABEL[fortune.relation]}`}
+                href="/calendar"
+                expandLabel={t("common.todayCard.expand")}
+                bellAlt={t("common.todayCard.bellAlt", { verdict: t(`calendar.grade.${gradeOf(fortune.scores.overall)}`) })}
+              />
+            </div>
+          )}
 
-          {/* ===== 七十二候标尺（03-screens 5a §3；index 来自 getCurrentSolarHou） ===== */}
+          {/* ===== 七十二候标尺（03-screens 5a §3；挂载后按访客本地日期覆盖） ===== */}
           <div className="relative mt-10 px-7 lg:mx-auto lg:max-w-4xl lg:px-16">
-            <SeasonRuler index={solarHou.index} label={solarHou.hou} />
+            <SeasonRuler index={hou.index} label={hou.hou} />
           </div>
 
           {/* ===== 目录（03-screens 5a §4：朱文方印 + serif 标题，卡片网格废除） ===== */}

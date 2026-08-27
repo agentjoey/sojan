@@ -39,8 +39,11 @@ type Stage =
       question?: string;
     };
 
-/** 筊象 → 大字名 / 传统释义 的 i18n 键（UAT②：揭晓屏用，两个键此前定义了却无人使用）。 */
-const OMEN_NAME_KEY: Record<Omen, string> = { 圣筊: "jiao.omenSheng", 笑筊: "jiao.omenXiao", 阴筊: "jiao.omenYin" };
+/** 筊象 → 传统释义 的 i18n 键（UAT②：揭晓屏用）。
+ *  筊象大字名不再走 i18n 键（验收返工 I3）：`stage.omen` 本身就是中文术语
+ *  （圣筊/笑筊/阴筊），两个 locale 都该原样显示——en 此前的
+ *  "圣筊 (Sheng — assent)" 有 19 字符，44px 大字在 402px 视口折 2–3 行，
+ *  而英文是默认路径；gloss 由下一行的释义（omenXxxDesc）承担。 */
 const OMEN_DESC_KEY: Record<Omen, string> = { 圣筊: "jiao.omenShengDesc", 笑筊: "jiao.omenXiaoDesc", 阴筊: "jiao.omenYinDesc" };
 /** 筊杯卡三列释义的单字短注（5c）——与揭晓屏长句刻意不同文，见 zh.ts 键上注释。 */
 const OMEN_SHORT_KEY: Record<Omen, string> = { 圣筊: "jiao.omenShengShort", 笑筊: "jiao.omenXiaoShort", 阴筊: "jiao.omenYinShort" };
@@ -74,7 +77,7 @@ export default function SpiritPage() {
   // 胶囊语境（06-desktop §4：语境由竖栏当前项 + 页头大标题承担），此声明在桌面
   // 无可见效果。useShellContext 是 hook，必须无条件调用、位于所有早退之前。
   useShellContext(
-    stage.kind === "revealed" || stage.kind === "conversing" ? t(OMEN_NAME_KEY[stage.omen]) : null,
+    stage.kind === "revealed" || stage.kind === "conversing" ? stage.omen : null,
   );
 
   useEffect(() => {
@@ -244,7 +247,15 @@ export default function SpiritPage() {
   const historyRow = (h: JiaoHistoryEntry) => {
     const summary = (
       <>
-        <span className="mr-2 font-serif font-semibold" style={{ color: OMEN_CHAR_COLOR[h.omen] }}>
+        {/* 验收返工 I2：筊象色只进字前 6px 色点（装饰，aria-hidden），单字用 ink——
+            wood 3.06:1 / gold 2.48:1 都低于 13px 正文的 AA 4.5:1（同 C1 根因）。 */}
+        <span
+          data-testid="omen-dot"
+          aria-hidden="true"
+          className="mr-1.5 inline-block h-[6px] w-[6px] rounded-full align-middle"
+          style={{ background: OMEN_CHAR_COLOR[h.omen] }}
+        />
+        <span className="mr-2 font-serif font-semibold" style={{ color: "var(--color-ink)" }}>
           {h.omen.slice(0, 1)}
         </span>
         {h.summary}
@@ -314,7 +325,12 @@ export default function SpiritPage() {
   // 左列（06-desktop §3：掷筊左列 440px＝筊台；问题输入与掷筊按钮同属筊台一侧）。
   // 筊杯卡（5c）：细线卡；图区 262px 随阶段换内容（静态弦月插画 / 抛掷动画 / 落定
   // 静态筊），三列筊象释义（圣筊走强调手法），卡脚「掷 筊 问 事」+ 46px 朱砂圆钮。
-  const left = (
+  // ⚠️ 验收返工 C4：crisis 时左列整体不渲染——「命中即直接换成求助引导屏」意味着
+  // 筊杯卡（262px 图区 + 三列释义）与三掷点都不能留在屏上：402×850 下它们会把
+  // 热线号码挤出首屏，且三掷点的 aria-label「还可以掷 n 次」会在危机屏上向读屏
+  // 用户播报剩余掷筊次数。右列的引导文案由那个跨 stage 持续挂载的 aria-live
+  // region 承载（不卸载、播报可靠），左列只是为空，TwoColumn 结构不变。
+  const left = stage.kind === "crisis" ? null : (
     <>
       {throwable && (
         <div className="mb-6">
@@ -337,8 +353,9 @@ export default function SpiritPage() {
         data-testid="jiao-card"
         className="rounded-[var(--radius-card)] border border-[var(--color-line)] bg-surface"
       >
-        {/* 图区 262px：asking/rethrow/reading/crisis 静态弦月插画；throwing 抛掷动画
-            （JiaoThrow 已上线，不碰）；revealed 落定静态筊（仓库几何版）。 */}
+        {/* 图区 262px：asking/rethrow/reading 静态弦月插画；throwing 抛掷动画
+            （JiaoThrow 已上线，不碰）；revealed 落定静态筊（仓库几何版）。
+            crisis 到不了这里——左列整个被门控（见 left 定义处 C4 注释）。 */}
         <div className="relative flex h-[262px] items-center justify-center overflow-hidden border-b border-[var(--color-line)]">
           {stage.kind === "throwing" ? (
             <JiaoThrow blocks={stage.blocks} onSettled={() => setStage({ kind: "revealed", blocks: stage.blocks, omen: stage.omen })} />
@@ -381,8 +398,7 @@ export default function SpiritPage() {
               onClick={doThrow}
               disabled={!canThrow}
               aria-label={stage.kind === "rethrow" ? t("jiao.xiaoRethrow") : t("jiao.throwCta")}
-              className="zj-wheel-focus inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full text-[var(--color-paper)] transition-colors duration-200 hover:bg-[var(--color-cinnabar-press)] disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "var(--color-cinnabar)" }}
+              className="zj-wheel-focus inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cinnabar)] text-[var(--color-paper)] transition-colors duration-200 hover:bg-[var(--color-cinnabar-press)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" aria-hidden="true">
                 <circle cx="12" cy="12" r="2.2" fill="currentColor" />
@@ -458,7 +474,7 @@ export default function SpiritPage() {
             crisis 分支同一套道理：命中危机拦截时页面从「输入问题」直接换成求助
             引导，这个变化本身也必须被播报出来，而不是静默换了一屏文字。 */}
         {stage.kind === "revealed"
-          ? t(OMEN_NAME_KEY[stage.omen])
+          ? stage.omen
           : stage.kind === "rethrow"
             ? t("jiao.xiaoHint")
             : stage.kind === "reading"
@@ -529,10 +545,10 @@ export default function SpiritPage() {
 /**
  * 筊杯卡图区的静态弦月插画（5c，asking/rethrow 等未掷阶段）：两枚饱满弦月筊，
  * 几何取 02-components §6（外弧 A56,56、内缘二次曲线内凹 30px、两枚内缘相对、
- * 落地姿态不对称）。面色用现有令牌（俯＝cinnabar 朱漆、仰＝tint 浅面）——设计稿
- * 的漆色/刻字色值（#a3382c/#dd9c92 等）不在令牌表内，「无裸十六进制」红线优先，
- * 刻字从略（见实施报告）。右上竖排「筊/杯」、底部「一 俯 一 仰 · 圣 筊 / 朱漆 · 手掷」
- * 为插画固定字样（命理术语两个 locale 都保持中文）。
+ * 落地姿态不对称）。面色用专用令牌 --color-jiao-down/up（验收返工 I4：设计稿
+ * 漆色以新令牌形式落地，不违反「无裸十六进制」；此前用 cinnabar/tint 凑，
+ * 「仰」仅 1.18:1，两枚不可区分）。右上竖排「筊/杯」、底部「一 俯 一 仰 · 圣 筊 /
+ * 朱漆 · 手掷」为插画固定字样（命理术语两个 locale 都保持中文）。
  */
 function JiaoCardArt() {
   return (
@@ -541,13 +557,12 @@ function JiaoCardArt() {
         <svg viewBox="0 0 264 172" className="h-[150px] w-auto">
           <path
             d="M132,30 A56,56 0 0 0 132,142 Q102,86 132,30 Z"
-            fill="var(--color-cinnabar)"
+            fill="var(--color-jiao-down)"
             transform="translate(-20,16) rotate(-34 132 86) scale(.94)"
           />
           <path
             d="M132,30 A56,56 0 0 1 132,142 Q162,86 132,30 Z"
-            fill="var(--color-tint)"
-            stroke="var(--color-line-strong)"
+            fill="var(--color-jiao-up)"
             transform="translate(4,-8) rotate(27 132 86)"
           />
         </svg>

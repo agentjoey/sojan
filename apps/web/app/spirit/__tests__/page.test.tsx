@@ -440,6 +440,12 @@ describe("EP-jiao 危机前置拦截：doThrow 接线", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     // 揭晓屏/掷筊动画都不该出现——命中拦截时压根没进 throwing 阶段。
     expect(screen.queryByTestId("jiao-block")).toBeNull();
+    // 验收返工 C4：是「换成求助引导屏」——筊杯卡（262px 图区+三列释义）、三掷点、
+    // 问题输入都必须一并不在；三掷点的 aria-label「还可以掷 n 次」也不该在危机屏
+    // 上向读屏用户播报。只查文案在场抓不到「卡片照旧渲染」这种结构破坏。
+    expect(screen.queryByTestId("jiao-card")).toBeNull();
+    expect(screen.queryByTestId("jiao-throw-dots")).toBeNull();
+    expect(screen.queryByPlaceholderText(/该不该/)).toBeNull();
 
     // 「我知道了」把用户带回空白的 asking 阶段，而不是让他一键重掷同一句话。
     fireEvent.click(screen.getByRole("button", { name: "我知道了" }));
@@ -529,20 +535,36 @@ describe("UI v3 C3：掷筊三态版式", () => {
     expect(screen.getByTestId("jiao-throw-dots").querySelectorAll("[data-lit='true']")).toHaveLength(1);
   });
 
-  it("最近问过的（3d）：问事态页内列表，筊象单字着色（圣 wood / 阴 cinnabar / 笑 gold）", async () => {
+  it("最近问过的（3d）：筊象单字墨色、字前 6px 色点按筊象着色（圣 wood / 阴 cinnabar / 笑 gold）（验收返工 I2）", async () => {
     listJiaoHistoryMock.mockResolvedValueOnce([
       { id: "h1", omen: "圣筊", summary: "换工作的纠结", fullText: null, createdAt: "2026-08-20T00:00:00Z" },
       { id: "h2", omen: "阴筊", summary: "搬家与否", fullText: null, createdAt: "2026-08-19T00:00:00Z" },
       { id: "h3", omen: "笑筊", summary: "问得太笼统的一次", fullText: null, createdAt: "2026-08-18T00:00:00Z" },
     ]);
     await renderSpiritPage();
-    const section = (await screen.findByText("最近问过的")).closest("section");
+    const section = (await screen.findByText("最近问过的")).closest("section") as HTMLElement;
     expect(section).not.toBeNull();
-    const colored = (ch: string) => within(section as HTMLElement).getByText(ch) as HTMLElement;
-    // 三条各据其筊象着色——不是统一色：逐条断言各自令牌，回退成无色/同色即变红。
-    expect(colored("圣").style.color).toBe("var(--color-wood)");
-    expect(colored("阴").style.color).toBe("var(--color-cinnabar)");
-    expect(colored("笑").style.color).toBe("var(--color-gold)");
+    // 单字：三条都必须是 ink——wood 3.06:1 / gold 2.48:1 低于 13px 的 AA 4.5:1（返工单 I2）。
+    const charOf = (ch: string) => within(section).getByText(ch) as HTMLElement;
+    expect(charOf("圣").style.color).toBe("var(--color-ink)");
+    expect(charOf("阴").style.color).toBe("var(--color-ink)");
+    expect(charOf("笑").style.color).toBe("var(--color-ink)");
+    // 筊象色降级为字前 6px 色点（装饰）：逐条钉住各自令牌，回退成无色/同色即变红。
+    const dotOf = (ch: string) => {
+      const li = charOf(ch).closest("li")!;
+      return within(li).getByTestId("omen-dot") as HTMLElement;
+    };
+    expect(dotOf("圣").style.background).toBe("var(--color-wood)");
+    expect(dotOf("阴").style.background).toBe("var(--color-cinnabar)");
+    expect(dotOf("笑").style.background).toBe("var(--color-gold)");
+  });
+
+  it("卡脚圆钮：背景走类（bg-[var(--color-cinnabar)]）而非内联 style——内联简写会让 hover:bg-* 失效（验收返工 I1）", async () => {
+    await renderSpiritPage();
+    const btn = screen.getByRole("button", { name: "掷筊" }) as HTMLElement;
+    expect(btn.className).toContain("bg-[var(--color-cinnabar)]");
+    expect(btn.className).toContain("hover:bg-[var(--color-cinnabar-press)]");
+    expect(btn.style.background).toBe("");
   });
 
   it("揭晓（3e）：落定后语境胶囊声明为这一卦的筊象名（ShellContext label），asking 时为空", async () => {

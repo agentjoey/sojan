@@ -237,6 +237,9 @@ export const en: Messages = {
     readingSaved: "This reading has been saved; return to Chart to view it again.",
     resonanceNote: "※ 仅在「内在世界 (inner world)」高置信锚点谈共振，非硬等价。",
     resonanceExampleChip: "福德宫 (Life Palace) ↔ 月亮 (Moon) · 土星 (Saturn)",
+    loadBearingTitle: "Load-Bearing Facts",
+    loadBearingNote: "The reading above rests only on the chart facts listed here — nothing inferred by the model.",
+    nextSection: "Next · {name} →",
 
     pillarYear: "年 (Year)",
     pillarMonth: "月 (Month)",

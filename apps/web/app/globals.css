@@ -377,6 +377,15 @@ body {
   color: var(--color-ink-2);
 }
 
+/* 3c 三段式解读专用排版（15px / 2.05）。
+   ⚠️ 刻意**不改** `.reading-prose` 基类——它有 8 个消费方（风水 3 处、解梦、掷筊、
+   AskToday、当下时序、本组件），改基类会把新排版推给尚未按 UI v3 重建的
+   C3/C4 页面，产生半迁移的不一致。C3/C4 重建那些页面时再统一到一处。 */
+.reading-prose-3c {
+  font-size: 15px;
+  line-height: 2.05;
+}
+
 /* ===== Telegram Mini App 主题（跟随 TG colorScheme；非 TG 无此属性→零影响）===== */
 html[data-tg-theme="dark"] {
   --color-paper: #100e0b;

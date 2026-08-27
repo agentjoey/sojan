@@ -244,6 +244,9 @@ export const zh = {
     readingSaved: "此解读已为你保存，下次回到命盘可直接查看。",
     resonanceNote: "※ 仅在「内在世界」高置信锚点谈共振，非硬等价。",
     resonanceExampleChip: "福德宫 ↔ 月亮 · 土星",
+    loadBearingTitle: "承重事实",
+    loadBearingNote: "以上结论只依据下列已排定的盘面事实，不含模型自行推算。",
+    nextSection: "下一段 · {name} →",
 
     pillarYear: "年",
     pillarMonth: "月",

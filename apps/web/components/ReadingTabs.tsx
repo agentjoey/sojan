@@ -3,7 +3,10 @@
 import { useState } from "react";
 import type { UnifiedChart } from "@sojan/core";
 import { Markdown } from "@/components/Markdown";
+import { Chip, cn } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
+
+const TAB_ORDER = ["命理", "心理", "共振"] as const;
 
 export type ReadingSection = { key: string; title: string; body: string; accent?: "fire" | "water" | "metal" };
 
@@ -63,12 +66,13 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
   const progress = { 命理: "34%", 心理: "67%", 共振: "100%" }[tab];
   const cur = TABS.find((t) => t.k === tab)!;
   const { head, rest } = splitHead(cur.sec?.body ?? "");
+  const nextTab = TAB_ORDER[TAB_ORDER.indexOf(tab) + 1];
 
   return (
     <div>
       {/* 阅读进度 */}
-      <div className="sticky top-0 z-20 h-[3px]" style={{ background: "var(--color-line)" }}>
-        <div className="h-full transition-[width] duration-500" style={{ width: progress, background: "var(--color-cinnabar)", transitionTimingFunction: "var(--ease-rise)" }} />
+      <div className="sticky top-0 z-20 h-[2px]" style={{ background: "var(--color-line)" }}>
+        <div className="h-full transition-[width] duration-500" data-testid="reading-progress-fill" style={{ width: progress, background: "var(--color-cinnabar)", transitionTimingFunction: "var(--ease-rise)" }} />
       </div>
 
       {/* 概览引言 */}
@@ -76,17 +80,20 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
         <p className="mt-4 font-serif text-[16px] leading-[1.7] text-ink-2">{overview.body.replace(/[*#>]/g, "")}</p>
       )}
 
-      {/* sticky Tab */}
-      <div className="sticky top-[3px] z-10 mt-4 py-2" style={{ background: "var(--color-paper)" }}>
-        <div className="flex gap-1 p-1" style={{ background: "var(--color-tint)", borderRadius: "var(--radius-button)" }}>
+      {/* sticky Tab（文字 tab：当前项 serif 700 + 2px 墨色下划线；非当前项 muted、无底无框） */}
+      <div className="sticky top-[2px] z-10 mt-4 py-2" style={{ background: "var(--color-paper)" }}>
+        <div className="flex gap-6">
           {TABS.map((item) => {
             const on = item.k === tab;
             return (
               <button
                 key={item.k}
+                data-testid={`reading-tab-${item.k}`}
                 onClick={() => setTab(item.k)}
-                className="flex-1 py-2.5 text-[13.5px] font-medium transition-colors duration-200"
-                style={{ borderRadius: "var(--radius-chip)", background: on ? "var(--color-surface)" : "transparent", color: on ? "var(--color-ink)" : "var(--color-muted)", border: on ? "1px solid var(--color-line)" : "1px solid transparent" }}
+                className={cn(
+                  "px-1 pb-2 font-serif text-[15px] transition-colors duration-200",
+                  on ? "border-b-2 border-[var(--color-ink)] font-bold text-ink" : "text-muted hover:text-ink",
+                )}
               >
                 {item.label}
               </button>
@@ -95,37 +102,60 @@ export function ReadingTabs({ sections, chart, streaming }: { sections: ReadingS
         </div>
       </div>
 
-      {/* 摘要先行卡（细线描边，无阴影；顶边 2px 五行语义色） */}
+      {/* 摘要先行卡（细线描边，无阴影；不再用顶边色作段落身份——身份改由文字 tab 承担） */}
       <div
         key={tab}
+        data-testid="reading-card"
         className="zj-rise mt-3 p-6"
         style={{
           borderRadius: "var(--radius-card)",
           background: "var(--color-surface)",
           color: "var(--color-ink)",
           border: "1px solid var(--color-line)",
-          borderTop: `2px solid var(--color-${tab === "命理" ? "fire" : tab === "心理" ? "water" : "metal"})`,
         }}
       >
-        <div className="text-[11px] tracking-[0.2em]" style={{ color: "var(--color-muted)" }}>{cur.kicker}</div>
+        <div className="text-[10.5px] tracking-[0.2em]" style={{ color: "var(--color-muted)" }}>{cur.kicker}</div>
         {head ? (
-          <div className="mt-2 font-serif text-[21px] font-bold leading-[1.5]">{head}</div>
+          <div data-testid="reading-head" className="mt-2 font-serif text-[29px] font-bold leading-[1.42]">{head}</div>
         ) : (
-          <div className="mt-2 text-[14px]" style={{ color: "var(--color-muted)" }}>{streaming ? t("chart.generating") : "—"}</div>
+          <div data-testid="reading-head" className="mt-2 text-[14px]" style={{ color: "var(--color-muted)" }}>{streaming ? t("chart.generating") : "—"}</div>
         )}
         {cur.chips.length > 0 && (
           <div className="mt-3.5 flex flex-wrap gap-1.5">
             {cur.chips.map((ch, i) => (
-              <span key={i} className="px-2.5 py-1 text-[12px]" style={{ borderRadius: "var(--radius-chip)", background: "var(--color-tint)", color: "var(--color-ink-2)" }}>{ch}</span>
+              <Chip key={i}>{ch}</Chip>
             ))}
           </div>
         )}
         {rest && (
-          <div className="reading-prose mt-3.5">
+          <div data-testid="reading-body" className="reading-prose reading-prose-3c mt-3.5">
             <Markdown text={rest} />
           </div>
         )}
-        {tab === "共振" && <div className="mt-3.5 text-[11px] leading-[1.6]" style={{ color: "var(--color-muted)" }}>{t("chart.resonanceNote")}</div>}
+        {cur.chips.length > 0 && (
+          <div
+            data-testid="load-bearing-block"
+            className="mt-5 py-3"
+            style={{ borderTop: "1px solid var(--color-line)", borderBottom: "1px solid var(--color-line)" }}
+          >
+            <div className="text-[10.5px] tracking-[0.2em]" style={{ color: "var(--color-muted)" }}>
+              {t("chart.loadBearingTitle")}
+            </div>
+            <p className="mt-2 text-[12px] leading-[1.7]" style={{ color: "var(--color-muted)" }}>
+              {t("chart.loadBearingNote")}
+            </p>
+          </div>
+        )}
+        {tab === "共振" && <div data-testid="resonance-note" className="mt-3.5 text-[11px] leading-[1.6]" style={{ color: "var(--color-muted)" }}>{t("chart.resonanceNote")}</div>}
+        {nextTab && (
+          <button
+            data-testid="reading-next"
+            onClick={() => setTab(nextTab)}
+            className="mt-4 text-[13px] text-muted transition-colors duration-200 hover:text-ink"
+          >
+            {t("chart.nextSection", { name: TABS.find((x) => x.k === nextTab)!.label })}
+          </button>
+        )}
       </div>
 
       <p className="mt-3 text-[12px] text-muted">

@@ -16,4 +16,9 @@ describe("ChartToc", () => {
     expect(rows[0].textContent).toContain("紫微十二宫");
     expect(rows[1].textContent).toContain("三段式解读");
   });
+
+  it("<nav> 带 aria-label（M7：与 AppShell 侧栏 nav 并存时避免读屏报两个未命名 navigation）", () => {
+    render(<I18nProvider locale="zh"><ChartToc /></I18nProvider>);
+    expect(screen.getByRole("navigation", { name: "命盘页内导航" })).toBeInTheDocument();
+  });
 });

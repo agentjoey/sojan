@@ -39,7 +39,9 @@ export const zh = {
     home: "首页",
     calendar: "运势",
     chart: "命盘",
-    spirit: "问事",
+    // EP-nav-label-2（UI v3 C3）：/spirit 导航小字改为「掷筊」；大字方印字符「灵」
+    // 不变（lib/nav.ts 的 char），TG_ENTRIES 的对应项不动（TG 冻结）。
+    spirit: "掷筊",
     fengshui: "风水",
     dream: "解梦",
     profiles: "我的",

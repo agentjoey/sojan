@@ -267,7 +267,7 @@ export default function ChartPage() {
             </span>
             {/* M8：hover 只许变色，不得位移/放大/投影（06-desktop §4）——
                 此前 `group-hover:translate-x-1` 违规，改为箭头变色（on-ink → 金色）。 */}
-            <span data-testid="generate-arrow" className="text-[22px] text-[var(--color-on-ink)] transition-colors duration-200 group-hover:text-[var(--color-on-ink-gold)]">✦</span>
+            <span data-testid="generate-arrow" className="text-[22px] text-[var(--color-on-ink)]">✦</span>
           </button>
         )}
         {/* EP-motion：首字前的空等此前只有一条纯文字+闪烁光标；换成品牌风铃常驻摆动

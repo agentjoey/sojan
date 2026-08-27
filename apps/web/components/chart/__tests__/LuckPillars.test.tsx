@@ -41,6 +41,17 @@ describe("LuckPillars", () => {
     expect(rows[2]).toContain("丙申");
   });
 
+  it("三格的标签与年龄区间都正确（防标签互换与插值坏掉）", () => {
+    renderAt(bazi({ currentLuckPillar: "丁卯" }));
+    const rows = screen.getAllByTestId("luck-row").map((e) => e.textContent ?? "");
+    expect(rows[0]).toContain("前一运");
+    expect(rows[1]).toContain("现行");
+    expect(rows[2]).toContain("下一运");
+    // idx=2（丁卯，startAge 23 / startYear 2016）是 PILLARS fixture 里的现行运
+    expect(rows[1]).toContain("23 岁起 · 2016");
+    expect(rows.join("")).not.toContain("{startAge}");
+  });
+
   it("currentLuckPillar 缺失时按 startYear 与当前年比对推出现行运", () => {
     renderAt(bazi()); // 无 currentLuckPillar，当前 2026 → 命中 startYear 2026 那格
     const rows = screen.getAllByTestId("luck-row").map((e) => e.textContent);

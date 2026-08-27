@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act, within } from "@testing-library/react";
+import { render, screen, cleanup, act, within, waitFor } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
@@ -144,12 +144,21 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
 
   // I6：当下时序缓存策略（spec §8「缓存策略与 LLM 调用逐字不动」）此前零覆盖——
   // 时序块能不能出现、算出的结果有没有按 (档案,年) 落盘缓存，全仓没有一条断言。
-  it("当下时序：mock LLM 结果渲染，且按 (档案,年) 写入 localStorage 缓存", async () => {
+  it("当下时序：mock LLM 结果渲染", async () => {
     timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
     await renderChart();
     const right = screen.getByTestId("two-col-right");
     expect(await within(right).findByText(/流年上下文占位内容/)).toBeInTheDocument();
-    expect(localStorage.getItem(`zhaojian.timeline.${profile.id}.${new Date().getFullYear()}`)).not.toBeNull();
+  });
+
+  // R9：与上一条拆成独立用例——若断言排在上一条的 findByText 之后，注释掉时序
+  // JSX 会先让 findByText 变红、走不到这里，缓存断言就没被独立 mutation 证明过。
+  // 这里用 waitFor 单独等 localStorage 落盘，不依赖任何 JSX/文本断言先行通过。
+  it("当下时序：结果按 (档案,年) 写入 localStorage 缓存", async () => {
+    timelineActionMock.mockResolvedValueOnce("## 本年时序\n流年上下文占位内容");
+    await renderChart();
+    const key = `zhaojian.timeline.${profile.id}.${new Date().getFullYear()}`;
+    await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
   });
 
   // M2：`renderChart(locale)` 的 locale 参数此前从未被传入过（死参数），spec §9

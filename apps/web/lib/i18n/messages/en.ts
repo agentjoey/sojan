@@ -299,6 +299,7 @@ export const en: Messages = {
     selfPortraitSubtitle: "An inner profile synthesized from chart structure and self-reported traits.",
     tocZiwei: "Twelve Palaces",
     tocReading: "Three-Part Reading",
+    tocAria: "Chart page sections",
   },
   calendar: {
     kicker: "Daily Fortune",

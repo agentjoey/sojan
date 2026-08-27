@@ -38,6 +38,15 @@ describe("Chip / PillChip", () => {
     expect(el.style.border).toBe("1px solid var(--color-line)");
     expect(el.style.color).toBe("var(--color-ink-2)");
   });
+
+  it("PillChip emphasis 真侧：描边与文字都转朱砂", () => {
+    const { rerender } = render(<PillChip data-testid="p">2026</PillChip>);
+    expect(screen.getByTestId("p").style.border).toBe("1px solid var(--color-line)");
+    rerender(<PillChip data-testid="p" emphasis>2026</PillChip>);
+    const el = screen.getByTestId("p");
+    expect(el.style.border).toContain("var(--color-cinnabar)");
+    expect(el.style.color).toContain("var(--color-cinnabar)");
+  });
 });
 
 describe("GanzhiBadge 三档尺寸", () => {

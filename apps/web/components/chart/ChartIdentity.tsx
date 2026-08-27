@@ -37,6 +37,9 @@ export function ChartIdentity({ chart }: { chart: UnifiedChart }) {
   // `packages/core/src/fengshui/ming-gua.ts:41` 的既有写法拼出干支字符串。
   const nz = deriveNayinZodiac(chart.bazi.pillars.year.stem + chart.bazi.pillars.year.branch);
   const birthYear = Number(String(chart.normalizedSolarTime).slice(0, 4));
+  // 不可达守卫（假侧）：`normalizedSolarTime` 由 `packages/core/src/normalize.ts`
+  // 保证 `YYYY-MM-DD HH:mm` 前缀，前 4 位恒为数字字符，`Number(...)` 恒为
+  // finite；保留为防御，不为它硬凑测试用例。
   const age = Number.isFinite(birthYear) ? new Date().getFullYear() - birthYear : null;
 
   const chips: string[] = [];

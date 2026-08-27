@@ -12,8 +12,10 @@ export function CastingOverlay({
   title?: string;
   /** 底部小字提示；提供才渲染（文案由调用方按 locale 注入）。 */
   hint?: string;
-  /** brief 与调用方的 2.1s 卸载同步淡出；pending 供结束时间不定的请求持续展示。 */
-  mode?: "brief" | "pending";
+  /** brief 与调用方的 2.1s 卸载同步淡出；route（owner 打磨批指令 7）是路由切换
+   * 的 1.2s 短版，与 `RouteCasting` 的 1200ms 卸载同步；pending 供结束时间不定
+   * 的请求持续展示。 */
+  mode?: "brief" | "route" | "pending";
 }) {
   return (
     <div

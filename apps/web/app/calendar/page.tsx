@@ -71,7 +71,6 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState(() => ymd(new Date()));
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [horoscope, setHoroscope] = useState<ZiweiHoroscope | null>(null);
-  const [casting, setCasting] = useState(false); // 进入运势的品牌化过场（每会话一次）
   const [dark, setDark] = useState(false);
   const [fortuneImgError, setFortuneImgError] = useState(false);
   const selYear = selected.slice(0, 4);
@@ -100,16 +99,8 @@ export default function CalendarPage() {
     })();
   }, []);
 
-  // 测算过场：每会话首次进入运势播 ~2.1s
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem("zj.cast")) return;
-      sessionStorage.setItem("zj.cast", "1");
-    } catch { /* ignore */ }
-    setCasting(true);
-    const t = setTimeout(() => setCasting(false), 2100);
-    return () => clearTimeout(t);
-  }, []);
+  // （原「每会话一次测算过场」zj.cast 已随 owner 打磨批指令 7 删除——
+  // 路由切换过场已全局化，见 components/RouteCasting.tsx。）
 
   // 本年/本限 时序上下文（确定性，按年取）
   useEffect(() => {
@@ -131,6 +122,7 @@ export default function CalendarPage() {
     if (!p) return;
     let alive = true;
     const bCache = cacheGet("behavior", p.id, selected);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 同步 localStorage 缓存到 state（与 HomeClient 挂载纠偏同类的既有认可模式）
     setBehavior(bCache ? (JSON.parse(bCache) as Behavior) : null);
     if (!bCache && fortune && fortune.date === selected) {
       dailyBehaviorAction(fortune, p.nickname).then((b) => {
@@ -142,7 +134,7 @@ export default function CalendarPage() {
     };
   }, [profile, selected, fortune]);
 
-  if (profile === undefined) return <Centered>{t("calendar.loadingProfile")}</Centered>;
+  if (profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>
@@ -356,7 +348,6 @@ export default function CalendarPage() {
 
   return (
     <main>
-      {casting && <CastingOverlay title={t("calendar.calculating")} hint={t("common.casting")} mode="brief" />}
       <TwoColumn leftWidth={392} header={header} left={left} right={right} />
     </main>
   );

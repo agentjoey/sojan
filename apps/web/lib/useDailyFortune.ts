@@ -49,6 +49,7 @@ export function useDailyFortune(
     const p = profile;
     if (!p) return;
     let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 取数开始：进入 loading 并同步 localStorage 缓存到 state（与 HomeClient 挂载纠偏同类的既有认可模式）
     setLoading(true);
     setPolish(cacheGet("polish", p.id, dateStr)); // 命中缓存先显示
     dailyFortuneAction({ bazi: p.chart.bazi }, dateStr)

@@ -68,9 +68,8 @@ async function renderCalendar(locale: "zh" | "en" = "zh") {
 beforeEach(() => {
   vi.resetModules();
   localStorage.clear();
-  // 每会话一次的测算过场（casting）与本文件的断言无关，且 2.1s setTimeout
-  // 会在 act() 作用域外触发 setState 警告——直接标记「本会话已放过」跳过它。
-  sessionStorage.setItem("zj.cast", "1");
+  // （原「每会话一次测算过场」zj.cast 已随 owner 打磨批指令 7 删除，这里不再
+  // 需要 sessionStorage 抑制；路由切换过场由全局 RouteCasting 承担。）
   dailyFortuneActionMock.mockClear();
   dailyPolishActionMock.mockClear();
   dailyBehaviorActionMock.mockClear();

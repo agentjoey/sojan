@@ -66,7 +66,7 @@ const homeFortune: DailyFortune = {
 const homeHou = { hou: "测试候", wuHou: "测试物候", index: 42, term: "测试节气" };
 const activeProfileMock = vi.fn(async (): Promise<typeof homeProfile | null> => homeProfile);
 vi.mock("@/lib/profiles", () => ({
-  getActiveProfile: (...a: unknown[]) => activeProfileMock(...a),
+  getActiveProfile: () => activeProfileMock(),
 }));
 vi.mock("@/app/actions", () => ({
   dailyFortuneAction: async () => homeFortune,

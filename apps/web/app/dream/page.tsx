@@ -179,7 +179,8 @@ export default function DreamPage() {
         <p className="text-ink-2">{t("dream.notEnabled")}</p>
       </main>
     );
-  if (profile === undefined) return null;
+  // owner 打磨批指令 7：档案读取期不再是白屏（裸 return null），挂持续版过场。
+  if (profile === undefined) return <CastingOverlay title={t("common.loading")} mode="pending" />;
   if (profile === null)
     return (
       <main className="mx-auto max-w-[720px] px-4 py-10">

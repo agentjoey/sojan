@@ -119,8 +119,9 @@ export const zh = {
   },
   home: {
     heroTitle1: "你的命盘，",
+    // kickerHero（卷 首）web 卷首已不用（打磨批指令 5），但 TG 首页 PageHeader
+    // 仍在用（HomeClient inTg 分支）——TG 冻结，键保留。kickerToc 已全废，删。
     kickerHero: "卷 首",
-    kickerToc: "目 录",
     footerBrand: "照 见 · 东 方 命 理",
     ctaSecondary: "先看看流日 →",
     heroTitle2: "是一面镜子",

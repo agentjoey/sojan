@@ -215,6 +215,29 @@ describe("UI v3 卷首（5a）", () => {
     expect(container.querySelector('[data-testid="compass-ticks"]')).not.toBeNull();
   });
 
+  it("Hero 不再有独立 logo+「照见」行（owner 打磨批指令 3：品牌词已上移进胶囊）", async () => {
+    await renderHome();
+    // web 臂内「照见」只应剩页脚 footerBrand（带空格的「照 见 · 东 方 命 理」，精确匹配撞不上）。
+    expect(screen.queryByText("照见")).toBeNull();
+  });
+
+  it("「卷 首」「目 录」两枚眉标已去除（owner 打磨批指令 5）", async () => {
+    await renderHome();
+    expect(screen.queryByText("卷 首")).toBeNull();
+    expect(screen.queryByText("目 录")).toBeNull();
+  });
+
+  it("目录五入口印章统一朱文 zhu（纸底朱字，owner 打磨批指令 5）", async () => {
+    await renderHome();
+    const rows = screen.getAllByTestId("toc-row");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const seal = row.querySelector<HTMLElement>("span[aria-hidden]")!;
+      expect(seal.style.color).toBe("var(--color-seal)");
+      expect(seal.style.background).toBe("var(--color-paper)");
+    }
+  });
+
   it("今日卡在页面上，且卡脚指向 /calendar", async () => {
     await renderHome();
     const card = screen.getByTestId("today-card-left");

@@ -112,8 +112,10 @@ export const en: Messages = {
   },
   home: {
     heroTitle1: "Your chart,",
+    // kickerHero is no longer used by the web hero (polish batch directive 5) but
+    // the TG homepage PageHeader still consumes it — TG is frozen, key stays.
+    // kickerToc is fully dead, removed.
     kickerHero: "Prologue",
-    kickerToc: "Contents",
     footerBrand: "Sojan · Eastern Mingli",
     ctaSecondary: "See today’s reading →",
     heroTitle2: "is a mirror",

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellLogo, SealIcon } from "@/components/ui";
+import { SealIcon } from "@/components/ui";
 import { CompassWatermark } from "@/components/CompassWatermark";
 import { PageHeader } from "@/components/PageHeader";
 import { TodayCard } from "@/components/TodayCard";
@@ -176,21 +176,16 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
     <main className="mx-auto w-full max-w-[480px] pb-16 lg:max-w-5xl">
       {!inTg && (
         <>
-          {/* ===== 卷首 Hero（转盘水印 + 眉标 + 大标题 + 定位句，03-screens 5a §1） ===== */}
+          {/* ===== 卷首 Hero（转盘水印 + 大标题 + 定位句，03-screens 5a §1） ===== */}
           <section className="relative overflow-hidden px-7 pt-12 lg:px-16 lg:pt-20">
             <CompassWatermark
               className="pointer-events-none absolute -right-24 top-10 w-[300px] lg:-right-16 lg:w-[380px]"
               style={{ opacity: 0.14 }}
             />
-            <div className="zj-rise relative flex items-center gap-2.5">
-              <BellLogo size={26} motion="ring" ringKey={0} />
-              <span className="font-serif text-[17px] font-bold tracking-[0.14em]">{t("common.brand")}</span>
-            </div>
 
+            {/* owner 打磨批指令 3/5：独立 logo+「照见」行与「卷 首」眉标已移除
+               （品牌词上移进移动端胶囊；眉标小字废除）。 */}
             <div className="relative mt-24 lg:mt-32">
-              <p className="zj-rise text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)", animationDelay: ".08s" }}>
-                {t("home.kickerHero")}
-              </p>
               <h1 className="zj-rise mt-4 font-serif text-[42px] font-bold leading-[1.18] lg:text-[64px]" style={{ animationDelay: ".16s" }}>
                 {t("home.heroTitle1")}<br />{t("home.heroTitle2")}
               </h1>
@@ -236,9 +231,9 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
 
           {/* ===== 目录（03-screens 5a §4：朱文方印 + serif 标题，卡片网格废除） ===== */}
           <div className="relative mt-16 px-7 lg:mx-auto lg:mt-20 lg:max-w-4xl lg:px-16">
-            <p className="zj-rise text-[11px] tracking-[0.3em]" style={{ color: "var(--color-muted)" }}>
-              {t("home.kickerToc")}
-            </p>
+            {/* owner 打磨批指令 5：「目 录」眉标小字废除；五入口印章统一朱文 zhu
+               （此前只有「运」是 zhu、其余墨文 ink——ui.tsx 的 variant 语义注释
+               是档案列表语境，目录这里按 owner 拍板统一）。 */}
             <div className="zj-rise mt-5" style={{ borderTop: "1px solid var(--color-line)" }}>
               {TOC_ENTRIES.map((e) => (
                 <Link
@@ -248,7 +243,7 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
                   className="group flex items-center gap-4 py-5"
                   style={{ borderBottom: "1px solid var(--color-line)" }}
                 >
-                  <SealIcon char={e.char} variant={e.key === "calendar" ? "zhu" : "ink"} size={36} />
+                  <SealIcon char={e.char} variant="zhu" size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="font-serif text-[19px] font-semibold">{t(`home.entries.${e.key}.title`)}</div>
                     <div className="mt-1 text-[12px] text-muted">{t(`home.entries.${e.key}.sub`)}</div>

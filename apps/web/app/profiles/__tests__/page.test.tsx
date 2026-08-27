@@ -136,3 +136,32 @@ describe("UI v3：账号入口（Task 2 移除常驻「账」项后，这里是�
     expect(screen.getAllByRole("link", { name: /账号/ })).toHaveLength(1);
   });
 });
+
+/**
+ * UI v3 C4-1（03-screens 我的+账号 6c）：版式断言。
+ * 每条对应一个可独立回退的实现点（当前档案 Emphasis / 页首档案信息行），
+ * 删掉对应实现即只有对应用例变红（mutation 复验输出见实施报告）。
+ */
+describe("UI v3 C4-1：6c 版式", () => {
+  it("当前档案走强调手法（Emphasis 2px 朱砂左线）且只有当前档案走，其余档案无强调", async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByText("甲一")).toBeInTheDocument());
+    const emphs = screen.getAllByTestId("profile-active-emphasis");
+    expect(emphs).toHaveLength(1);
+    expect(emphs[0]).toHaveStyle({ borderLeft: "2px solid var(--color-cinnabar)" });
+    // 强调手法包的是当前档案（甲一）那一行，不是别的行
+    expect(emphs[0]!.textContent).toContain("甲一");
+    expect(emphs[0]!.textContent).not.toContain("乙二");
+  });
+
+  it("页首说明行展示当前档案的昵称与出生信息（6c：我 的 / 昵称 / 出生信息一行）", async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByText("甲一")).toBeInTheDocument());
+    // 说明行是一个 <p>，文本恰为「昵称 · 阳历 日期 · 时辰」——列表行按钮的
+    // textContent 也含这些片段，但它是 BUTTON 不是 P，matcher 已用两侧验证能区分。
+    const annotation = screen.getByText(
+      (_, el) => el?.tagName === "P" && el.textContent === "甲一 · 阳历 1990-06-15 · 未时",
+    );
+    expect(annotation).toBeInTheDocument();
+  });
+});

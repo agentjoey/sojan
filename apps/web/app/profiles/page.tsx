@@ -8,7 +8,7 @@ import { hasTgSession, tgListProfiles, tgDeleteProfile } from "@/lib/tg/client";
 import { shichenOf } from "@/lib/shichen";
 import { useIsTelegram } from "@/lib/tg/ui";
 import { supabase } from "@/lib/supabase";
-import { Card, SealIcon } from "@/components/ui";
+import { Card, SealIcon, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { Group, Cell } from "@/components/tg/native";
 import { useT } from "@/lib/i18n/I18nProvider";
@@ -90,11 +90,20 @@ export default function ProfilesPage() {
   const inputClass = "rounded border px-2 py-1 text-[13px] outline-none focus:border-[var(--color-cinnabar)]";
   const inputStyle = { borderColor: "var(--color-line)", background: "var(--color-paper)", color: "var(--color-ink)" };
 
+  // 6c（03-screens 我的+账号节）：页首＝我 的 / 昵称 / 出生信息一行——annotation
+  // 展示当前档案的昵称与出生信息（与列表行同一来源，不是另算）。加载完且能定位到
+  // 当前档案时才渲染，加载中/空列表/TG（冻结分支）都不出。
+  const activeProfile = !inTg ? profiles.find((p) => p.id === activeId) : undefined;
+  const headerAnnotation = activeProfile
+    ? `${activeProfile.nickname} · ${t("profiles.solarPrefix")} ${activeProfile.birthInput.date}${activeProfile.birthInput.time ? ` · ${shichenOf(activeProfile.birthInput.time)}` : ""}`
+    : undefined;
+
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8">
       <PageHeader
         kicker={t("profiles.kicker")}
         title={t("profiles.title")}
+        annotation={headerAnnotation}
         action={
           <Link href="/reading" className="px-5 py-2.5 text-[14px]" style={{ background: "var(--color-cinnabar)", color: "var(--color-paper)", borderRadius: "var(--radius-button)" }}>{t("profiles.create")}</Link>
         }
@@ -171,9 +180,8 @@ export default function ProfilesPage() {
             const active = p.id === activeId;
             const editing = editingId === p.id;
             const confirming = confirmDeleteId === p.id;
-            return (
+            const row = (
               <div
-                key={p.id}
                 className="flex items-center justify-between gap-4 py-4"
                 style={{ borderBottom: "1px solid var(--color-line)" }}
               >
@@ -230,6 +238,14 @@ export default function ProfilesPage() {
                   )}
                 </div>
               </div>
+            );
+            // 6c（03-screens 我的+账号节）：当前档案走强调手法——全站唯一的 Emphasis
+            // （02-components §2 列出的「当前档案」用例），朱文印（SealIcon bai）之上
+            // 再加 2px 朱砂左线与浅朱砂淡出底；其余档案保持墨印、无强调。
+            return active ? (
+              <Emphasis key={p.id} data-testid="profile-active-emphasis">{row}</Emphasis>
+            ) : (
+              <div key={p.id}>{row}</div>
             );
           })}
         </div>

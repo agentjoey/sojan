@@ -209,3 +209,47 @@ describe("EP-auth-return：?next= 回跳参数透传", () => {
     await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, undefined));
   });
 });
+
+/**
+ * UI v3 C4-1（03-screens 我的+账号 6c）：版式断言。
+ * 每条对应一个可独立回退的实现点（订阅等级字级 / 未绑定项朱砂 / 危险区 Emphasis），
+ * 删掉对应实现即只有对应用例变红（mutation 复验输出见实施报告）。
+ */
+describe("UI v3 C4-1：6c 版式", () => {
+  beforeEach(() => {
+    // 测试间污染：文件首个 describe 的「active=false」用例用 mockImplementation 覆盖过
+    // fetchMock，外层 afterEach 只 mockClear（清调用记录）不还原实现——不重置的话
+    // /api/tg/session 在本组仍回 active:false，页面落匿名态，identity/danger-zone 全不渲染。
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/tg/session") return new Response(JSON.stringify({ active: true, refreshed: false }), { status: 200 });
+      if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: null, telegram: { username: "u1" } }), { status: 200 });
+      if (url.startsWith("/api/billing/status")) return new Response(JSON.stringify({ tier: "free", memberUntil: null, used: 0, free: 30 }), { status: 200 });
+      return new Response("{}", { status: 200 });
+    });
+  });
+
+  it("订阅等级用 serif 19px 呈现（6c：等级 serif 19px + 用量）", async () => {
+    await renderAccountPage();
+    const tier = (await screen.findByTestId("billing-tier")) as HTMLElement;
+    expect(tier.className).toContain("font-serif");
+    expect(tier.className).toContain("text-[19px]");
+  });
+
+  it("绑定与登录：未绑定项朱砂、已绑定项墨色（两侧都钉，不是只钉一侧）", async () => {
+    await renderAccountPage();
+    // fetchMock 的 identities：email=null（未绑定）/ telegram.username="u1"（已绑定）
+    await waitFor(() => expect(screen.getByTestId("identity-telegram").textContent).toBe("u1"));
+    expect((screen.getByTestId("identity-email") as HTMLElement).style.color).toBe("var(--color-cinnabar)");
+    expect((screen.getByTestId("identity-telegram") as HTMLElement).style.color).toBe("var(--color-ink)");
+  });
+
+  it("危险区走强调手法（Emphasis 2px 朱砂左线 + 浅朱砂淡出底），不再是朱砂边框盒", async () => {
+    await renderAccountPage();
+    const dz = (await screen.findByTestId("danger-zone")) as HTMLElement;
+    expect(dz).toHaveStyle({ borderLeft: "2px solid var(--color-cinnabar)" });
+    // 整圈朱砂边框盒已被取代——border shorthand 不再存在（只剩 borderLeft）
+    expect(dz.style.border).toBe("");
+    // 不可逆警告仍在强调块内（版式重排没把警告弄丢）
+    expect(dz.textContent).toContain("此操作不可逆");
+  });
+});

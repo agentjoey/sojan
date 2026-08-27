@@ -3,9 +3,9 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）**
-Last Updated:   2026-08-27 by claude-opus-5（UI v3 C2-2 命盘右列，SDD 4 任务 + 全分支终审 + 一轮修复；已合 main 并发 staging）
+Last Updated:   2026-08-27 by claude-opus-5（UI v3 C3+C4 由外部 agent kimicode 实施、claude 验收两轮；已合 main 并发 staging）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 192 · llm 279 · web 791（全绿；`lint` 0 errors 已为阻塞闸门）
+测试:           core 192 · llm 279 · web 813（全绿；`lint` 0 errors 已为阻塞闸门）
 ⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
 
 > 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。
@@ -20,7 +20,11 @@ Last Updated:   2026-08-27 by claude-opus-5（UI v3 C2-2 命盘右列，SDD 4 �
 >   · **C2-2 命盘右列（2026-08-27 合入）**：`ReadingTabs` 按 `3c` 重建（文字 tab + 2px 墨色下划线 / 结论大字 29px/1.42 / 承重事实说明块 / 下一段入口）；`ZiweiBoard` 按 `6b` 收尾（格高 84 / 流派副标题取自 `ziwei.school` / 交互说明）；西方盘·自我画像·时序三块归位。**`/chart` 整页已按 UI v3 重建完毕。**
 >     · ⚠️ **共振段的承重事实块被刻意关闭**：该段 chips 是硬编码示例（`resonanceIllustrativeChip`），而说明块文案声称「只依据下列已排定的盘面事实」——把示例当本人盘面事实是反幻觉红线。已止血（共振段不出该块，只留「非硬等价」免责句），**但「共振该锚在哪些真实事实上」待 owner 拍板**，见 backlog `EP-reading-anchor-gap`。
 >     · ⚠️ **CTA 箭头 hover 不换色**是刻意的：改金（`--color-on-ink-gold`）会让对比度从 5.40:1 跌到 3.31:1（22px 常规字重不吃 WCAG 大字豁免）；不变色反而升到 6.91:1，hover 反馈由按钮背景变深承担。`--color-on-ink-gold` 配朱砂底仅 **2.58:1**，**禁止用于朱砂背景**。
->   · **未做**：C3（掷筊 `5c/3d/3e` + 解梦 `6a`）、C4（我的+账号合并 `6c` + 境 `6d`，2092 行，全场最大且含产品结构改动）、D（5s 七拍排盘过场 `7a`）。这些页面目前仍是旧 UI，与新外壳并存。
+>   · **C3+C4（2026-08-27 合入，外部 agent kimicode 实施 + claude 验收两轮）**：掷筊 `/spirit` 三态（`5c` 筊杯卡 / `3d` 问事 / `3e` 揭晓）、解梦 `/dream`（`6a`）、我的+账号（`6c`，**两页都留、只合并导航入口**）、境 `/fengshui`（`6d`，`TwoColumn` 左列 440）。导航小字 `nav.spirit`「问事」→「掷筊」（大字方印「灵」不变，`TG_ENTRIES` 不动）。
+>     · ⚠️ **五行色不得作文字色**（验收 C1/I2 实算）：`wood` 3.06:1 / `earth` 2.33:1 / `gold` 2.48:1 / `line-strong` **1.38:1**，纸底全部低于 AA 4.5:1。现行解法是**文字用 `--color-ink-2`（5.42:1）、五行色只进标签左侧 6px 色点**。⚠️ `--color-muted`（4.84:1）是 2026-08 一次 P0 critique 专门提上来的值，**别再拿五行色去换它**。全局规则待 owner 拍板。
+>     · ⚠️ **危机前置拦截的结构语义**：`stage.kind === "crisis"` 时 `/spirit` 的**左列整体门控为 null**，只剩页首+求助引导+返回钮。选门控而非整页早退是刻意的——`aria-live` 区在右列，整页早退会把它卸载、破坏播报语义。
+>     · ⚠️ **测试时区已固定** `Asia/Shanghai`（`apps/web/vitest.config.ts`）：此前未固定，而「本地时区 vs UTC」的日期断言在 `TZ=UTC`（GitHub Actions 默认）下会退化为**零区分力**。改这个值前先确认是非 UTC。
+>   · **未做**：D（5s 七拍排盘过场 `7a`）。**UI v3 的 8 个屏至此全部重建完毕。**
 > 🧭 **分支拓扑（别搞错生产在哪）**：**生产分支是 `production`**（`sojan.app` 指向它），不是 `main`。`main` = 集成分支，`staging` = `zhaojian.agentjoey.ai`。合 `main` / 推 `staging` **都不会碰生产**；上生产必须显式推 `production`。2026-08-26 核实：`production` 落后 `main` 17 个 commit（UI v3 合入前）。
 > ⚠️ **Tailwind 4 断点混单位陷阱（2026-08-26 踩中并修复）**：自定义断点用 px 而其余是 rem，会因 Tailwind 4 无法跨单位排序，让该断点的 media 块整体前置、**低断点反压高断点**，且 class-name 断言在结构上抓不到（七条测试全绿却全错）。已把 `--breakpoint-xl` 改为 `75rem`。详见 CLAUDE.md「Key Implementation Details」。
 

@@ -1,5 +1,34 @@
 # Eastern-Astrology-MVP — Claude Code Context
 
+<!-- BEGIN SHARED-ENGINEERING v2 -->
+## Shared engineering conventions
+
+Optimize delivery time and total token use while preserving correctness, security, and maintainability.
+
+### Scope and collaboration
+Follow the task's goal and acceptance criteria. Confirm the checkout and existing changes before editing; preserve unrelated work and isolate concurrent writes. Read applicable instructions and relevant code, expanding context as needed.
+
+### Implementation
+Prefer the simplest complete solution, not the smallest diff. Follow sound project patterns. Use refactoring or abstraction when it directly improves the current solution. Avoid unrelated cleanup and speculative features; remove code made unused by your changes.
+
+### Verification
+Check changed behavior with focused tests or reproducible checks; ensure regression coverage for bug fixes. Run broader checks when impact or project requirements justify them; inexpensive full checks are fine.
+Reuse results only while relevant code, dependencies, configuration, environment, and coverage remain valid. After fixes, rerun affected checks. Do not weaken tests to hide failures; distinguish regressions, existing failures, and environment blockers.
+
+### Review
+Review coherent changesets, not each internal task. Self-review low-risk changes; use independent review for high-risk changes such as authorization, destructive data operations, or concurrency. Independent review may use another agent; it is not a human approval gate unless explicitly required.
+Focus follow-up reviews on findings, fixes, and affected behavior; expand for new risks. Separate blockers from optional improvements.
+
+### Workflows
+Use skills as needed, not as a fixed sequence. Do not restart approved design unless material assumptions change. Check actual rendering for visual changes and real user paths for interaction, authorization, or persistence changes. Use screenshots, e2e, and mutation testing where useful.
+
+### Safety and delivery
+Execute approved work end to end. Reuse approvals within their scope, conditions, and validity; phase transitions and routine fixes do not reset them.
+Check existing authorization before asking. Batch foreseeable gaps into one request naming targets, operations, and material side effects. General development permission does not authorize unspecified production writes, destructive actions, or external data transfers.
+Ask only for a missing consequential decision or permission, a material change beyond agreed scope or risk, or a required human checkpoint. Explain the specific gap or rule and why prior approval is insufficient. Pause affected work only; continue independent authorized tasks.
+Mitigate avoidable risks within scope, protect secrets, and respect enforced permissions; never bypass denials. Preserve approval references and limits in existing handoff notes. Finish when acceptance criteria and required checks are met and blockers resolved; report changes, checks, and gaps accurately. Skipped, unrun, or failed checks are not passes.
+<!-- END SHARED-ENGINEERING -->
+
 ## ⭐ Session 启动（每次必执行）
 ```bash
 git fetch origin 2>/dev/null && git status -sb   # behind → git pull
@@ -94,12 +123,16 @@ curl -s -X POST localhost:3030/api/reading -H 'content-type: application/json' \
 2. 更新 Current Sprint Summary
 3. 如有架构变更：更新 `docs/architecture.md`
 
-## Superpowers Checkpoints（强制）
-| 阶段 | Skill |
+## Superpowers Skills（按需使用，非强制顺序）
+按共享约定 Workflows 一节"skills as needed"使用，下表只是常用场景参考：
+| 场景 | Skill |
 |------|------|
-| 新功能/Sprint 规划前 | `superpowers:brainstorming` |
+| 新功能/Sprint 规划 | `superpowers:brainstorming` |
 | 遇 Bug / 意外行为 | `superpowers:systematic-debugging` |
 | 标 ✅ Done 前 | `superpowers:verification-before-completion` |
+
+## 与共享约定的冲突处理
+- **Review**：pact 规则优先于共享约定中的"低风险改动可自审"——worker 不能自我验收，只有任务的 reviewer 能 accept；所有任务 accept 前 feature 不能 merge。
 
 <!-- pact:begin (managed by pactify — edit outside this block) -->
 # pact protocol — seat `claude`

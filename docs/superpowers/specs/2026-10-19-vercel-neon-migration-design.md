@@ -37,6 +37,36 @@
 - 没有：**匿名账号**（`signInAnonymously` 直接报 `AnonymousProviderDisabled`）、`updateUser({ email })` 改邮箱、免会话的 service-role admin 接口。
 - 只能用在 AWS 区域；Free 套餐 6 万 MAU。
 
+### Task 1 验证结果（2026-10-19）
+
+**Neon Auth 已开启**（Better Auth）。三个分支各有独立的 auth 地址：
+
+| 分支 | branch id | `NEON_AUTH_BASE_URL` | trusted origins |
+|---|---|---|---|
+| production | `br-steep-firefly-a1zje5v4` | `https://ep-blue-math-a1bagtco.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth` | `https://sojan.app` |
+| staging | `br-dry-recipe-a1yu0b5m` | `https://ep-summer-unit-a126vkw4.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth` | `https://zhaojian.agentjoey.ai` |
+| dev | `br-sweet-shadow-a1j0jfsd` | `https://ep-hidden-boat-a1y7e13r.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth` | （无，靠 localhost） |
+
+**配置**
+- 应用名「照见 Sojan」，email/password 已开（用来承载邮箱验证码登录）。
+- 默认带的共享 Google OAuth 已删除。
+- ⚠️ **`allow_localhost` 三个分支都还是 `true`**：MCP 没有对应的开关，**上线前要在 Console → Settings → Better Auth 手动把 production 和 staging 关掉**（列入 Task 11）。
+- `organization` 插件默认开着，不用它，保持不动。
+
+**`neon_auth` 表结构**
+- 用户表是 `neon_auth."user"`，列为 `id uuid`、`email text`、`"emailVerified" boolean`、`"createdAt"` 等（驼峰命名，SQL 里要加双引号）。
+- `session`、`account`、`member`、`invitation` 都通过 `ON DELETE CASCADE` 外键指向 `"user"(id)`。
+
+**冒烟测试**（dev 分支，curl 直接调 auth 接口，Origin 用 localhost）
+- **S1 通过**：`email-otp/send-verification-otp` 返回 200，邮件送达。`sign-in/email-otp` 返回 200，新用户自动注册，`emailVerified = true`。`get-session` 能取回会话。
+- **S2 不通过**：带有效会话调 `POST /delete-user` 返回 **404**，说明托管版关闭了这个端点。
+- **S2 改用 SQL 删除，验证通过**：`delete from neon_auth."user" where id = …` 级联清掉了 session 和 account，同一个 cookie 再调 `get-session` 立即返回 `null`。**注销方案据此修改，见 §5。**
+- 测试账号已删除，dev 分支 auth 数据清零。
+
+**Vercel 函数区域**
+- 线上响应头 `x-vercel-id: sfo1::iad1::…`，说明当前函数跑在 **`iad1`**（美东）。
+- Task 10 用 `vercel.json` 的 `"regions": ["sin1"]` 改到新加坡，不需要去 Vercel 面板操作。
+
 ## 3. 决策（owner 已定）
 
 | # | 决策 | 含义 |
@@ -80,9 +110,12 @@ Neon lucky-lake-64982745（ap-southeast-1）
 - **不再用 Bearer token。** 页面里约 20 处 `supabase().auth.getSession()` 拼 `Authorization` 头的代码删掉，同源 fetch 自动带 cookie。
 - **路由 handler 和 server action 只认会话**：一律通过 `getUid()` / `requireUid()`（底层是 `auth.getSession()`）拿身份，不读请求里传来的 uid。
 - **注销**（`POST /api/account/delete`）：
-  1. 先在**一个事务**里删掉该 uid 名下的全部业务行；
-  2. 再调 `auth.deleteUser()` 删认证账号。
-  - 顺序是故意的：如果第 2 步失败，留下的只是一个空账号，可以重试；反过来的顺序可能留下没有主人的个人数据。
+  - 托管版 Neon Auth 关闭了 `delete-user` 端点（Task 1 实测返回 404），所以改为**在同一个数据库事务里**：
+    1. 先删 8 张业务表里该 uid 的行；
+    2. 最后执行 `delete from neon_auth."user" where id = ${uid}`。session 和 account 会被外键级联删除，Neon Auth 立即判定会话失效。
+  - 业务数据和认证账号要么一起删掉，要么一起保留。
+  - 然后响应里清除本站全部 Neon Auth cookie。原因：SDK 会在本站 cookie 里缓存会话数据（`sessionDataTtl` 默认 300 秒），不清的话，最长 5 分钟内 `getSession()` 还会返回已删除的 uid，后续写入就会产生没有主人的数据行。
+  - 代价：直接写托管 schema，依赖 Neon 不改 `neon_auth."user"` 的表名和级联关系。db 集成测试会守住这一点。
 - **条款记录**：`recordConsentOnce` 改在**首次登录成功后**调用。`account` 页登录成功时调 server action `acceptTermsOnce()`。
 
 ## 6. 目标 Schema（`db/migrations/0001_baseline.sql`）

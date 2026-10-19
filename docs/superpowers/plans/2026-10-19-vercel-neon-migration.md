@@ -380,15 +380,24 @@
 
 **Interfaces:**
 - Consumes: `sql()`、`getUid`、`auth`（Task 4）
-- Produces: `export async function purgeUserData(uid: string): Promise<void>`，在一个 `sql().transaction([...])` 里按依赖顺序删除：`jiao_history`、`dream_history`、`fengshui_reports`、`dwellings`、`profiles`、`llm_usage`、`entitlements`、`user_consents` 中属于该 uid 的行。
-  路由流程：`getUid()`，无会话 → 401；`purgeUserData(uid)`；`auth.deleteUser()`（Task 1 Step 4 如判定不可用，改调 Neon API）；成功返回 `{ ok: true }`；`deleteUser` 失败返回 502，且业务数据已清（可重试）。
+- Produces: `export async function purgeUserData(uid: string): Promise<void>`，在一个 `sql().transaction([...])` 里依次删除：
+  1. `jiao_history`、`dream_history`、`fengshui_reports`、`dwellings`、`profiles`、`llm_usage`、`entitlements`、`user_consents` 中属于该 uid 的行；
+  2. 最后一条：`delete from neon_auth."user" where id = ${uid}`。
+
+  **不调用 `auth.deleteUser()`**：Task 1 实测托管版返回 404（见 spec §2「Task 1 验证结果」与 §5）。
+  路由流程：
+  - `getUid()`，无会话 → 401；
+  - `purgeUserData(uid)`；
+  - 响应 `{ ok: true }`，同时清除本站全部 Neon Auth cookie（cookie 名以 `@neondatabase/auth` 0.6.0-beta 源码为准，写成常量并注释出处）；
+  - `purgeUserData` 抛错 → 500，事务回滚，业务数据与账号都还在。
 
 - [ ] **Step 1: 写 db 测试**
-  为 u1、u2 各造齐 8 张表的数据，`purgeUserData(u1)` 后：u1 在 8 张表各 0 行，u2 各表行数不变（Review Focus 5）。
+  - 先用 SQL 在 `neon_auth."user"` 插入 u1、u2 两行（`id`、`email`、`"emailVerified"`、`name`），再为两人各造齐 8 张业务表的数据。
+  - `purgeUserData(u1)` 后：u1 在 8 张表与 `neon_auth."user"` 中各 0 行；u2 各表行数不变（Review Focus 5）。
 - [ ] **Step 2: 写路由测试**
   - 无会话 → 401，且未调用 `purgeUserData`。
-  - 正常 → 依次调用 `purgeUserData`、`auth.deleteUser`，返回 200。
-  - `deleteUser` 返回 error → 502，且 `purgeUserData` 已被调用。
+  - 正常 → 调用 `purgeUserData(uid)`，返回 200，响应带有把每个 Neon Auth cookie 置为过期的 `Set-Cookie`。
+  - `purgeUserData` reject → 500。
 - [ ] **Step 3: 跑测试确认失败**
   Run: `TEST_DATABASE_URL=<dev> pnpm --filter @sojan/web test -- delete`
   Expected: FAIL。
@@ -445,6 +454,9 @@
 - [ ] **Step 1: 邮件**
   Resend 验证发信域名 `sojan.app`（SPF/DKIM），在 Neon `staging` 与 `production` 分支配置 Custom SMTP，发件人 `noreply@sojan.app` / `照见 Sojan`。
   验证：Neon API `send_test_email` 收到信。
+- [ ] **Step 1b: 关闭 localhost**
+  owner 在 Neon Console → Settings → Better Auth 把 production 与 staging 分支的 Allow Localhost 关掉（MCP 没有这个开关）。
+  验证：`select allow_localhost from neon_auth.project_config` 在这两个分支上返回 `false`。
 - [ ] **Step 2: Vercel Preview env**（作用于 git 分支 `staging`）
   设置 `DATABASE_URL`（staging 分支 pooled 串）、`NEON_AUTH_BASE_URL`（staging）、`NEON_AUTH_COOKIE_SECRET`（新生成，`openssl rand -base64 32`）、`BILLING_ENABLED`（沿用现值）、`FREE_PROFILE_LIMIT`（如需）。
 - [ ] **Step 3: 迁移 staging 库**

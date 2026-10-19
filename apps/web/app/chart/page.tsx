@@ -100,16 +100,10 @@ export default function ChartPage() {
     let pause = 0;
     let rafId = 0;
 
-    const finalize = async () => {
+    // 只做展示收尾；保存在流读完时就已发出（见下方 streamDone），不在这里重复
+    const finalize = () => {
       setReading(target);
-      if (target.trim()) {
-        try {
-          await saveReading(profile.id, target);
-        } catch (e) {
-          if (!gate.handleAuthError(e)) console.error("saveReading failed:", e);
-        }
-        setProfile({ ...profile, reading: target });
-      }
+      if (target.trim()) setProfile({ ...profile, reading: target });
       setStreaming(false);
     };
     const tick = () => {
@@ -126,7 +120,7 @@ export default function ChartPage() {
         else if (/[，、；：]/.test(last)) pause = 3;   // 读断停顿 ~50ms
       }
       if (shown < target.length || !streamDone) rafId = requestAnimationFrame(tick);
-      else void finalize();
+      else finalize();
     };
     rafId = requestAnimationFrame(tick);
 
@@ -149,7 +143,16 @@ export default function ChartPage() {
         if (done) break;
         target += dec.decode(value, { stream: true });
       }
-      streamDone = true; // tick 追平后自行 finalize（保存+收尾）
+      streamDone = true; // tick 追平后自行 finalize（仅收尾）
+      // 流一读完就落库，不等打字机播完：长解读要播一分钟左右，中途离开/刷新，
+      // 或标签页在后台（rAF 降频乃至暂停）都会让解读丢失、LLM 额度白花（EP-reading-save-timing）
+      if (target.trim()) {
+        try {
+          await saveReading(profile.id, target);
+        } catch (e) {
+          if (!gate.handleAuthError(e)) console.error("saveReading failed:", e);
+        }
+      }
     } catch (e) {
       cancelAnimationFrame(rafId);
       setErr(e instanceof Error ? e.message : String(e));

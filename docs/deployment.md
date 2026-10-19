@@ -1,33 +1,60 @@
 # Deployment — Eastern-Astrology-MVP
 
-> ⚠️ 占位：Web 框架由 [ADR-001](decisions/ADR-001-tech-stack.md) 拍板后补全完整手册。以下为推荐路径（Next.js + Vercel）。
+> 托管：**Vercel**（Next.js App Router，函数区域固定 `sin1`，见 `apps/web/vercel.json`）。数据库 + 认证：**Neon**（Postgres + Neon Auth），2026-10 自 Supabase 迁入。设计见 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`。
+> ⏳ **production 切换尚未执行**（待 Task 12：production env、迁移、owner 数据导入、冒烟；切换日期待补）。下文 production 栏描述的是目标状态。
 
 ## 环境变量
-见 `.env.example`。生产用 `vercel env` 管理（下表对齐 2026-08-16 `vercel env ls` 实况）：
+见 `.env.example`。生产用 `vercel env` 管理。下表均为**服务端变量**（无 `NEXT_PUBLIC_` 前缀，不会进客户端包）：
 
 | Key | 用途 |
 |-----|------|
+| `DATABASE_URL` | Neon 连接串（pooled）。仅服务端；缺失时数据层报「`DATABASE_URL` 未配置」。**每个 Vercel 环境指向各自的 Neon 分支**（见下节映射）|
+| `NEON_AUTH_BASE_URL` | Neon Auth 地址，**每个 Neon 分支各一个**（见下节）|
+| `NEON_AUTH_COOKIE_SECRET` | 签名 session cookie 的密钥，≥32 字符（`openssl rand -base64 32`）。**staging 与 production 必须不同** |
+| `TEST_DATABASE_URL` | 可选，仅 `*.db.test.ts` 用，指向 Neon dev 分支；不设则这些测试 skip。**不要配进 Vercel** |
 | `LLM_API_KEY` | LLM 密钥。默认 MiniMax-M3 走 anthropic 兼容线（`sk-cp…`）；兼容读取 `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` 作为回退 |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_BASE_URL` / `LLM_WIRE` | 可插拔 LLM，未设时用 MiniMax-M3 默认值（见 CLAUDE.md）|
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 浏览器侧 Supabase（匿名会话 + RLS）|
-| `SUPABASE_SERVICE_ROLE_KEY` | 服务端 Supabase。**仅限 route handler，绕过 RLS**，绝不可进客户端包 |
-| `NEXT_PUBLIC_SPIRIT_ENABLED` | 本命之灵 flag，`=1` 开启 |
+| `BILLING_ENABLED` | 会员闸门总开关。**不为 `"1"`（默认）时不做任何限制** |
+| `FREE_LLM_MONTHLY` | 免费账号每月 LLM 额度（仅 `BILLING_ENABLED=1` 时生效）|
+| `FREE_PROFILE_LIMIT` | 免费档案上限，不设 = 3（仅 `BILLING_ENABLED=1` 时生效）|
+| `NEXT_PUBLIC_SPIRIT_ENABLED` | 本命之灵 / 掷筊 flag，`=1` 开启 |
 | `NEXT_PUBLIC_FENGSHUI_ENABLED` | 风水「境」flag，`=1` 开启。**2026-08-16 起 Production + Preview 均已设为 1** |
-| `BILLING_ENABLED` | 会员闸门总开关。**不为 `"1"`（默认）时不做任何限制**——注意它**没有** `NEXT_PUBLIC_` 前缀，客户端读不到，故页面须向服务端探测权益 |
 
-⚠️ `NEXT_PUBLIC_*` 是**构建期内联**的：改这类变量后必须**重新部署**才生效，光改 env 不重建不会有任何变化。
+⚠️ `NEXT_PUBLIC_*`（上表仅两个 flag）是**构建期内联**的：改后必须**重新部署**才生效。
+⚠️ **已移除**（迁移后 Vercel 上若还留着请清掉）：所有 `SUPABASE*` / `NEXT_PUBLIC_SUPABASE_*`、`TELEGRAM_*`、`TG_*`、`NEXT_PUBLIC_TG_*`、`NEXT_PUBLIC_MINIAPP_URL`、`CRON_SECRET`、`NEXT_PUBLIC_BILLING_ENABLED`、`NEXT_PUBLIC_FREE_PROFILE_LIMIT`。
 
-## 推荐部署（待确认）
-- **平台：** Vercel（Next.js App Router 原生，Fluid Compute）。
+## Neon 分支 ↔ Vercel 环境
+Neon 项目 `sojan`（`lucky-lake-64982745`，AWS ap-southeast-1，PG 18）。**Neon Auth 状态随分支复制，每个分支有独立的 `NEON_AUTH_BASE_URL` 与 trusted origins。**
+
+| Neon 分支 | branch id | 对应环境 | git 分支 | trusted origins |
+|---|---|---|---|---|
+| production | `br-steep-firefly-a1zje5v4` | Vercel Production · `sojan.app` | `production` | `https://sojan.app` |
+| staging | `br-dry-recipe-a1yu0b5m` | Vercel Preview · `zhaojian.agentjoey.ai` | `staging` | `https://zhaojian.agentjoey.ai` |
+| dev | `br-sweet-shadow-a1j0jfsd` | 本地开发 + `TEST_DATABASE_URL` | — | 无（靠 localhost）|
+
+- 各分支的 `NEON_AUTH_BASE_URL` 形如 `https://<ep-id>.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth`，取值见 Neon Console → Auth（或设计文档 §2 Task 1 表）。
+- Vercel 随机预览域名**不在白名单，预览部署里登录不可用**（已接受的取舍）；验证一律在 staging 上做。
+
+### 上线前必做（Neon Console，MCP 无对应开关）
+1. **关闭 `allow_localhost`**：Console → Settings → Better Auth，把 **production 与 staging** 两个分支的 `allow_localhost` 关掉（三个分支目前都还是 `true`，对应 Task 11 Step 1b）。dev 分支保持开启。
+2. **配 Custom SMTP**（staging / production 上线前必须，共享 SMTP 仅限 dev）：推荐 Resend，发信地址 `noreply@sojan.app`；先在 DNS 配好 SPF/DKIM；Neon 里应用名设为「照见 Sojan」。品牌化双语邮件模板（`send.otp` webhook 自行发信）不在本次范围。
+
+## 部署
+- **平台：** Vercel（Next.js App Router 原生，Fluid Compute）。**函数区域固定 `sin1`**（`apps/web/vercel.json` 的 `regions`），必须与 Neon 同在新加坡，否则默认 `iad1` 每条 SQL 都要跨太平洋走一个来回。
 - **计算：** 排盘 + LLM 调用在 Server Action / Route Handler，密钥不出服务端。
-- **持久化：** MVP 无需 DB。引入保存报告/账号时，经 Vercel Marketplace 接 Neon(Postgres) 或 Supabase。
-- **命令（框架确定后补）：**
+- **持久化：** Neon Postgres。Schema 在 `apps/web/db/migrations/`，**部署前**对目标分支手动迁移（幂等，记录在 `schema_migrations` 表）：
+  ```bash
+  DATABASE_URL=<目标分支连接串> pnpm --filter @sojan/web db:migrate
+  ```
+- **命令：**
   ```bash
   pnpm install
   pnpm build
   vercel deploy            # preview
   vercel deploy --prod     # production
   ```
+- **回滚：** 切换后 Supabase 项目（`sxjcpoxhphlnwhpzachi`）暂停保留 2–4 周；回滚 = 把 Vercel env 和代码分支回退。到期删除须 owner 确认（BACKLOG `EP-supabase-sunset`）。Supabase 暂停时间待 Task 12 后补。
+- **Telegram 已下线**：bot webhook、`/api/tg/*`、cron 均已删除，无需再配 `setWebhook`。重新接入见 BACKLOG `EP-tg-replan`。
 
 ## 发布
 ```bash

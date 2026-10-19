@@ -1,7 +1,16 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act, within, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, act, within, waitFor, fireEvent } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
+
+/**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
 
 /**
  * UI v3 · C2-1 Task 5：命盘 `app/chart/page.tsx` 接入 `TwoColumn`（桌面两栏）+
@@ -207,5 +216,49 @@ describe("UI v3 命盘（5b 左列 + TwoColumn 两栏）", () => {
     // 内部还会再嵌一层 ChartBlock 的 <section>；id 直接落在 ChartBlock 本体后，
     // 内部不应再出现第二层 section。
     expect(el!.querySelector("section")).toBeNull();
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderChart();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Fchart");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("尚无命盘档案。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderChart();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
+  });
+});
+
+describe("Task 6：会话中途失效（Review Focus 3）", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("生成解读后 saveReading 抛 UnauthenticatedError → 转为登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.saveReading).mockRejectedValueOnce(new UnauthenticatedError());
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("## 命理\n好", { status: 200 })));
+    await renderChart();
+    fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
+    const prompt = await screen.findByTestId("sign-in-prompt", {}, { timeout: 3000 });
+    expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fchart");
   });
 });

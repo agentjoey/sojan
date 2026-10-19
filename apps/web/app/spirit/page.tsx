@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { phaseAfter, formatQuestionnaire, MAX_THROWS, type Omen, type BlockFace } from "@sojan/core";
 import { getActiveProfile, getSpiritMemory, getQuestionnaire, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { supabase } from "@/lib/supabase";
 import { throwJiao } from "@/lib/jiao";
 import { detectJiaoCrisis } from "@/lib/jiao-crisis";
@@ -59,6 +61,7 @@ const OMENS: Omen[] = ["圣筊", "笑筊", "阴筊"];
 
 export default function SpiritPage() {
   const t = useT();
+  const gate = useSignInGate();
   const { locale } = useLocale();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [question, setQuestion] = useState("");
@@ -213,7 +216,8 @@ export default function SpiritPage() {
   }
 
   if (!ENABLED) return <Centered><p className="text-muted">{t("spirit.notEnabled")}</p></Centered>;
-  if (profile === undefined) return <CastingOverlay title={t("spirit.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/spirit" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("spirit.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>

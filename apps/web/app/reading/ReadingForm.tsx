@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { computeChartAction, geocodeAction, type GeoResult } from "@/app/actions";
 import { createProfile } from "@/lib/profiles";
+import { UnauthenticatedError } from "@/lib/errors";
+import { saveReadingDraft, takeReadingDraft } from "@/lib/reading-draft";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { BirthInput } from "@sojan/core";
 import { shichenOf } from "@/lib/shichen";
@@ -19,8 +21,10 @@ export function ReadingForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // 受控字段
+  // 受控字段（全部受控：未登录跳去登录前要存草稿、回来要回填，见 lib/reading-draft.ts）
+  const [nickname, setNickname] = useState("");
   const [date, setDate] = useState("");
+  const [isLunar, setIsLunar] = useState(false);
   const [gender, setGender] = useState<"male" | "female" | "">("");
 
   // 出生时辰
@@ -33,6 +37,22 @@ export function ReadingForm() {
   const [candidates, setCandidates] = useState<GeoResult[]>([]);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geocoding, startGeocode] = useTransition();
+
+  // D1：登录回来后回填草稿（只回填，不自动提交）。sessionStorage 只能挂载后读，
+  // 放进 useState 初值会让 SSR 首帧与水合不一致。
+  useEffect(() => {
+    const d = takeReadingDraft();
+    if (!d) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- 挂载后读浏览器专有存储（eslint.config.mjs 记的 A 类既有模式） */
+    setNickname(d.nickname);
+    setDate(d.date);
+    setIsLunar(d.isLunar);
+    setTime(d.time);
+    setTimeUnknown(d.timeUnknown);
+    setGender(d.gender);
+    setGeo(d.geo);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   function doGeocode() {
     setGeoError(null);
@@ -65,6 +85,12 @@ export function ReadingForm() {
         await createProfile({ nickname, birthInput: input as BirthInput, chart: res.chart });
         router.push("/chart");
       } catch (e) {
+        // D1：未登录不能建档——存草稿、去登录，登录后回到 /reading 回填。
+        if (e instanceof UnauthenticatedError) {
+          saveReadingDraft({ nickname: nickname ?? "", date, isLunar, time, timeUnknown, gender, geo });
+          router.push("/account?next=/reading");
+          return;
+        }
         setError(t("reading.saveChartError", { message: e instanceof Error ? e.message : String(e) }));
       }
     });
@@ -75,13 +101,13 @@ export function ReadingForm() {
   return (
     <form action={onSubmit} className="space-y-5">
       <Field label={t("reading.nicknameLabel")}>
-        <input name="nickname" className={`${field} placeholder:text-muted`} style={fieldStyle} placeholder={t("reading.nicknamePlaceholder")} />
+        <input name="nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className={`${field} placeholder:text-muted`} style={fieldStyle} placeholder={t("reading.nicknamePlaceholder")} />
       </Field>
 
       <Field label={t("reading.birthDateLabel")}>
         <input name="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} className={`${field} placeholder:text-muted`} style={fieldStyle} />
         <label className="mt-2 flex items-center gap-2 text-[12px] text-ink-2">
-          <input name="isLunar" type="checkbox" className="accent-[var(--color-cinnabar)]" /> {t("reading.lunarCheckbox")}
+          <input name="isLunar" type="checkbox" checked={isLunar} onChange={(e) => setIsLunar(e.target.checked)} className="accent-[var(--color-cinnabar)]" /> {t("reading.lunarCheckbox")}
         </label>
       </Field>
 

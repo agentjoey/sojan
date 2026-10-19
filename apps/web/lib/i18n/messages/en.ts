@@ -85,6 +85,11 @@ export const en: Messages = {
       rateLimited: "Too many requests. Please wait a moment and try again.",
     },
   },
+  signInPrompt: {
+    title: "Sign in to save your chart",
+    body: "Profiles and charts live in your account. Sign in with an email code — first sign-in creates the account — and see them on any device.",
+    cta: "Sign in",
+  },
   paywall: {
     title: "Upgrade to unlock unlimited",
     upgrade: "Upgrade",
@@ -546,7 +551,8 @@ export const en: Messages = {
     confirmDelete: "Confirm delete?",
     nicknameLengthError: "Nickname must be 1–24 characters",
     renameFailed: "Rename failed",
+    deleteFailed: "Deletion failed, please try again",
     privacyNotice:
-      "Profiles are stored in your private space (anonymous, device-isolated, visible only to you) and can be deleted anytime. The chart is calculated once at profile creation and frozen, and will not change.",
+      "Profiles are stored in your account, visible only to you, and can be deleted anytime. The chart is calculated once at profile creation and frozen, and will not change.",
   },
 };

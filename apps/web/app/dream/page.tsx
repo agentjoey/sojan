@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatQuestionnaire } from "@sojan/core";
 import { getActiveProfile, getSpiritMemory, saveSpiritMemory, getQuestionnaire, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDreamHistory, appendDreamHistory, type DreamHistoryEntry } from "@/lib/dream-history";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
@@ -25,6 +27,7 @@ type Turn = { role: "user" | "spirit"; content: string };
 
 export default function DreamPage() {
   const t = useT();
+  const gate = useSignInGate();
   const { locale } = useLocale();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   // input 是共用输入框：turns 为空时它是「梦原文」，turns 非空时它是「追问」。
@@ -127,7 +130,9 @@ export default function DreamPage() {
       spiritMemoryAction(newTurns, memory ?? undefined).then((m) => {
         if (m) {
           setMemory(m);
-          void saveSpiritMemory(profile.id, m);
+          saveSpiritMemory(profile.id, m).catch((e) => {
+            if (!gate.handleAuthError(e)) console.error("saveSpiritMemory failed:", e);
+          });
         }
       });
       // 历史摘要只在首次解读后写一条——追问是同一次解梦会话的延续，不产生新的列表条目。
@@ -152,7 +157,8 @@ export default function DreamPage() {
       </main>
     );
   // owner 打磨批指令 7：档案读取期不再是白屏（裸 return null），挂持续版过场。
-  if (profile === undefined) return <CastingOverlay title={t("common.loading")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/dream" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("common.loading")} mode="pending" />;
   if (profile === null)
     return (
       <main className="mx-auto max-w-[720px] px-4 py-10">

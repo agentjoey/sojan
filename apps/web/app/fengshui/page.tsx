@@ -7,6 +7,8 @@ import {
   type FengshuiChart, type DwellingInput, type CohabitantInput, type Direction,
 } from "@sojan/core";
 import { getActiveProfile, getProfile, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDwellings, type Dwelling } from "@/lib/dwellings";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
@@ -170,6 +172,7 @@ type EntitlementState = "idle" | "probing" | "entitled" | "blocked" | "unknown";
  */
 export default function FengshuiPage() {
   const t = useT();
+  const gate = useSignInGate();
   const { locale } = useLocale();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [dwellings, setDwellings] = useState<Dwelling[] | undefined>(undefined);
@@ -511,7 +514,8 @@ export default function FengshuiPage() {
   }
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/fengshui" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

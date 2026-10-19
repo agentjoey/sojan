@@ -91,6 +91,12 @@ export const zh = {
       rateLimited: "发送过于频繁，请稍后再试",
     },
   },
+  // D1：未登录访客不能存档；依赖档案的页面对访客显示这块（components/SignInPrompt）。
+  signInPrompt: {
+    title: "登录后建档",
+    body: "档案与命盘存在你的账号里。用邮箱验证码登录，首次登录自动创建账号，之后换设备也能看到。",
+    cta: "登录",
+  },
   paywall: {
     title: "升级会员，解锁无限",
     upgrade: "升级会员",
@@ -568,8 +574,9 @@ export const zh = {
     confirmDelete: "确认删除?",
     nicknameLengthError: "昵称长度应为 1-24 字符",
     renameFailed: "重命名失败",
+    deleteFailed: "删除失败，请重试",
     privacyNotice:
-      "档案存于你的私人空间（匿名、按设备隔离，仅你可见），可随时删除。命盘建档时一次推算并冻结，不再更改。",
+      "档案存于你的账号下，仅你可见，可随时删除。命盘建档时一次推算并冻结，不再更改。",
   },
 } as const;
 

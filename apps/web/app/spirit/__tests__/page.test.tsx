@@ -4,6 +4,15 @@ import { render, screen, waitFor, fireEvent, act, within } from "@testing-librar
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
+
+/**
  * 最终评审 Blocking 2：/spirit 此前只认 `topic === "portrait"`，`?topic=fengshui:<id>`
  * 落地后 autoSend 恒为 undefined——remedyId 被解析出来即丢弃，用户落进空白通用聊天
  * （EP-fs-08 的验收「复用现有 topic 机制」只复用了 URL 形状，没复用机制本身）。
@@ -590,5 +599,34 @@ describe("UI v3 C3：掷筊三态版式", () => {
     fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
 
     await waitFor(() => expect(screen.getByTestId("shell-label").textContent).toBe("胶囊:圣筊"));
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderSpiritPage();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Fspirit");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("尚无命盘档案。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderSpiritPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
   });
 });

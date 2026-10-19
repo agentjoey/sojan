@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DIRECTION_LABEL } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { listDwellings, deleteDwelling, type Dwelling } from "@/lib/dwellings";
 import { PageHeader } from "@/components/PageHeader";
@@ -39,6 +41,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  */
 export default function DwellingsPage() {
   const t = useT();
+  const gate = useSignInGate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [dwellings, setDwellings] = useState<Dwelling[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -107,7 +110,8 @@ export default function DwellingsPage() {
   }, [editingId]);
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/fengshui/dwellings" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

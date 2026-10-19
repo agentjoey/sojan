@@ -19,6 +19,8 @@ import { ChartIdentity } from "@/components/chart/ChartIdentity";
 import { LuckPillars } from "@/components/chart/LuckPillars";
 import { ChartToc } from "@/components/chart/ChartToc";
 import { SelfPortrait } from "./SelfPortrait";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 
 type Section = { key: string; title: string; body: string; accent?: "fire" | "water" | "metal" };
 
@@ -39,6 +41,7 @@ const todayYmd = `${YEAR}-${String(new Date().getMonth() + 1).padStart(2, "0")}-
 export default function ChartPage() {
   const { locale } = useLocale();
   const t = useT();
+  const gate = useSignInGate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [reading, setReading] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -100,7 +103,11 @@ export default function ChartPage() {
     const finalize = async () => {
       setReading(target);
       if (target.trim()) {
-        try { await saveReading(profile.id, target); } catch (e) { console.error("saveReading failed:", e); }
+        try {
+          await saveReading(profile.id, target);
+        } catch (e) {
+          if (!gate.handleAuthError(e)) console.error("saveReading failed:", e);
+        }
         setProfile({ ...profile, reading: target });
       }
       setStreaming(false);
@@ -150,7 +157,8 @@ export default function ChartPage() {
     }
   }
 
-  if (profile === undefined) return <CastingOverlay title={t("chart.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/chart" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("chart.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>

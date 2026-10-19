@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { listProfiles, getActiveProfileId, setActiveProfile, deleteProfile, type Profile } from "@/lib/profiles";
+import { listProfiles, getActiveProfileId, setActiveProfile, deleteProfile, renameProfile, type Profile } from "@/lib/profiles";
 import { shichenOf } from "@/lib/shichen";
-import { supabase } from "@/lib/supabase";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
+import { SignInPrompt } from "@/components/SignInPrompt";
 import { Card, SealIcon, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -14,6 +15,7 @@ import { useT } from "@/lib/i18n/I18nProvider";
 export default function ProfilesPage() {
   const router = useRouter();
   const t = useT();
+  const gate = useSignInGate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,17 +49,10 @@ export default function ProfilesPage() {
       alert(t("profiles.nicknameLengthError"));
       return;
     }
-    const { data: { session } } = await supabase().auth.getSession();
-    const headers: Record<string, string> = { "content-type": "application/json" };
-    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-    const r = await fetch("/api/account/rename", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ profileId, nickname: trimmed }),
-    });
-    if (!r.ok) {
-      const msg = await r.text().catch(() => t("profiles.renameFailed"));
-      alert(msg);
+    try {
+      await renameProfile(profileId, trimmed);
+    } catch (e) {
+      if (!gate.handleAuthError(e)) alert(t("profiles.renameFailed"));
       return;
     }
     setEditingId(null);
@@ -65,7 +60,12 @@ export default function ProfilesPage() {
   }
 
   async function doDelete(profileId: string) {
-    await deleteProfile(profileId);
+    try {
+      await deleteProfile(profileId);
+    } catch (e) {
+      if (!gate.handleAuthError(e)) alert(t("profiles.deleteFailed"));
+      return;
+    }
     setConfirmDeleteId(null);
     refresh();
   }
@@ -89,6 +89,8 @@ export default function ProfilesPage() {
     ? `${activeProfile.nickname} · ${t("profiles.solarPrefix")} ${activeProfile.birthInput.date}${activeProfile.birthInput.time ? ` · ${shichenOf(activeProfile.birthInput.time)}` : ""}`
     : undefined;
 
+  if (gate.signedOut) return <SignInPrompt next="/profiles" />;
+
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8">
       <PageHeader
@@ -111,7 +113,7 @@ export default function ProfilesPage() {
       </Link>
 
       <div className="mt-8">
-      {loading ? (
+      {gate.pending || loading ? (
         // owner 打磨批指令 7：加载态统一为持续版风铃过场（原为卡内一行文字）。
         <CastingOverlay title={t("profiles.loading")} mode="pending" />
       ) : profiles.length === 0 ? (
@@ -192,7 +194,7 @@ export default function ProfilesPage() {
           })}
         </div>
       )}
-      {!loading && profiles.length > 0 && (
+      {!gate.pending && !loading && profiles.length > 0 && (
         <Link href="/reading" className="mt-5 inline-block text-[13px] text-muted transition-colors hover:text-ink">
           {t("profiles.addNew")}
         </Link>

@@ -4,6 +4,15 @@ import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-libra
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 
 /**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
+
+/**
  * 最终评审 I-1：/dream 页面级 flag 门控。此前 page.tsx 全文不查
  * NEXT_PUBLIC_DREAM_ENABLED，flag 关闭时直接访问 URL 会完整渲染表单
  * （API 层虽有 404，但 spec 要求「/dream 不可达」，且 /fengshui、/spirit
@@ -433,5 +442,48 @@ describe("UI v3 C3：解梦 6a 版式", () => {
     const date = screen.getByText(expected) as HTMLElement;
     expect(date.className).toContain("font-latin");
     expect(date.textContent).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderDreamPage();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Fdream");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("尚无命盘档案——先起盘，灵才认得你。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderDreamPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
+  });
+});
+
+describe("Task 6：会话中途失效（Review Focus 3）", () => {
+  it("解梦后写回关系记忆抛 UnauthenticatedError → 转为登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("解读文本。", { status: 200 })));
+    spiritMemoryActionMock.mockResolvedValueOnce("新记忆");
+    saveSpiritMemoryMock.mockRejectedValueOnce(new UnauthenticatedError());
+    await renderDreamPage();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "梦见考试没带准考证。" } });
+    fireEvent.click(screen.getByText("解这个梦"));
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fdream");
   });
 });

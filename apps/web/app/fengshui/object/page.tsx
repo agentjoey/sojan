@@ -7,6 +7,8 @@ import {
   type FengshuiChart, type Direction, type DirectionVerdict,
 } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDwellings } from "@/lib/dwellings";
 import { supabase } from "@/lib/supabase";
 import { useT } from "@/lib/i18n/I18nProvider";
@@ -53,6 +55,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  */
 export default function FengshuiObjectPage() {
   const t = useT();
+  const gate = useSignInGate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   /**
    * 只取第一个居所——与 ../page.tsx 一致（本波未实现居所切换器）。这里只留下
@@ -159,7 +162,8 @@ export default function FengshuiObjectPage() {
   const showProbeFailedNote = !!facing && probeFailed;
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/fengshui/object" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

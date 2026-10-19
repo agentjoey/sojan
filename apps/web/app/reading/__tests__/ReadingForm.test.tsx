@@ -1,9 +1,28 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { UnauthenticatedError } from "@/lib/errors";
+import type { ReadingDraft } from "@/lib/reading-draft";
 import { ReadingForm } from "../ReadingForm";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const m = vi.hoisted(() => ({
+  push: vi.fn(),
+  createProfile: vi.fn(),
+  computeChartAction: vi.fn(),
+  saveReadingDraft: vi.fn(),
+  takeReadingDraft: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: m.push }) }));
+vi.mock("@/lib/profiles", () => ({ createProfile: m.createProfile }));
+vi.mock("@/app/actions", () => ({ computeChartAction: m.computeChartAction, geocodeAction: vi.fn() }));
+vi.mock("@/lib/reading-draft", () => ({ saveReadingDraft: m.saveReadingDraft, takeReadingDraft: m.takeReadingDraft }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  m.takeReadingDraft.mockReturnValue(null);
+  m.computeChartAction.mockResolvedValue({ ok: true, chart: { fake: true } });
+  m.createProfile.mockResolvedValue({ id: "p1" });
+});
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <I18nProvider locale="zh">{children}</I18nProvider>
@@ -72,5 +91,72 @@ describe("ReadingForm：对照设计稿", () => {
     fireEvent.click(unknownCheckbox);
     expect(screen.queryByText("未时")).toBeNull();
     expect(timeInput).toBeDisabled();
+  });
+});
+
+const draft: ReadingDraft = {
+  nickname: "阿甲",
+  date: "1991-03-15",
+  isLunar: true,
+  time: "14:30",
+  timeUnknown: false,
+  gender: "female",
+  geo: { label: "Shanghai, China", lat: 31.23, lon: 121.47, timezone: "Asia/Shanghai" },
+};
+
+describe("ReadingForm：未登录起盘（D1）", () => {
+  function fillAndSubmit() {
+    render_();
+    fireEvent.change(screen.getByPlaceholderText(/称呼|昵称|nickname/i), { target: { value: "阿甲" } });
+    fireEvent.change(document.querySelector('input[name="date"]')!, { target: { value: "1991-03-15" } });
+    fireEvent.change(document.querySelector('input[type="time"]')!, { target: { value: "14:30" } });
+    fireEvent.click(screen.getByText("乾 · 男"));
+    fireEvent.click(screen.getByRole("button", { name: "排我的盘" }));
+  }
+
+  it("createProfile 抛 UnauthenticatedError → 存草稿并跳去登录（next=/reading）", async () => {
+    m.createProfile.mockRejectedValue(new UnauthenticatedError());
+    fillAndSubmit();
+    await waitFor(() => expect(m.push).toHaveBeenCalledWith("/account?next=/reading"));
+    expect(m.saveReadingDraft).toHaveBeenCalledWith({
+      nickname: "阿甲",
+      date: "1991-03-15",
+      isLunar: false,
+      time: "14:30",
+      timeUnknown: false,
+      gender: "male",
+      geo: null,
+    });
+    expect(m.push).not.toHaveBeenCalledWith("/chart");
+  });
+
+  it("建档成功 → 跳 /chart，不存草稿", async () => {
+    fillAndSubmit();
+    await waitFor(() => expect(m.push).toHaveBeenCalledWith("/chart"));
+    expect(m.saveReadingDraft).not.toHaveBeenCalled();
+  });
+
+  it("其它错误 → 显示错误，不跳登录、不存草稿", async () => {
+    m.createProfile.mockRejectedValue(new Error("profile_limit"));
+    fillAndSubmit();
+    expect(await screen.findByText(/profile_limit/)).toBeInTheDocument();
+    expect(m.push).not.toHaveBeenCalled();
+    expect(m.saveReadingDraft).not.toHaveBeenCalled();
+  });
+
+  it("挂载时有草稿 → 回填各字段，不自动提交", async () => {
+    m.takeReadingDraft.mockReturnValue(draft);
+    render_();
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText(/称呼|昵称|nickname/i) as HTMLInputElement).value).toBe("阿甲"),
+    );
+    expect((document.querySelector('input[name="date"]') as HTMLInputElement).value).toBe("1991-03-15");
+    expect((document.querySelector('input[name="isLunar"]') as HTMLInputElement).checked).toBe(true);
+    expect((document.querySelector('input[type="time"]') as HTMLInputElement).value).toBe("14:30");
+    expect((document.querySelector('input[name="gender"]') as HTMLInputElement).value).toBe("female");
+    expect(screen.getByText("Shanghai、 China")).toBeInTheDocument();
+    expect(m.takeReadingDraft).toHaveBeenCalled();
+    expect(m.computeChartAction).not.toHaveBeenCalled();
+    expect(m.createProfile).not.toHaveBeenCalled();
   });
 });

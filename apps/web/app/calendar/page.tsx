@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { dailyBehaviorAction, ziweiHoroscopeAction } from "@/app/actions";
 import { matchFortuneImage, MOOD_LABEL } from "@/lib/fortune-images";
 import { Emphasis, GanzhiBadge } from "@/components/ui";
@@ -64,6 +66,7 @@ const DIMS: ("career" | "wealth" | "love" | "health" | "travel")[] = [
 
 export default function CalendarPage() {
   const t = useT();
+  const gate = useSignInGate();
   const WK = t("calendar.weekDays").split(",");
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [today] = useState(() => new Date());
@@ -122,7 +125,8 @@ export default function CalendarPage() {
     };
   }, [profile, selected, fortune]);
 
-  if (profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/calendar" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>

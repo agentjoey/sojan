@@ -3,16 +3,16 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成 + 2026-08-28 打磨批，只剩 D 块过场动效）**
-Last Updated:   2026-10-19 by claude（Neon 迁移已合 main（`9b0e1c2`）并切到 staging、实测通过；production 切换待做）
+Last Updated:   2026-10-20 by claude（Neon 迁移完成：staging 2026-10-19、production 2026-10-20 已切换并实测；Supabase 待暂停）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
 测试:           core 182 · llm 279 · web 727（另 36 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；2026-10-19 Neon 迁移分支实测，全绿；`lint` 0 errors 已为阻塞闸门）
 ✅ `pnpm typecheck`：core / llm / apps/web 均 0 errors（此前 apps/web 的 7 处既存测试类型错误随 Neon 迁移中相关测试的删改一并消除，BACKLOG `EP-web-typecheck-debt` 可关闭）。
 
-> 🚚 **Supabase → Vercel + Neon 迁移（2026-10-19，staging 已切换，production 待切）**：已合 main（`9b0e1c2`）并推 staging，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`，计划 `docs/superpowers/plans/2026-10-19-vercel-neon-migration.md`。
->   · **进度**：Task 1–10 已完成（Neon 项目/分支/Auth 开通、schema 迁移工具、`lib/auth` + `lib/data` + 客户端门面、登录门控、注销事务、`sin1` 区域、Supabase 依赖移除）；**staging 已于 2026-10-19 切到 Neon**（Neon staging 分支已迁移；`x-vercel-id` 函数段为 `sin1`；浏览器实测通过：未登录引导、邮箱验证码登录、建档、运势、风水居所+报告、解梦、掷筊、改名、登出/重登数据仍在、注销后 11 张表 0 行）。Production 切换（Task 12：owner 数据导入 + 暂停 Supabase）**待做**，**production 仍跑旧 Supabase 版本**。
+> 🚚 **Supabase → Vercel + Neon 迁移（staging 2026-10-19、production 2026-10-20 已切换）**：已合 main（`9b0e1c2`）并推 staging，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`，计划 `docs/superpowers/plans/2026-10-19-vercel-neon-migration.md`。
+>   · **进度**：Task 1–10 已完成（Neon 项目/分支/Auth 开通、schema 迁移工具、`lib/auth` + `lib/data` + 客户端门面、登录门控、注销事务、`sin1` 区域、Supabase 依赖移除）；**staging 已于 2026-10-19 切到 Neon**（Neon staging 分支已迁移；`x-vercel-id` 函数段为 `sin1`；浏览器实测通过：未登录引导、邮箱验证码登录、建档、运势、风水居所+报告、解梦、掷筊、改名、登出/重登数据仍在、注销后 11 张表 0 行）。**production 已于 2026-10-20 切到 Neon**（`production` 分支 = `d288664`；Neon production 分支已迁移；函数段 `sin1`；邮箱验证码经 Resend `noreply@agentjoey.ai` 送达；owner 数据已从 Supabase 导入——1 档案含解读、1 风水报告、2 解梦、2 掷筊、1 条款同意，md5 与源库逐项一致，页面实测显示正常）。**Supabase 尚未暂停**（等 owner 确认，见 `EP-supabase-sunset`）；Vercel Production 上的旧 `SUPABASE*`/`TELEGRAM_*` 等变量待随 Supabase 下线一并删除。
 >   · **身份/数据**：Neon Auth（Managed Better Auth，邮箱验证码），**无匿名账号**——未登录不能存档；数据全走服务端 `lib/data/*`（会话 uid 过滤，无 RLS）；Neon 项目 `lucky-lake-64982745`（ap-southeast-1），分支 production `br-steep-firefly-a1zje5v4` / staging `br-dry-recipe-a1yu0b5m` / dev `br-sweet-shadow-a1j0jfsd`，见 `docs/deployment.md`。
 >   · **Telegram 已整体下线**（bot、Mini App、`/api/tg/*`、cron、grammy 全删）。重新接入见 BACKLOG `EP-tg-replan`；下文各节里 TG 相关内容均为**历史记录**。
->   · **上线前必做**：staging 的 `allow_localhost` 已关；**production 分支的 `allow_localhost` 仍为 true，切生产前须在 Neon Console 关闭**。Custom SMTP 暂用 Resend 的 `agentjoey.ai` 发信域名（owner 2026-10-19 决定），**需在 Neon Console 为 staging/production 配置**，配好前两分支走 Neon 共享 SMTP（`auth@mail.myneon.app`，验证码可用）。见 `docs/deployment.md`。
+>   · **上线前必做**：staging 与 production 的 `allow_localhost` 均已关闭；两分支 Custom SMTP 已配（Resend，`noreply@agentjoey.ai`，owner 2026-10-20 配置）。小差异：production 发件人名为「Sojan」、staging 为「照见 Sojan」，可在 Neon Console 统一。见 `docs/deployment.md`。
 >   · **遗留**：`EP-llm-unauth`（`/api/reading`、`dailyPolish`/`dailyBehavior` 未登录可调）、`EP-supabase-sunset`（切换后暂停 Supabase `sxjcpoxhphlnwhpzachi`，2–4 周后经 owner 确认删除）。
 
 > 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。

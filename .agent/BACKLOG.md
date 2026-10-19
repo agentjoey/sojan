@@ -7,7 +7,7 @@
 - [ ] **[EP-session-cache-orphan] 注销后其他设备/标签页的会话缓存仍有效，可写出孤儿行**：Neon Auth 的 `__Secure-neon-auth.local.session_data` 是带签名的会话缓存 cookie，TTL 最长 300 s。账号注销后，**其他设备/标签页**不会被清 cookie，在缓存过期前 `getSession()` 仍返回已删除用户的 uid，此窗口内 `createProfile` / `createDwelling` / `saveFengshuiReport` 等写路径可能写入无人可达的孤儿行（`profiles` 等表无到 auth 用户的外键）。方案：`withUid` 的写路径改用 `auth.getSession({ query: { disableCookieCache: "true" } })` 绕开缓存直查上游（SDK 支持，见 `@neondatabase/auth` dist `server-pZf5ArnA.mjs` ~1065）；读路径可继续用缓存。代价：每次写多一次上游往返，需评估。
 - [ ] **[EP-reading-save-timing] 命盘解读要等打字机动画播完才保存**（2026-10-19 staging 实测发现，迁移前即如此）：`app/chart/page.tsx` 的 `finalize()`（含 `saveReading`）只在 `requestAnimationFrame` 打字机追平全文后触发。长解读按 60–120 字/秒要播一分钟左右；用户中途离开/刷新/关页，或标签页在后台（rAF 被降频乃至暂停），解读就不会落库，LLM 额度白花，下次回来又要重新生成。方案：流读完（`streamDone`）即保存，动画只负责展示；补一条「流结束即调 saveReading」的页面测试。
 - [ ] **[EP-reading-field-leak] 解读正文出现 facts 字段名**（2026-10-19 staging 实测）：命理段标题写出了「命宫（未支）为空宫（soulTriad.isEmpty）」——模型把承重事实的字段名原样写进正文。需在 `@sojan/llm` prompt 硬规则里禁止引用字段名，并在 sanitize 层去掉 `xxx.yyy` 形式的标识符；补 eval 用例。
-- [ ] **[EP-supabase-sunset] Supabase 下线**：production 切换完成后**暂停**项目 `sxjcpoxhphlnwhpzachi`（Task 12 Step 5，暂停日期待补）；保留 2–4 周作为回滚后路，**到期删除须 owner 明确确认**（不可逆）。删除前确认 owner 数据已在 Neon 核对无误、Vercel 上已无 `SUPABASE*` env。
+- [ ] **[EP-supabase-sunset] Supabase 下线**：production 已于 2026-10-20 切换完成；**暂停**项目 `sxjcpoxhphlnwhpzachi` 待 owner 确认（暂停日期待补），同时删除 Vercel Production 上的旧 `SUPABASE*`/`NEXT_PUBLIC_SUPABASE_*`/`TELEGRAM_*`/`TG_*`/`CRON_SECRET` 等变量；保留 2–4 周作为回滚后路，**到期删除须 owner 明确确认**（不可逆）。删除前确认 owner 数据已在 Neon 核对无误、Vercel 上已无 `SUPABASE*` env。
 
 ## 🔴 HIGH
 ### 账号登录（EP-account-login，owner 实测发现 2026-08-21，**同日修复**）

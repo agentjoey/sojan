@@ -1,7 +1,7 @@
 # Deployment — Eastern-Astrology-MVP
 
 > 托管：**Vercel**（Next.js App Router，函数区域固定 `sin1`，见 `apps/web/vercel.json`）。数据库 + 认证：**Neon**（Postgres + Neon Auth），2026-10 自 Supabase 迁入。设计见 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`。
-> ⏳ **production 切换尚未执行**（待 Task 12：production env、迁移、owner 数据导入、冒烟；切换日期待补）。下文 production 栏描述的是目标状态。
+> ✅ **切换完成**：staging 2026-10-19、production 2026-10-20 已切到 Neon 并实测。Supabase 项目 `sxjcpoxhphlnwhpzachi` 尚未暂停（见 BACKLOG `EP-supabase-sunset`），Vercel Production 上的旧 Supabase/TG 变量随其下线一并删除。
 
 ## 环境变量
 见 `.env.example`。生产用 `vercel env` 管理。下表均为**服务端变量**（无 `NEXT_PUBLIC_` 前缀，不会进客户端包）：

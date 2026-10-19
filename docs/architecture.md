@@ -1,7 +1,7 @@
 # Architecture — 照见 Sojan
 
 > 东方命理（八字 + 紫微）× 西方心理占星（利兹·格林）双引擎。系统架构总览；PRD 见 Obsidian `P028-Miro-Zhaojian`，调研依据见 `research/`，决策见 `docs/decisions/`。
-> 现状：MVP 全链路已上线（production `sojan.app` · staging `zhaojian.agentjoey.ai`）。**2026-10 起数据库与认证由 Supabase 迁到 Neon（Postgres + Neon Auth），Telegram bot / Mini App 已下线**（production 切换日期待 Task 12 完成后补）。本文随引擎演进同步更新。
+> 现状：MVP 全链路已上线（production `sojan.app` · staging `zhaojian.agentjoey.ai`）。**数据库与认证由 Supabase 迁到 Neon（Postgres + Neon Auth）、Telegram bot / Mini App 下线的代码已完成于 `feat/neon-migration`，staging/生产切换待执行**（上述线上环境在切换完成前仍跑旧 Supabase 版本）。本文随引擎演进同步更新。
 
 ## 1. 设计总原则
 
@@ -68,7 +68,7 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 |------|------|--------|------|
 | `@sojan/core` | 排盘 + 统一 Schema + 每日运势 + 共振映射 | lunar-typescript, iztro, circular-natal-horoscope-js, zod | ✅ 上线（core 22 测试） |
 | `@sojan/llm` | 承重事实 + 三声部 Prompt + 双线 LLM 客户端 + 反幻觉链 + eval | fetch（provider 无关） | ✅ 上线（llm 26 测试） |
-| `apps/web` | 表单 + 命盘可视化 + 运势日历 + 档案 + 登录 | Next.js 16, Neon Postgres (`@neondatabase/serverless`), Neon Auth (`@neondatabase/auth`), tz-lookup | ✅ 上线（Neon 迁移已合 `feat/neon-migration`，production 切换待 Task 12） |
+| `apps/web` | 表单 + 命盘可视化 + 运势日历 + 档案 + 登录 | Next.js 16, Neon Postgres (`@neondatabase/serverless`), Neon Auth (`@neondatabase/auth`), tz-lookup | ✅ 上线（Neon 迁移代码已完成于 `feat/neon-migration`，staging/生产切换待执行） |
 
 ## 5. 解读层细节（反幻觉是重点）
 

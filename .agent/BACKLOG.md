@@ -3,7 +3,8 @@
 
 ## 🔴 Neon 迁移遗留（2026-10-19，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`）
 - [ ] **[EP-tg-replan] Telegram 重新规划**：bot + Mini App + `/api/tg/*` + cron 已在迁移中整体下线（D2），代码留在 git 历史。重新接入必须按**新身份模型**设计（Neon Auth 会话 uid；TG initData 与邮箱账号如何绑定、合成邮箱/付费门槛漏洞要重新评估），**不要从历史原样恢复**。先 brainstorming 再决定是否做；TG 里没有 web 导航、webview 无浏览器侧会话这两条旧陷阱（见 git 历史里的 CLAUDE.md）重做时仍成立。关闭的 TG 条目：`EP-jiao-tg`、`EP-domain-2a/2b/2c`、`EP-tg-bot-close`、`EP-spirit-chat-orphan`、`EP-tg-bot-test`、`EP-billing-pay`（TG Stars 一项）。
-- [ ] **[EP-llm-unauth] LLM 入口未鉴权**：`/api/reading`（流式解读）与 `app/actions.ts` 的 `dailyPolish` / `dailyBehavior` 不要求登录即可调用，会被任意消耗 LLM 额度。迁移前就存在，不在本次范围（设计 §1/§9）。方案：改走 `requireUid()` + 额度闸门（复用 `llm_usage` / `consume_llm_credit_account`）。
+- [ ] **[EP-llm-unauth] LLM 入口未鉴权**：`/api/reading`（流式解读）与 `app/actions.ts` 的 `dailyPolishAction` / `dailyBehaviorAction`，以及 `/api/fengshui/object`、`/api/fengshui/reading`（Layer 0）同样不要求登录即可调用，会被任意消耗 LLM 额度。迁移前就存在，不在本次范围（设计 §1/§9）。方案：改走 `requireUid()` + 额度闸门（复用 `llm_usage` / `consume_llm_credit_account`）。
+- [ ] **[EP-session-cache-orphan] 注销后其他设备/标签页的会话缓存仍有效，可写出孤儿行**：Neon Auth 的 `__Secure-neon-auth.local.session_data` 是带签名的会话缓存 cookie，TTL 最长 300 s。账号注销后，**其他设备/标签页**不会被清 cookie，在缓存过期前 `getSession()` 仍返回已删除用户的 uid，此窗口内 `createProfile` / `createDwelling` / `saveFengshuiReport` 等写路径可能写入无人可达的孤儿行（`profiles` 等表无到 auth 用户的外键）。方案：`withUid` 的写路径改用 `auth.getSession({ query: { disableCookieCache: "true" } })` 绕开缓存直查上游（SDK 支持，见 `@neondatabase/auth` dist `server-pZf5ArnA.mjs` ~1065）；读路径可继续用缓存。代价：每次写多一次上游往返，需评估。
 - [ ] **[EP-supabase-sunset] Supabase 下线**：production 切换完成后**暂停**项目 `sxjcpoxhphlnwhpzachi`（Task 12 Step 5，暂停日期待补）；保留 2–4 周作为回滚后路，**到期删除须 owner 明确确认**（不可逆）。删除前确认 owner 数据已在 Neon 核对无误、Vercel 上已无 `SUPABASE*` env。
 
 ## 🔴 HIGH

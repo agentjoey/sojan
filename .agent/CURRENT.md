@@ -5,8 +5,8 @@ Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成 + 2026-08-28 打磨批，只剩 D 块过场动效）**
 Last Updated:   2026-10-19 by claude（Neon 迁移 Task 1–10 完成并在 `feat/neon-migration` 分支，文档收尾 Task 12a；staging/production 切换待做）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 193 · llm 279 · web 834（全绿；`lint` 0 errors 已为阻塞闸门）
-⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
+测试:           core 182 · llm 279 · web 727（另 36 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；2026-10-19 Neon 迁移分支实测，全绿；`lint` 0 errors 已为阻塞闸门）
+✅ `pnpm typecheck`：core / llm / apps/web 均 0 errors（此前 apps/web 的 7 处既存测试类型错误随 Neon 迁移中相关测试的删改一并消除，BACKLOG `EP-web-typecheck-debt` 可关闭）。
 
 > 🚚 **Supabase → Vercel + Neon 迁移（2026-10-19，进行中）**：分支 `feat/neon-migration`，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`，计划 `docs/superpowers/plans/2026-10-19-vercel-neon-migration.md`。
 >   · **进度**：Task 1–10 已完成（Neon 项目/分支/Auth 开通、schema 迁移工具、`lib/auth` + `lib/data` + 客户端门面、登录门控、注销事务、`sin1` 区域、Supabase 依赖移除）；Task 11（staging 切换 + 冒烟）、Task 12（production 切换 + owner 数据导入 + 暂停 Supabase）**待做**，Task 12a（本次文档收尾）完成。**production / staging 仍跑旧 Supabase 版本，直到切换完成**（切换日期待 Task 12 后补）。
@@ -130,10 +130,10 @@ spec 同波1（§14 波2 表）· plan `docs/superpowers/plans/2026-08-15-fengsh
 1. ~~**【已解除 2026-08-16】TG 会话下身份不一致**~~ —— 由 **EP-fs-tg** 修复：新增 `api/tg/fengshui` 中介端点，`lib/dwellings.ts` / `lib/fengshui-report.ts` 按 `hasTgSession()` 在**数据层**分流，TG 路径的 uid 只从 HMAC 验签的 TG session 解，七处查询全带 `.eq("uid", s.uid)`。同时修掉一条 spec 未预见的：TG 的 RLS 下 `getProfile(id)` 逐条读拿 null，**合看在 TG 内一直静默失效**，改走 `tgListProfiles()` 中介。
 
 **其他已知限制（不阻塞合并）**
-- **多居所写入但不可读**：`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套及以后只作为管理列表里的一行存在。最终评审 I2 据此**撤除了多居所付费墙**——为零可观察产出收费不可辩护。日后做切换器时需**同时**新建服务端写入路由：`createDwelling` 是浏览器直写 Supabase，届时任何纯客户端闸门都可绕过。
+- **多居所写入但不可读**：`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套及以后只作为管理列表里的一行存在。最终评审 I2 据此**撤除了多居所付费墙**——为零可观察产出收费不可辩护。日后做切换器时需把多居所闸门放在服务端：（Neon 迁移前 `createDwelling` 是浏览器直写 Supabase，属历史背景；现已是走会话 uid 的 server action，`lib/data/dwellings.ts`，闸门可直接落在其中。）
 - **`DwellingForm` 编辑回显不可达**：`initial` prop 与 `updateDwelling` 都实现且有单测，但页面无编辑入口 → 生产走不到。归 EP-fs-tg §4.2（与 §4.1 的原生 `confirm()` 一并修）。
 - 探测失败路径会发两次 LLM 调用（`unknown` 发 Layer-0 一次，重试进 `entitled` 改指纹再发一次）；两次都是真实缓存未命中，代价由用户显式点击封顶，接入支付后值得重估。
-- cookie 解析现存两份拷贝（EP-account2 已把 `api/fengshui/reading` / `billing/status` 收敛进 `resolveUid`，第三份留在 `GET /api/tg/session` 的内联解析——它需要 exp/uid 等 session 字段做续期判断，而 `resolveUid` 只返回 uid）；待 `resolveUid` 扩返回 session 字段后可收敛最后一份。
+- ~~cookie 解析现存两份拷贝~~（**历史**：`GET /api/tg/session` 与 `resolveUid` 已随 Telegram 下线、Neon Auth 迁移删除；身份现统一走 `lib/account/uid.ts` 的 `getViewer`/`getUid`）。
 - `packages/core/tsconfig.json` 的 `include` 只有 `["src"]` → `core/test/` 不过类型检查，写在那里的类型断言是**惰性的**。已从台账升入正式待办。
 
 ## 风水「境」· Telegram 适配（EP-fs-tg，2026-08-16）

@@ -15,12 +15,14 @@
 | `LLM_API_KEY` | LLM 密钥。默认 MiniMax-M3 走 anthropic 兼容线（`sk-cp…`）；兼容读取 `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` 作为回退 |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_BASE_URL` / `LLM_WIRE` | 可插拔 LLM，未设时用 MiniMax-M3 默认值（见 CLAUDE.md）|
 | `BILLING_ENABLED` | 会员闸门总开关。**不为 `"1"`（默认）时不做任何限制** |
-| `FREE_LLM_MONTHLY` | 免费账号每月 LLM 额度（仅 `BILLING_ENABLED=1` 时生效）|
+| `FREE_LLM_MONTHLY` | 免费账号每月 LLM 额度，不设 = 30（`lib/entitlements.ts`；仅 `BILLING_ENABLED=1` 时生效）|
 | `FREE_PROFILE_LIMIT` | 免费档案上限，不设 = 3（仅 `BILLING_ENABLED=1` 时生效）|
 | `NEXT_PUBLIC_SPIRIT_ENABLED` | 本命之灵 / 掷筊 flag，`=1` 开启 |
 | `NEXT_PUBLIC_FENGSHUI_ENABLED` | 风水「境」flag，`=1` 开启。**2026-08-16 起 Production + Preview 均已设为 1** |
+| `NEXT_PUBLIC_DREAM_ENABLED` | 解梦 flag，`=1` 开启 |
 
-⚠️ `NEXT_PUBLIC_*`（上表仅两个 flag）是**构建期内联**的：改后必须**重新部署**才生效。
+⚠️ `NEXT_PUBLIC_*`（上表三个 flag：`SPIRIT` / `FENGSHUI` / `DREAM`；代码里只用到这三个）是**构建期内联**的：改后必须**重新部署**才生效。
+⚠️ **每个会执行 `next build` 的 Vercel 环境（Production **和** Preview）都必须配 `NEON_AUTH_BASE_URL` / `NEON_AUTH_COOKIE_SECRET`**：`app/api/auth/[...path]/route.ts` 在 import 时就实例化 auth，缺任何一个 `next build` 直接失败（不是运行时才报错）。Preview 可指向 dev 分支的值。
 ⚠️ **已移除**（迁移后 Vercel 上若还留着请清掉）：所有 `SUPABASE*` / `NEXT_PUBLIC_SUPABASE_*`、`TELEGRAM_*`、`TG_*`、`NEXT_PUBLIC_TG_*`、`NEXT_PUBLIC_MINIAPP_URL`、`CRON_SECRET`、`NEXT_PUBLIC_BILLING_ENABLED`、`NEXT_PUBLIC_FREE_PROFILE_LIMIT`。
 
 ## Neon 分支 ↔ Vercel 环境

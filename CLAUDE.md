@@ -64,7 +64,7 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 |-------|------|------|
 | Web 框架 | **Next.js 16 App Router (TS)** + React 19 + Tailwind 4 | ✅ `apps/web` 已建 |
 | 部署 | **Vercel**（函数区域固定 `sin1`，见 `apps/web/vercel.json`，与 Neon 同在新加坡）| ✅ |
-| 数据库 + 认证 | **Neon Postgres**（项目 `lucky-lake-64982745`，ap-southeast-1，PG 18）+ **Neon Auth**（Managed Better Auth，邮箱验证码登录；`@neondatabase/auth` 锁 `0.6.0-beta`）| ✅ 2026-10 自 Supabase 迁入；production 切换见 `.agent/CURRENT.md` |
+| 数据库 + 认证 | **Neon Postgres**（项目 `lucky-lake-64982745`，ap-southeast-1，PG 18）+ **Neon Auth**（Managed Better Auth，邮箱验证码登录；`@neondatabase/auth` 锁 `0.6.0-beta`）| 🚧 代码已完成于 `feat/neon-migration`（自 Supabase 迁入）；staging/生产切换待执行，见 `.agent/CURRENT.md` |
 | 八字排盘 | lunar-typescript (MIT) | ✅ 已定 |
 | 紫微排盘 | iztro (MIT) | ✅ 已定 |
 | 西方星盘 | circular-natal-horoscope-js（公有领域，规避 Swiss Ephemeris AGPL）| ✅ 已定 |

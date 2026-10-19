@@ -161,7 +161,7 @@ Neon lucky-lake-64982745（ap-southeast-1）
 ## 9. 风险与遗留
 
 - **Neon Auth SDK 仍是 beta 版本号**：`@neondatabase/auth` 锁死在 `0.6.0-beta`，升级前看 changelog（10-16 那次升级已经改过 account 方法的参数）。
-- **会话 cookie 的 `sameSite` 默认是 `strict`**：对验证码登录没影响，以后加 magic link 或第三方登录时要重新评估。
+- **会话 cookie 的 `sameSite` 默认是 `lax`**（SDK 默认值，`@neondatabase/auth` dist `server-pZf5ArnA.mjs` ~925：`sameSite ?? "lax"`）：验证码登录无跨站跳转，没影响；以后加 magic link 或第三方登录时按 lax 语义复核（顶层跨站 GET 会带 cookie，POST 不会）。注销路由清 cookie 时也用 `SameSite=Lax` 与之对齐。
 - **区域一致**：Vercel 函数区域必须设为 `sin1`。否则（默认 `iad1`）每条 SQL 都要跨太平洋走一个来回。
 - **现存的未鉴权 LLM 入口**（`/api/reading`、`app/actions.ts` 的 `dailyPolish` / `dailyBehavior`）不在本次范围，记 BACKLOG `EP-llm-unauth`。
 - **TG 恢复**：日后从 git 历史按新身份模型重新接入，记 BACKLOG `EP-tg-replan`。

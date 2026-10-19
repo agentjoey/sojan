@@ -468,6 +468,8 @@
   - 未登录逐页打开 Review Focus 1 的八个页面，确认显示引导。
   - 起盘时被引导去登录，回来后表单已回填。
   - 用邮箱验证码登录（错码一次，确认提示）。
+  - 确认收到的验证码是 **6 位**（与 `account/page.tsx` 的 `OTP_LENGTH = 6` 一致；位数不符则先改常量再测）。
+  - 登录成功后在 DevTools → Application → Cookies 确认 `__Secure-neon-auth.session_token` 与 `__Secure-neon-auth.local.session_data` **两个 cookie 都已设置**（缺 `local.session_data` 多半是 trusted origin / `NEON_AUTH_COOKIE_SECRET` 配置问题，页面会提示「登录状态没有保存成功」）。
   - 建档 → `/chart` 生成解读 → 刷新后解读仍在。
   - `/calendar` 正常；`/fengshui` 新建居所、生成报告；`/dream` 一次；`/spirit` 掷筊一次。
   - `/profiles` 改名、删档。

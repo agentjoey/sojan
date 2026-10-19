@@ -1,4 +1,3 @@
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { auth } from "@/lib/auth/server";
 import { UnauthenticatedError } from "@/lib/errors";
 
@@ -31,21 +30,4 @@ export async function requireUid(): Promise<string> {
   const uid = await getUid();
   if (!uid) throw new UnauthenticatedError();
   return uid;
-}
-
-/**
- * 旧的 Supabase Bearer token 解析（仅读 `req.headers`，不用 `next/headers`）。
- * @deprecated Task 10 删除；新代码一律用 getViewer/getUid/requireUid。
- */
-export async function resolveUid(
-  req: Request,
-): Promise<{ uid: string; via: "web" } | null> {
-  const authz = req.headers.get("authorization");
-  if (authz?.startsWith("Bearer ")) {
-    const token = authz.slice(7);
-    const { data } = await supabaseAdmin().auth.getUser(token);
-    if (data.user) return { uid: data.user.id, via: "web" };
-  }
-
-  return null;
 }

@@ -7,12 +7,7 @@ vi.mock("@/lib/auth/server", () => ({
   auth: { getSession: (...a: unknown[]) => getSessionMock(...a) },
 }));
 
-const getUserMock = vi.fn();
-vi.mock("@/lib/supabase-admin", () => ({
-  supabaseAdmin: () => ({ auth: { getUser: (...a: unknown[]) => getUserMock(...a) } }),
-}));
-
-const { getViewer, getUid, requireUid, resolveUid } = await import("../uid");
+const { getViewer, getUid, requireUid } = await import("../uid");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -72,25 +67,5 @@ describe("getUid / requireUid", () => {
   it("requireUid 无会话 → 抛 UnauthenticatedError", async () => {
     getSessionMock.mockResolvedValue({ data: null, error: null });
     await expect(requireUid()).rejects.toBeInstanceOf(UnauthenticatedError);
-  });
-});
-
-// 旧 Bearer 路径（@deprecated，Task 10 删除）——删除前保持行为不变。
-describe("resolveUid（deprecated）：只读 Request 本身", () => {
-  it("有 Bearer → via=web", async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: "u2" } } });
-    const req = new Request("http://x/api/whatever", { headers: { authorization: "Bearer tok" } });
-    expect(await resolveUid(req)).toEqual({ uid: "u2", via: "web" });
-  });
-
-  it("没有 Bearer → null", async () => {
-    expect(await resolveUid(new Request("http://x/api/whatever"))).toBeNull();
-    expect(getUserMock).not.toHaveBeenCalled();
-  });
-
-  it("Bearer 无效（getUser 无用户）→ null", async () => {
-    getUserMock.mockResolvedValue({ data: { user: null } });
-    const req = new Request("http://x/api/whatever", { headers: { authorization: "Bearer bad" } });
-    expect(await resolveUid(req)).toBeNull();
   });
 });

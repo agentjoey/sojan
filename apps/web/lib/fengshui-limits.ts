@@ -2,11 +2,11 @@
  * 风水（「境」）功能的数量上限。**单一事实源**——服务端校验与客户端选择器共用同一个
  * 常量，不各写一份字面量。
  *
- * ⚠️ 这个模块必须保持零依赖（不 import supabase / core / react）：它同时被 Node
+ * ⚠️ 这个模块必须保持零依赖（不 import db / core / react）：它同时被 Node
  * 运行时的路由（`app/api/fengshui/reading/route.ts`）与浏览器组件
  * （`app/fengshui/DwellingForm.tsx`、`app/fengshui/page.tsx`）import。把它挂到
- * `lib/dwellings.ts` 之类的模块上会顺带把 `"use client"` 的 supabase 浏览器客户端
- * 拖进服务端路由的模块图里。
+ * `lib/dwellings.ts` 之类的模块上，会让路由与浏览器两边的模块图互相夹带
+ * 对方的依赖（server action / 服务端 SQL）。
  */
 
 /**

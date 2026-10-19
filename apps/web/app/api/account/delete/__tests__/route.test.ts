@@ -58,7 +58,10 @@ describe("POST /api/account/delete", () => {
       expect(line, name).toBeTruthy();
       expect(line).toMatch(/Max-Age=0/i);
       expect(line).toMatch(/Path=\//i);
-      expect(line).toMatch(/Secure/i);
+      // 注意：行首的 cookie 名自带 "__Secure-"，必须匹配属性段，否则永远为真
+      expect(line).toMatch(/;\s*Secure(;|$)/i);
+      expect(line).toMatch(/;\s*HttpOnly(;|$)/i);
+      expect(line).toMatch(/;\s*SameSite=Lax(;|$)/i);
     }
   });
 
@@ -73,7 +76,10 @@ describe("POST /api/account/delete", () => {
   it("purgeUserData reject → 500，不清 cookie", async () => {
     getUidMock.mockResolvedValue("u1");
     purgeMock.mockRejectedValue(new Error("db down"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await POST(req());
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
     expect(res.status).toBe(500);
     expect(res.headers.getSetCookie()).toEqual([]);
   });

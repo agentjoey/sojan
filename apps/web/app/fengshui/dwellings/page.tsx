@@ -46,7 +46,7 @@ export default function DwellingsPage() {
   const [dwellings, setDwellings] = useState<Dwelling[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  // 页内两步确认（EP-fs-tg）：点「删除」只进入确认态，再点「确认」才真正删。
+  // 页内两步确认：点「删除」只进入确认态，再点「确认」才真正删。
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // 编辑入口（spec §4.2 / 评审必修1）：DwellingForm 的 `initial` 编辑回显此前没有
   // 任何调用方——生产不可达的死代码，且是用户修正「同住人超限的历史居所」的唯一

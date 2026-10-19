@@ -100,8 +100,7 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
   useEffect(() => {
     // 有意为之（不是可挪进渲染体的派生状态）：这正是「先用服务端初值渲染避免
     // hydration mismatch、挂载后立刻用访客本地时钟纠偏」的规范写法，与
-    // `lib/i18n/I18nProvider.tsx`（62 行）、`components/DarkImage.tsx`
-    // 是同一类已被本仓库接受的模式。
+    // `lib/i18n/I18nProvider.tsx`（62 行）是同一类已被本仓库接受的模式。
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setToday(computeToday());
 
@@ -118,7 +117,7 @@ export default function HomeClient({ solarHou, today: initialToday }: HomeClient
       timer = setTimeout(() => {
         // 不需要 eslint-disable：`react-hooks/set-state-in-effect` 只管 effect
         // body 里直接同步的 setState，这里是定时器回调里的 setState（订阅外部
-        // 时钟变化），是规则本身认可的写法（同上方注释引的 DarkImage 例子）。
+        // 时钟变化），是规则本身认可的写法。
         setToday(computeToday());
         scheduleMidnightRollover();
       }, nextMidnight.getTime() - now.getTime());

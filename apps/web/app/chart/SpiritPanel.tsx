@@ -34,23 +34,20 @@ function Bubble({ role, children }: { role: "spirit" | "user"; children: React.R
 /**
  * 掷筊问事的追问面板（EP-jiao 最终评审 C2 + I4 合并修复）。
  *
- * 这个组件此前叫「本命之灵通用聊天面板」，挂在 /chart 页做常驻多轮对话：读写
- * `spirit_messages`（`apps/web/lib/spirit.ts` 的 `listMessages`/`appendMessage`，
- * 该文件按 profile 存全量历史、不按会话切分），追问打通用 `/api/spirit/chat`。
- * EP-jiao 把它挪来 /spirit 承载「掷完筊之后的追问」，只加了 `seedTurns` 去渲染
- * 开场，但 `listMessages`/`appendMessage`/`/api/spirit/chat` 三处都原样留着，
- * 于是：
- *   1) 第二次问卦时，`listMessages` 拉出的是同一 profile 下**上一卦的全部追问
- *      记录**，倒序拼在新一卦的 seed 后面——时序错乱、旧对话污染新卦上下文
+ * 这个组件此前叫「本命之灵通用聊天面板」，挂在 /chart 页做常驻多轮对话：把整段
+ * 历史按 profile 持久化、追问走一条通用聊天接口（二者均已删除）。EP-jiao 把它挪来
+ * /spirit 承载「掷完筊之后的追问」时，持久化与通用接口都原样留着，于是：
+ *   1) 第二次问卦时，拉出的是同一 profile 下**上一卦的全部追问记录**，倒序拼在
+ *      新一卦的 seed 后面——时序错乱、旧对话污染新卦上下文
  *      （最终评审 C2，100% 复现于每个用户的第二次问卦）。
- *   2) 追问打通用 `/api/spirit/chat`，不带掷筊的 `JIAO_RULES_*` 与
- *      `correctOmen` 后置校验——掷筊守护栏在第二轮就消失（最终评审 I4）。
+ *   2) 通用接口不带掷筊的 `JIAO_RULES_*` 与 `correctOmen` 后置校验——掷筊守护栏
+ *      在第二轮就消失（最终评审 I4）。
  *
  * 现在的形态：**整个组件一次性、不持久化，追问统一走 `/api/spirit/jiao` 的
  * `followUp` 分支（`continueJiaoReply`）**。本仓库唯一的挂载点就是掷筊后的对话
  * （`app/spirit/page.tsx`），不再有别的调用方需要「常驻可续、写库」的语义——
  * 历史续问走的是 `jiao_history` 的 `full_text` 锚点（见 spec §2），与这里的
- * `turns` state 完全无关，从不读写 `spirit_messages`。追问因此与首轮同一套
+ * `turns` state 完全无关，从不读写任何持久化消息表。追问因此与首轮同一套
  * `JIAO_RULES_*`/`correctOmen`，掷筊守护栏覆盖整场对话，不再有「第一轮受管、
  * 第二轮起失控」的缺口。
  *

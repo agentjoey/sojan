@@ -31,8 +31,8 @@ export async function POST(req: Request): Promise<Response> {
   if (dreamRaw && dreamRaw.length > DREAM_MAX_CHARS) return new Response("梦境过长", { status: 400 });
   if (followUp && followUp.length > DREAM_MAX_CHARS) return new Response("追问过长", { status: 400 });
 
-  // EP-account2-05：与 api/spirit/chat 同一处漏洞（原 `if (userId)` 未带 token
-  // 时静默跳过闸门）。解梦没有开场白分支，任何一次调用都必须已识别身份。
+  // EP-account2-05：原 `if (userId)` 在未带身份时会静默跳过闸门。
+  // 解梦没有开场白分支，任何一次调用都必须已识别身份。
   // 身份只取会话 cookie（getUid），不再读 Authorization 头。
   const userId = await getUid();
   if (!userId) {

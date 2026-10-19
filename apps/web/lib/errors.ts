@@ -10,7 +10,11 @@ export class UnauthenticatedError extends Error {
   }
 }
 
-export type ActionErrorCode = "unauthenticated" | "profile_limit" | "profile_not_found";
+export type ActionErrorCode =
+  | "unauthenticated"
+  | "profile_limit"
+  | "profile_not_found"
+  | "invalid_nickname";
 
 export type ActionResult<T> = { ok: true; value: T } | { ok: false; code: ActionErrorCode };
 

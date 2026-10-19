@@ -124,11 +124,14 @@ export async function saveQuestionnaire(profileId: string, answers: Questionnair
   });
 }
 
-/** 改昵称：去首尾空白后 1–24 字符（页面先校验；这里是服务端兜底，越界直接抛错）。 */
+/**
+ * 改昵称：去首尾空白后 1–24 字符（页面先校验；这里是服务端兜底）。
+ * 校验在 `withUid` 内：无会话优先返回 unauthenticated；越界/非字符串返回 invalid_nickname。
+ */
 export async function renameProfile(id: string, nickname: string): Promise<ActionResult<void>> {
-  const trimmed = nickname.trim();
-  if (trimmed.length < 1 || trimmed.length > 24) throw new Error("昵称长度应为 1-24 字符");
   return withUid(async (uid) => {
+    const trimmed = typeof nickname === "string" ? nickname.trim() : "";
+    if (trimmed.length < 1 || trimmed.length > 24) throw new ActionError("invalid_nickname");
     await sql()`update profiles set nickname = ${trimmed} where id = ${id} and user_id = ${uid}`;
   });
 }

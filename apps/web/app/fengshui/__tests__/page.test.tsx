@@ -1257,8 +1257,8 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Critical 1）：未知 ≠ �
 
 /**
  * 身份只靠同源请求自带的会话 cookie：客户端不再手工拼 `Authorization`。
- * 此前的实现读 Supabase 会话 token 附到探测 GET 与叙述 POST 上，两处漏掉任何一处都会让
- * 会员被静默 402；迁到 Neon Auth cookie 之后，这条断言守的是反方向——别把 Bearer 拼回来
+ * 此前的实现读浏览器侧会话 token 附到探测 GET 与叙述 POST 上，两处漏掉任何一处都会让
+ * 会员被静默 402；改用 Neon Auth cookie 之后，这条断言守的是反方向——别把 Bearer 拼回来
  * （服务端也已不读 `Authorization`，拼了只会制造「看似带了身份」的假象）。
  */
 describe("EP-fs-17 会员闸门：客户端不手工带 Authorization（身份走 cookie）", () => {

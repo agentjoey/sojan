@@ -53,9 +53,8 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 **Version:**  v0.1.0            ← release.sh 自动更新
 
 > **命名沿革**（避免后人困惑）：`照见/Zhaojian`（代号）→ 一度对外称 `Mira`（`2026-08-14-fengshui-environment-design.md` 有记载，已全部收回）→ 现定 `照见 / Sojan`。
-> **两处内部标识符刻意保留 `zhaojian` 旧名、不是漏改**（均已在代码里写了注释）：
-> ① `SYNTHETIC_EMAIL_DOMAIN = "zhaojian.local"`（`apps/web/lib/access.ts`）——生产库 `auth.users` 里已有真实用户邮箱是 `tg_<id>@zhaojian.local`，改常量会让存量 TG 用户不再被识别为合成邮箱、重开 EP-account2 堵上的付费门槛漏洞。
-> ② localStorage 缓存键前缀 `zhaojian.*`（`app/calendar/page.tsx`、`app/chart/page.tsx`、`lib/profiles.ts`）——改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度。
+> **内部标识符刻意保留 `zhaojian` 旧名、不是漏改**（已在代码里写了注释）：
+> localStorage 缓存键前缀 `zhaojian.*`（`app/calendar/page.tsx`、`app/chart/page.tsx`、`lib/profiles.ts`）——改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度。
 
 **Technical docs:** [Architecture](docs/architecture.md) · [Deployment](docs/deployment.md) · [Operations](docs/operations.md)
 **前序资产:** Obsidian `research/fortune-engine-{prd,plan,tech-report}.md`（八字+紫微基础方案，本项目在其上叠加心理占星层）

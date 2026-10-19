@@ -20,7 +20,7 @@ vi.mock("@/lib/auth/client", () => ({
  * 复用既有的 autoSend 机制（与 topic=portrait 同一套接线）。
  *
  * 全文件用 `SpiritPanel` 的桩组件截获 autoSend/seedTurns prop——真实 SpiritPanel 依赖
- * Supabase / fetch / Telegram 等一整套外部世界，这里只关心「page.tsx 算出的
+ * 服务端 action / fetch 等一整套外部世界，这里只关心「page.tsx 算出的
  * autoSend/seedTurns 是什么」，与 SpiritPanel 内部如何消费它是两件事（后者的测试见
  * `app/chart/__tests__/SpiritPanel.test.tsx`——最终评审 I5 之前这句话曾经是失实的，
  * 全仓当时并不存在那个文件；I5 已补上，这里改成指向具体路径而不是一句空口承诺）。
@@ -34,7 +34,7 @@ vi.mock("@/lib/auth/client", () => ({
  * page.tsx 顶层 `const ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1"`
  * 在**模块加载时**求值，必须 `vi.resetModules()` 之后再动态 import；`I18nProvider`
  * 必须出自**同一次**动态 import，否则 `useT()` 拿到的 context 实例对不上 Wrapper
- * 提供的那个；supabase 会话用 `vi.hoisted` 共享可变量，不能直接摆弄 mock 实例
+ * 提供的那个；会话/数据层 mock 用 `vi.hoisted` 共享可变量，不能直接摆弄 mock 实例
  * （resetModules 后会打到旧实例）。
  */
 // SpiritPanel 的 autoSend prop 已随 EP-jiao Task 8 删除（产生它的旧 topic=portrait /

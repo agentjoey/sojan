@@ -10,8 +10,6 @@ export type Season = "春" | "夏" | "秋" | "冬";
 
 export type FortuneImage = {
   file: string; // 相对 public，如 /fortune/guansha-1.jpeg
-  /** 深色版约定路径（/fortune/x.jpg → /fortune/x-dark.jpg），不存在时由客户端 onError 回退 */
-  darkFile?: string;
   /** 适配的十神情绪（可多选）—— 主匹配维度，确保意境一致 */
   moods: Relation[];
   /** 适配季节（可选，EP-cal-img-2 加的第二匹配维度，软匹配——同情绪池内优先选季节相符的，没有就不筛季节） */
@@ -76,13 +74,6 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
-/** 按约定生成 `-dark` 变体路径，不验证文件是否存在（客户端 onError 兜底）。 */
-export function darkVariant(path: string): string {
-  const dot = path.lastIndexOf(".");
-  if (dot <= 0) return `${path}-dark`;
-  return `${path.slice(0, dot)}-dark${path.slice(dot)}`;
-}
-
 /**
  * 按当日流日选一张配图：先按情绪(relation)匹配，池内再优先取当季(seasonOf)标签相符的子集
  * （子集为空则退回整个情绪池），最终按日期确定性轮选（同一天稳定）。
@@ -95,7 +86,5 @@ export function matchFortuneImage(relation: Relation, dateStr: string): FortuneI
   const season = seasonOf(dateStr);
   const seasonPool = pool.filter((i) => i.seasons?.includes(season));
   const list = seasonPool.length ? seasonPool : pool;
-  const image = list[hashStr(dateStr) % list.length];
-  if (!image) return null;
-  return { ...image, darkFile: darkVariant(image.file) };
+  return list[hashStr(dateStr) % list.length] ?? null;
 }

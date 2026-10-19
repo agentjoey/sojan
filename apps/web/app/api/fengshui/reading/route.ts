@@ -57,7 +57,7 @@ export async function GET(): Promise<Response> {
  * （住宅实盘 + 多住客合看），服务端独立校验——客户端闸门（/fengshui 页面上的
  * Paywall）只挡得住走页面 UI 的请求，直接打这个接口能绕过去，所以这里必须自己
  * 再判一次，不能只信任客户端不发这两个字段。未通过时返回 402（与
- * `/api/spirit/chat` 的 LLM 额度闸门同一个状态码语义），不触碰
+ * 其它 LLM 额度闸门同一个状态码语义），不触碰
  * `computeFengshui`/`generateFengshuiReading`，不产生任何 LLM 费用。
  */
 export async function POST(req: Request): Promise<Response> {

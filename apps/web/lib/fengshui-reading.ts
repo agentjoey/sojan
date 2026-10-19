@@ -9,7 +9,7 @@ import type { FengshuiSections } from "@/lib/fengshui-report";
 
 /**
  * 风水报告生成的**服务端共享逻辑**（校验 / 闸门 / 生成）。
- * 曾为 web 路由与 TG 中介端点共用（TG 已下线），保留为独立模块供路由调用。
+ * 独立于路由文件，便于单测。
  *
  * 本模块只被服务端路由 import，不进浏览器模块图（依赖 entitlements → 服务端 SQL）。
  */

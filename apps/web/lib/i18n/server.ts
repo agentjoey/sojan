@@ -1,7 +1,7 @@
 import { type Locale, LOCALE_COOKIE } from "./locale";
 
 export function localeFromRequest(req: Request): Locale {
-  // 1. 客户端显式指定（TG / Web 调用统一优先）
+  // 1. 客户端显式指定（调用方显式传入优先）
   const header = req.headers.get("x-zj-locale");
   if (header === "zh" || header === "en") return header;
 

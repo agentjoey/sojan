@@ -8,9 +8,7 @@ import { BirthInputSchema, computeUnifiedChart, type DailyFortune } from "@sojan
  * 也不再有任何 Telegram 宿主分流。
  */
 
-const routerPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: routerPush }),
   usePathname: () => "/",
 }));
 
@@ -70,7 +68,6 @@ async function renderHome(locale: "zh" | "en" = "zh") {
 
 beforeEach(() => {
   vi.resetModules();
-  routerPush.mockReset();
   activeProfileMock.mockClear();
   vi.stubEnv("NEXT_PUBLIC_FENGSHUI_ENABLED", "1");
   vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");

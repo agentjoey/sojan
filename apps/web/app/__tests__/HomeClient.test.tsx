@@ -23,10 +23,6 @@ import { BirthInputSchema, computeUnifiedChart, type DailyFortune } from "@sojan
  * - 长驻标签页跨本地午夜自动纠偏（M6），且纠偏后取数日期也跟着变。
  */
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
-
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
 const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart: computeUnifiedChart(birth), createdAt: "", reading: null };
 const fortune: DailyFortune = {

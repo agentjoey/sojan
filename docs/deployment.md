@@ -1,7 +1,7 @@
 # Deployment — Eastern-Astrology-MVP
 
 > 托管：**Vercel**（Next.js App Router，函数区域固定 `sin1`，见 `apps/web/vercel.json`）。数据库 + 认证：**Neon**（Postgres + Neon Auth），2026-10 自 Supabase 迁入。设计见 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`。
-> ✅ **切换完成**：staging 2026-10-19、production 2026-10-20 已切到 Neon 并实测。Supabase 项目 `sxjcpoxhphlnwhpzachi` 已于 2026-10-20 暂停（回滚窗口 2–4 周，见 BACKLOG `EP-supabase-sunset`），Vercel Production 上的旧 Supabase/TG 变量随其下线一并删除。
+> ✅ **切换完成**：staging 2026-10-19、production 2026-10-20 已切到 Neon 并实测。Supabase 项目 `sxjcpoxhphlnwhpzachi` 已于 2026-10-20 删除；Vercel 上残留的旧 Supabase/TG 变量可直接删除。
 
 ## 环境变量
 见 `.env.example`。生产用 `vercel env` 管理。下表均为**服务端变量**（无 `NEXT_PUBLIC_` 前缀，不会进客户端包）：
@@ -55,7 +55,7 @@ Neon 项目 `sojan`（`lucky-lake-64982745`，AWS ap-southeast-1，PG 18）。**
   vercel deploy            # preview
   vercel deploy --prod     # production
   ```
-- **回滚：** 切换后 Supabase 项目（`sxjcpoxhphlnwhpzachi`）暂停保留 2–4 周；回滚 = 把 Vercel env 和代码分支回退。到期删除须 owner 确认（BACKLOG `EP-supabase-sunset`）。Supabase 暂停时间待 Task 12 后补。
+- **回滚：** Supabase 项目已于 2026-10-20 删除，**不再有回退到 Supabase 版本的路径**。出问题时在 Vercel 上回滚到上一个 Neon 版本部署，数据层用 Neon 分支快照/时间点恢复。
 - **Telegram 已下线**：bot webhook、`/api/tg/*`、cron 均已删除，无需再配 `setWebhook`。重新接入见 BACKLOG `EP-tg-replan`。
 
 ## 发布

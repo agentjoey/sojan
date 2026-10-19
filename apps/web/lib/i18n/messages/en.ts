@@ -83,6 +83,7 @@ export const en: Messages = {
       verifyFailed: "Sign-in failed. Please try again later.",
       sendFailed: "Couldn't send the code. Please try again later.",
       rateLimited: "Too many requests. Please wait a moment and try again.",
+      sessionMissing: "The code was accepted, but your sign-in session wasn't saved. Please refresh the page and try again, or use another browser.",
     },
   },
   signInPrompt: {

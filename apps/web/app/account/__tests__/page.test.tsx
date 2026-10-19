@@ -26,6 +26,8 @@ const replaceMock = vi.fn();
 const refreshMock = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: replaceMock, refresh: refreshMock }) }));
 vi.mock("@/components/Paywall", () => ({ Paywall: () => null }));
+const clearLocalCachesMock = vi.fn();
+vi.mock("@/lib/local-cache", () => ({ clearLocalCaches: () => clearLocalCachesMock() }));
 
 const signedInSummary: Summary = { email: "me@example.com", access: { level: "identified", hasVerifiedEmail: true } };
 
@@ -37,6 +39,14 @@ const fetchMock = vi.fn(defaultFetch);
 
 function stubSearch(search: string) {
   Object.defineProperty(window, "location", { value: { ...window.location, search }, writable: true });
+}
+
+/** 注销成功后页面会 `location.href = "/"`；jsdom 对赋值只报 not-implemented，这里吞掉。 */
+function stubLocationHref() {
+  Object.defineProperty(window, "location", {
+    value: { ...window.location, search: "", set href(_v: string) {} },
+    writable: true,
+  });
 }
 
 async function renderAccountPage() {
@@ -59,6 +69,7 @@ beforeEach(() => {
   acceptTermsOnceMock.mockClear();
   replaceMock.mockClear();
   refreshMock.mockClear();
+  clearLocalCachesMock.mockClear();
   stubSearch("");
 });
 afterEach(() => {
@@ -81,6 +92,11 @@ async function enterCodeAndVerify(code = "123456") {
 }
 
 describe("未登录：邮箱 → 验证码", () => {
+  beforeEach(() => {
+    // 挂载时未登录；验证码通过后服务端能读到会话。
+    getAccountSummaryMock.mockReset().mockResolvedValueOnce(null).mockResolvedValue(signedInSummary);
+  });
+
   it("显示邮箱输入，没有登出按钮与危险区", async () => {
     await renderAccountPage();
     expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
@@ -172,6 +188,43 @@ describe("未登录：邮箱 → 验证码", () => {
     expect(sendOtpMock).toHaveBeenCalledWith({ email: "me@example.com", type: "sign-in" });
   });
 
+  it("验证码通过但读不到会话（cookie 没落地）→ 显示 sessionMissing 错误，保留输入，不跳转", async () => {
+    getAccountSummaryMock.mockReset().mockResolvedValue(null);
+    await renderAccountPage();
+    await submitEmail();
+    await enterCodeAndVerify("123456");
+    expect(await screen.findByText(/登录状态没有保存成功/)).toBeInTheDocument();
+    expect((screen.getByLabelText("验证码") as HTMLInputElement).value).toBe("123456");
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(acceptTermsOnceMock).not.toHaveBeenCalled();
+  });
+
+  it("邮箱输入框连按两次 Enter：第一次发送未返回前，sendVerificationOtp 只调用一次", async () => {
+    let release!: (v: { data: unknown; error: AuthErr }) => void;
+    sendOtpMock.mockImplementation(() => new Promise((r) => { release = r; }));
+    await renderAccountPage();
+    const input = await screen.findByLabelText("邮箱地址");
+    fireEvent.change(input, { target: { value: "me@example.com" } });
+    await act(async () => { fireEvent.keyDown(input, { key: "Enter" }); });
+    await act(async () => { fireEvent.keyDown(input, { key: "Enter" }); });
+    expect(sendOtpMock).toHaveBeenCalledTimes(1);
+    await act(async () => { release({ data: { success: true }, error: null }); });
+    expect(await screen.findByLabelText("验证码")).toBeInTheDocument();
+  });
+
+  it("验证码输入框连按两次 Enter：第一次验证未返回前，signIn.emailOtp 只调用一次", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    let release!: (v: { data: unknown; error: AuthErr }) => void;
+    signInOtpMock.mockImplementation(() => new Promise((r) => { release = r; }));
+    const input = await screen.findByLabelText("验证码");
+    fireEvent.change(input, { target: { value: "123456" } });
+    await act(async () => { fireEvent.keyDown(input, { key: "Enter" }); });
+    await act(async () => { fireEvent.keyDown(input, { key: "Enter" }); });
+    expect(signInOtpMock).toHaveBeenCalledTimes(1);
+    await act(async () => { release({ data: { user: {} }, error: null }); });
+  });
+
   it("「更换邮箱」回到邮箱步骤", async () => {
     await renderAccountPage();
     await submitEmail();
@@ -210,7 +263,20 @@ describe("已登录视图", () => {
       fireEvent.click(await screen.findByText("登出"));
     });
     expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(clearLocalCachesMock).toHaveBeenCalledTimes(1);
     expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
+  });
+
+  it("注销成功 → 清本地缓存并 signOut", async () => {
+    stubLocationHref();
+    await renderAccountPage();
+    fireEvent.click(await screen.findByText("注销账号"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("确认注销"));
+    });
+    expect(clearLocalCachesMock).toHaveBeenCalledTimes(1);
+    expect(signOutMock).toHaveBeenCalledTimes(1);
   });
 
   it("注销：勾选确认后 POST /api/account/delete（无 Authorization 头）", async () => {
@@ -225,6 +291,20 @@ describe("已登录视图", () => {
     const init = (call as unknown[])[1] as { method: string; headers: Record<string, string> };
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBeUndefined();
+  });
+
+  it("注销失败 → 不清本地缓存", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/account/delete") return new Response(JSON.stringify({}), { status: 500 });
+      return defaultFetch(url);
+    });
+    await renderAccountPage();
+    fireEvent.click(await screen.findByText("注销账号"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("确认注销"));
+    });
+    expect(clearLocalCachesMock).not.toHaveBeenCalled();
   });
 
   it("注销失败 → 显示服务端错误或通用失败文案", async () => {

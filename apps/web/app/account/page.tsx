@@ -9,6 +9,7 @@ import { Paywall } from "@/components/Paywall";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
 import { Emphasis } from "@/components/ui";
+import { clearLocalCaches } from "@/lib/local-cache";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { LocaleSwitch } from "@/lib/i18n/switch";
 
@@ -127,16 +128,20 @@ export default function AccountPage() {
         setError(err.status === 429 ? t("account.otp.rateLimited") : t("account.otp.invalidCode"));
         return;
       }
+      // 验证码通过后会话 cookie 必须已经落地：服务端读不到会话（trusted origin / cookie 配置问题等）
+      // 就别假装登录成功——停在验证码表单、保留输入，给出可读错误。
+      const summary = await getAccountSummary().catch(() => null);
+      if (!summary) {
+        setError(t("account.otp.sessionMissing"));
+        return;
+      }
       // 条款接受记录是登录的附带动作，失败不挡路。
       await acceptTermsOnce().catch(() => {});
       // ?next= 只接受同源相对路径（safeNext 拒绝 "//evil.com" 等），防 open redirect。
       const target = safeNext(new URLSearchParams(window.location.search).get("next"));
       router.replace(target);
       // 目标就是本页时 replace 不会重挂载组件，要自己把视图切成已登录。
-      if (target === DEFAULT_NEXT) {
-        const summary = await getAccountSummary();
-        if (summary) setView({ kind: "in", email: summary.email });
-      }
+      if (target === DEFAULT_NEXT) setView({ kind: "in", email: summary.email });
     } catch {
       setError(t("account.otp.verifyFailed"));
     } finally {
@@ -160,6 +165,7 @@ export default function AccountPage() {
         setDeleteError(json.error || t("account.deleteFailed"));
         return;
       }
+      clearLocalCaches();
       await authClient.signOut().catch(() => {});
       location.href = "/";
     } catch {
@@ -171,6 +177,7 @@ export default function AccountPage() {
 
   async function handleLogout() {
     await authClient.signOut().catch(() => {});
+    clearLocalCaches();
     setView({ kind: "out" });
     setStep("email");
     setCode("");
@@ -267,7 +274,7 @@ export default function AccountPage() {
                   placeholder="your@email.com"
                   className={inputCls}
                   style={inputSt}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendEmail()}
+                  onKeyDown={(e) => e.key === "Enter" && busy !== "send" && handleSendEmail()}
                 />
               </div>
 
@@ -302,7 +309,7 @@ export default function AccountPage() {
                   placeholder="000000"
                   className={`${inputCls} tracking-[0.5em]`}
                   style={inputSt}
-                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                  onKeyDown={(e) => e.key === "Enter" && busy === null && handleVerify()}
                 />
               </div>
 

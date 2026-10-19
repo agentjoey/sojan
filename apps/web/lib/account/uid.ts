@@ -14,9 +14,11 @@ export async function getViewer(): Promise<Viewer | null> {
     if (error || !data?.user) return null;
     const { id, email, emailVerified } = data.user;
     return { uid: id, email, emailVerified: !!emailVerified };
-  } catch {
+  } catch (e) {
     // SDK 的 getSession 可能直接 throw（上游非传输类错误会 rethrow；
-    // Server Component 渲染期写 Set-Cookie 也会抛）。统一降级为匿名，而不是 500。
+    // Server Component 渲染期写 Set-Cookie 也会抛）。统一降级为匿名，而不是 500；
+    // 但要留痕，否则 Neon Auth 配置/上游故障会被静默吞成「全员未登录」。
+    console.error("[getViewer] getSession threw", e);
     return null;
   }
 }

@@ -23,6 +23,28 @@ beforeEach(() => {
 });
 
 describe("POST /api/account/delete", () => {
+  it("Origin 与 Host 不一致 → 403，且未调用 purgeUserData", async () => {
+    getUidMock.mockResolvedValue("u1");
+    const res = await POST(req({ confirm: true }, { host: "sojan.app", origin: "https://evil.example" }));
+    expect(res.status).toBe(403);
+    expect(purgeMock).not.toHaveBeenCalled();
+    expect(res.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("Origin 非法值 → 403", async () => {
+    getUidMock.mockResolvedValue("u1");
+    const res = await POST(req({ confirm: true }, { host: "sojan.app", origin: "null" }));
+    expect(res.status).toBe(403);
+    expect(purgeMock).not.toHaveBeenCalled();
+  });
+
+  it("Origin 与 Host 一致 → 正常处理", async () => {
+    getUidMock.mockResolvedValue("u1");
+    const res = await POST(req({ confirm: true }, { host: "sojan.app", origin: "https://sojan.app" }));
+    expect(res.status).toBe(200);
+    expect(purgeMock).toHaveBeenCalledWith("u1");
+  });
+
   it("缺少 confirm → 400，不清数据", async () => {
     getUidMock.mockResolvedValue("u1");
     const res = await POST(req({}));

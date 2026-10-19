@@ -89,6 +89,7 @@ export const zh = {
       verifyFailed: "登录失败，请稍后重试",
       sendFailed: "发送失败，请稍后重试",
       rateLimited: "发送过于频繁，请稍后再试",
+      sessionMissing: "验证码已通过，但登录状态没有保存成功。请刷新页面后重试，或换一个浏览器。",
     },
   },
   // D1：未登录访客不能存档；依赖档案的页面对访客显示这块（components/SignInPrompt）。

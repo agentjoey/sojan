@@ -32,6 +32,13 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
     session.uid = null;
   });
 
+  /** 直接插一条档案（本文件不测建档逻辑）；报告的 profile_id 必须是自己名下的档案。 */
+  async function insertProfile(uid: string): Promise<string> {
+    const rows = await sql()`
+      insert into profiles (user_id, birth_input, chart) values (${uid}, '{}'::jsonb, '{}'::jsonb) returning id`;
+    return rows[0]!.id as string;
+  }
+
   async function createAs(uid: string, name = "家") {
     session.uid = uid;
     const r = await createDwelling(mk(name));
@@ -86,8 +93,9 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
   it("本人 delete：居所下的报告级联删除", async () => {
     const u1 = fresh();
     const d = await createAs(u1);
+    const pid = await insertProfile(u1);
     expect((await saveFengshuiReport({
-      fingerprint: "fs-cascade", profileId: crypto.randomUUID(), dwellingId: d.id, layer: 1, locale: "zh", sections,
+      fingerprint: "fs-cascade", profileId: pid, dwellingId: d.id, layer: 1, locale: "zh", sections,
     })).ok).toBe(true);
     expect(await readFengshuiReport("fs-cascade")).toEqual(sections);
 
@@ -111,8 +119,9 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
   it("报告：u2 读不到 u1 同 fingerprint 的报告；无会话读返回 null", async () => {
     const u1 = fresh();
     const u2 = fresh();
+    const p1 = await insertProfile(u1);
     session.uid = u1;
-    await saveFengshuiReport({ fingerprint: "fs-shared", profileId: crypto.randomUUID(), dwellingId: null, layer: 0, locale: "zh", sections });
+    await saveFengshuiReport({ fingerprint: "fs-shared", profileId: p1, dwellingId: null, layer: 0, locale: "zh", sections });
     expect(await readFengshuiReport("fs-shared")).toEqual(sections);
 
     session.uid = u2;
@@ -127,7 +136,9 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
   it("报告：同一 (uid, fingerprint) 再 save 覆盖 sections，行数仍是 1；不同 uid 同指纹各自一行", async () => {
     const u1 = fresh();
     const u2 = fresh();
-    const args = { fingerprint: "fs-upsert", profileId: crypto.randomUUID(), dwellingId: null, layer: 0, locale: "zh" };
+    const p1 = await insertProfile(u1);
+    const p2 = await insertProfile(u2);
+    const args = { fingerprint: "fs-upsert", profileId: p1, dwellingId: null, layer: 0, locale: "zh" };
     session.uid = u1;
     await saveFengshuiReport({ ...args, sections });
     const next = { situation: "新甲", youAndSpace: "新乙", actions: "- 新丙" };
@@ -137,7 +148,7 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
     expect(rows[0]!.n).toBe(1);
 
     session.uid = u2;
-    await saveFengshuiReport({ ...args, sections });
+    await saveFengshuiReport({ ...args, profileId: p2, sections });
     expect(await readFengshuiReport("fs-upsert")).toEqual(sections);
     session.uid = u1;
     expect(await readFengshuiReport("fs-upsert")).toEqual(next);
@@ -147,11 +158,26 @@ describe.skipIf(!hasTestDb)("lib/data/dwellings + fengshui-report（Neon）", { 
     const u1 = fresh();
     const u2 = fresh();
     const theirs = await createAs(u1);
+    const mine = await insertProfile(u2);
     session.uid = u2;
     await saveFengshuiReport({
-      fingerprint: "fs-foreign", profileId: crypto.randomUUID(), dwellingId: theirs.id, layer: 1, locale: "zh", sections,
+      fingerprint: "fs-foreign", profileId: mine, dwellingId: theirs.id, layer: 1, locale: "zh", sections,
     });
     const rows = await sql()`select dwelling_id from fengshui_reports where uid = ${u2} and input_fingerprint = 'fs-foreign'`;
     expect(rows[0]!.dwelling_id).toBeNull();
+  });
+
+  it("报告：profileId 指向别人的（或不存在的）档案 → profile_not_found，不落库", async () => {
+    const u1 = fresh();
+    const u2 = fresh();
+    const theirs = await insertProfile(u1);
+    session.uid = u2;
+    for (const [fp, profileId] of [["fs-foreign-profile", theirs], ["fs-missing-profile", crypto.randomUUID()]] as const) {
+      expect(await saveFengshuiReport({ fingerprint: fp, profileId, dwellingId: null, layer: 0, locale: "zh", sections }))
+        .toEqual({ ok: false, code: "profile_not_found" });
+      const rows = await sql()`select 1 from fengshui_reports where input_fingerprint = ${fp}`;
+      expect(rows.length).toBe(0);
+    }
+    expect(await readFengshuiReport("fs-foreign-profile")).toBeNull();
   });
 });

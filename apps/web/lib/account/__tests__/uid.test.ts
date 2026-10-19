@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UnauthenticatedError } from "@/lib/errors";
 
 const getSessionMock = vi.fn();
@@ -39,9 +39,20 @@ describe("getViewer", () => {
 });
 
 describe("getViewer：getSession 抛异常时降级为匿名", () => {
-  it("getSession reject → null（不向上抛）", async () => {
-    getSessionMock.mockRejectedValue(new Error("upstream down"));
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    errSpy.mockRestore();
+  });
+
+  it("getSession reject → null（不向上抛），并 console.error 留痕", async () => {
+    const boom = new Error("upstream down");
+    getSessionMock.mockRejectedValue(boom);
     await expect(getViewer()).resolves.toBeNull();
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith("[getViewer] getSession threw", boom);
   });
 
   it("getSession reject → getUid 为 null，requireUid 抛 UnauthenticatedError", async () => {

@@ -15,7 +15,24 @@ function neonAuthCookieNamesIn(req: Request): string[] {
     .filter((n) => n.startsWith(NEON_AUTH_COOKIE_PREFIX));
 }
 
+/**
+ * 同源校验：带了 Origin 头且 host 与请求 Host 不一致 → 跨站发起，拒绝。
+ * 没有 Origin（服务端到服务端、测试）放行；SameSite=Lax cookie 不会随跨站 POST 发送，这是第二道闸。
+ */
+function isCrossOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== req.headers.get("host");
+  } catch {
+    return true;
+  }
+}
+
 export async function POST(req: Request): Promise<Response> {
+  if (isCrossOrigin(req)) {
+    return NextResponse.json({ error: "跨站请求被拒绝" }, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   if (body?.confirm !== true) {
     return NextResponse.json({ error: "缺少确认标志" }, { status: 400 });

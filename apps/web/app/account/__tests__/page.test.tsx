@@ -1,32 +1,43 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 
-const getWebUserMock = vi.fn(async (): Promise<{ id: string; email: string | null; isAnonymous: boolean } | null> => null);
-const signInWithEmailMock = vi.fn(async (..._a: unknown[]): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true }));
-const upgradeAnonymousToEmailMock = vi.fn(async (..._a: unknown[]): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true }));
-const getSessionMock = vi.fn(async () => ({ data: { session: null as { access_token: string } | null } }));
-vi.mock("@/lib/supabase", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/supabase")>("@/lib/supabase");
-  return {
-    ANON_MERGE_TOKEN_KEY: actual.ANON_MERGE_TOKEN_KEY,
-    getWebUser: (...a: unknown[]) => getWebUserMock(...a),
-    signInWithEmail: (...a: unknown[]) => signInWithEmailMock(...a),
-    signOutWeb: vi.fn(),
-    upgradeAnonymousToEmail: (...a: unknown[]) => upgradeAnonymousToEmailMock(...a),
-    supabase: () => ({ auth: { getSession: getSessionMock } }),
-  };
-});
+type AuthErr = { status?: number; message?: string } | null;
+const sendOtpMock = vi.fn(async (..._a: unknown[]): Promise<{ data: unknown; error: AuthErr }> => ({ data: { success: true }, error: null }));
+const signInOtpMock = vi.fn(async (..._a: unknown[]): Promise<{ data: unknown; error: AuthErr }> => ({ data: { user: {} }, error: null }));
+const signOutMock = vi.fn(async (..._a: unknown[]) => ({ data: { success: true }, error: null }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: {
+    emailOtp: { sendVerificationOtp: (...a: unknown[]) => sendOtpMock(...a) },
+    signIn: { emailOtp: (...a: unknown[]) => signInOtpMock(...a) },
+    signOut: (...a: unknown[]) => signOutMock(...a),
+  },
+}));
+
+type Summary = { email: string; access: { level: "identified" | "member" | "anonymous"; hasVerifiedEmail: boolean } } | null;
+const getAccountSummaryMock = vi.fn(async (): Promise<Summary> => null);
+const acceptTermsOnceMock = vi.fn(async () => {});
+vi.mock("@/lib/data/account", () => ({
+  getAccountSummary: () => getAccountSummaryMock(),
+  acceptTermsOnce: () => acceptTermsOnceMock(),
+}));
+
+const replaceMock = vi.fn();
+const refreshMock = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: replaceMock, refresh: refreshMock }) }));
 vi.mock("@/components/Paywall", () => ({ Paywall: () => null }));
 
-const { ANON_MERGE_TOKEN_KEY } = await import("@/lib/supabase");
+const signedInSummary: Summary = { email: "me@example.com", access: { level: "identified", hasVerifiedEmail: true } };
 
 const defaultFetch = async (url: string) => {
-  if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: "me@example.com" }), { status: 200 });
   if (url.startsWith("/api/billing/status")) return new Response(JSON.stringify({ tier: "free", memberUntil: null, used: 0, free: 30 }), { status: 200 });
   return new Response("{}", { status: 200 });
 };
 const fetchMock = vi.fn(defaultFetch);
+
+function stubSearch(search: string) {
+  Object.defineProperty(window, "location", { value: { ...window.location, search }, writable: true });
+}
 
 async function renderAccountPage() {
   const { default: Page } = await import("../page");
@@ -41,175 +52,202 @@ async function renderAccountPage() {
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockImplementation(defaultFetch);
-  getWebUserMock.mockReset().mockResolvedValue(null);
-  signInWithEmailMock.mockReset().mockResolvedValue({ ok: true });
-  upgradeAnonymousToEmailMock.mockReset().mockResolvedValue({ ok: true });
-  getSessionMock.mockReset().mockResolvedValue({ data: { session: null } });
-  localStorage.clear();
+  sendOtpMock.mockReset().mockResolvedValue({ data: { success: true }, error: null });
+  signInOtpMock.mockReset().mockResolvedValue({ data: { user: {} }, error: null });
+  signOutMock.mockClear();
+  getAccountSummaryMock.mockReset().mockResolvedValue(null);
+  acceptTermsOnceMock.mockClear();
+  replaceMock.mockClear();
+  refreshMock.mockClear();
+  stubSearch("");
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   fetchMock.mockClear();
 });
 
-describe("已登录（邮箱）与未登录视图", () => {
-  it("邮箱用户：渲染登出按钮与危险区", async () => {
-    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
-    await renderAccountPage();
-    expect(await screen.findByText("登出")).toBeInTheDocument();
-    expect(await screen.findByTestId("danger-zone")).toBeInTheDocument();
+async function submitEmail(email = "me@example.com") {
+  fireEvent.change(await screen.findByLabelText("邮箱地址"), { target: { value: email } });
+  await act(async () => {
+    fireEvent.click(screen.getByText("发送验证码"));
   });
+}
 
-  it("未登录：落匿名态，没有登出按钮", async () => {
-    getWebUserMock.mockResolvedValue(null);
+async function enterCodeAndVerify(code = "123456") {
+  fireEvent.change(await screen.findByLabelText("验证码"), { target: { value: code } });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
+  });
+}
+
+describe("未登录：邮箱 → 验证码", () => {
+  it("显示邮箱输入，没有登出按钮与危险区", async () => {
     await renderAccountPage();
     expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
     expect(screen.queryByText("登出")).toBeNull();
+    expect(screen.queryByTestId("danger-zone")).toBeNull();
   });
 
-  it("不再有任何 Telegram 元素：没有 Telegram 登录 widget、没有 Telegram 绑定行", async () => {
-    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
-    const { container } = await renderAccountPage();
-    await screen.findByTestId("identity-email");
-    expect(container.textContent).not.toContain("Telegram");
-    expect(screen.queryByTestId("identity-telegram")).toBeNull();
-    expect(container.querySelector("script[data-telegram-login]")).toBeNull();
-  });
-});
-
-describe("EP-account-login：换设备用已注册邮箱登录", () => {
-  async function fillAndSubmit(email = "existing@example.com") {
-    const input = await screen.findByLabelText("邮箱地址");
-    fireEvent.change(input, { target: { value: email } });
-    await act(async () => {
-      fireEvent.click(screen.getByText("发送登录链接"));
-    });
-  }
-
-  it("匿名设备 + upgrade 成功（全新邮箱）→ 不退回 signInWithEmail，不落匿名 token", async () => {
-    getWebUserMock.mockResolvedValue({ id: "anon1", email: null, isAnonymous: true });
-    getSessionMock.mockResolvedValue({ data: { session: { access_token: "anon-tok-1" } } });
-    upgradeAnonymousToEmailMock.mockResolvedValue({ ok: true });
-
+  it("提交邮箱 → sendVerificationOtp({ email, type: 'sign-in' })，并切到验证码输入", async () => {
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(upgradeAnonymousToEmailMock).toHaveBeenCalledWith("existing@example.com", undefined));
-    expect(signInWithEmailMock).not.toHaveBeenCalled();
-    expect(localStorage.getItem(ANON_MERGE_TOKEN_KEY)).toBeNull();
-    expect(await screen.findByText("已发送，请查收邮件中的登录链接")).toBeInTheDocument();
+    await submitEmail();
+    expect(sendOtpMock).toHaveBeenCalledWith({ email: "me@example.com", type: "sign-in" });
+    expect(await screen.findByLabelText("验证码")).toBeInTheDocument();
+    expect(screen.getByText(/me@example\.com/)).toBeInTheDocument();
   });
 
-  it("匿名设备 + upgrade 失败（邮箱已属于别的账号）→ 退回 signInWithEmail 真正登录，先存好匿名 token", async () => {
-    getWebUserMock.mockResolvedValue({ id: "anon1", email: null, isAnonymous: true });
-    getSessionMock.mockResolvedValue({ data: { session: { access_token: "anon-tok-1" } } });
-    upgradeAnonymousToEmailMock.mockResolvedValue({ ok: false, error: "A user with this email address has already been registered" });
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
+  it("邮箱格式不对 → 提示，不发请求", async () => {
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, undefined));
-    // 退回登录前已经存好匿名 token（不依赖 upgrade 报错文案，任何失败都退回）
-    expect(localStorage.getItem(ANON_MERGE_TOKEN_KEY)).toBe("anon-tok-1");
-    expect(await screen.findByText("已发送，请查收邮件中的登录链接")).toBeInTheDocument();
+    await submitEmail("not-an-email");
+    expect(sendOtpMock).not.toHaveBeenCalled();
+    expect(await screen.findByText("请输入有效的邮箱地址")).toBeInTheDocument();
   });
 
-  it("匿名设备 + upgrade 失败 + 退回登录也失败 → 报错，清掉暂存的匿名 token（没有后续 callback 会用到它）", async () => {
-    getWebUserMock.mockResolvedValue({ id: "anon1", email: null, isAnonymous: true });
-    getSessionMock.mockResolvedValue({ data: { session: { access_token: "anon-tok-1" } } });
-    upgradeAnonymousToEmailMock.mockResolvedValue({ ok: false, error: "taken" });
-    signInWithEmailMock.mockResolvedValue({ ok: false, error: "发送失败" });
-
+  it("sendVerificationOtp 返回 429 → 显示「发送过于频繁」，停留在邮箱步骤", async () => {
+    sendOtpMock.mockResolvedValue({ data: null, error: { status: 429, message: "Too many requests" } });
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(screen.getByText("发送失败")).toBeInTheDocument());
-    expect(localStorage.getItem(ANON_MERGE_TOKEN_KEY)).toBeNull();
+    await submitEmail();
+    expect(await screen.findByText("发送过于频繁，请稍后再试")).toBeInTheDocument();
+    expect(screen.queryByLabelText("验证码")).toBeNull();
   });
 
-  it("非匿名（无会话）→ 直接 signInWithEmail，不碰 upgradeAnonymousToEmail 或匿名 token", async () => {
-    getWebUserMock.mockResolvedValue(null);
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
+  it("sendVerificationOtp 其他错误 → 通用发送失败文案", async () => {
+    sendOtpMock.mockResolvedValue({ data: null, error: { status: 500, message: "boom" } });
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, undefined));
-    expect(upgradeAnonymousToEmailMock).not.toHaveBeenCalled();
-    expect(localStorage.getItem(ANON_MERGE_TOKEN_KEY)).toBeNull();
+    await submitEmail();
+    expect(await screen.findByText("发送失败，请稍后重试")).toBeInTheDocument();
   });
-});
 
-describe("EP-auth-return：?next= 回跳参数透传", () => {
-  function stubSearch(search: string) {
-    Object.defineProperty(window, "location", { value: { ...window.location, search }, writable: true });
-  }
+  it("输入 6 位码 → signIn.emailOtp({ email, otp })；成功后 acceptTermsOnce 并 router.replace 到默认 /account", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    await enterCodeAndVerify("123456");
+    expect(signInOtpMock).toHaveBeenCalledWith({ email: "me@example.com", otp: "123456" });
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/account"));
+    expect(acceptTermsOnceMock).toHaveBeenCalledTimes(1);
+  });
 
-  async function fillAndSubmit(email = "existing@example.com") {
-    const input = await screen.findByLabelText("邮箱地址");
-    fireEvent.change(input, { target: { value: email } });
-    await act(async () => {
-      fireEvent.click(screen.getByText("发送登录链接"));
-    });
-  }
+  it("不足 6 位时验证按钮禁用，不发请求", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    fireEvent.change(await screen.findByLabelText("验证码"), { target: { value: "123" } });
+    expect(screen.getByRole("button", { name: "验证并登录" })).toBeDisabled();
+    expect(signInOtpMock).not.toHaveBeenCalled();
+  });
 
-  it("URL 带 ?next=/dream → signInWithEmail 收到 next，让 /auth/callback 能送回 /dream", async () => {
+  it("?next=/dream → 登录成功后 replace 到 /dream", async () => {
     stubSearch("?next=/dream");
-    getWebUserMock.mockResolvedValue(null);
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, "/dream"));
+    await submitEmail();
+    await enterCodeAndVerify();
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/dream"));
   });
 
-  it("匿名设备退回登录分支同样带上 next", async () => {
-    stubSearch("?next=/dream");
-    getWebUserMock.mockResolvedValue({ id: "anon1", email: null, isAnonymous: true });
-    getSessionMock.mockResolvedValue({ data: { session: { access_token: "anon-tok-1" } } });
-    upgradeAnonymousToEmailMock.mockResolvedValue({ ok: false, error: "taken" });
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
-    await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(upgradeAnonymousToEmailMock).toHaveBeenCalledWith("existing@example.com", "/dream"));
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, "/dream"));
-  });
-
-  it("?next=//evil.com（协议相对地址）→ 拒绝，不当作合法回跳目标透传", async () => {
+  it("?next=//evil.com → 回落 /account，不跳外域", async () => {
     stubSearch("?next=" + encodeURIComponent("//evil.com"));
-    getWebUserMock.mockResolvedValue(null);
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
     await renderAccountPage();
-    await fillAndSubmit();
-
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, undefined));
+    await submitEmail();
+    await enterCodeAndVerify();
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/account"));
+    expect(replaceMock).not.toHaveBeenCalledWith("//evil.com");
   });
 
-  it("?next=https://evil.com（绝对地址）→ 拒绝，不透传", async () => {
-    stubSearch("?next=" + encodeURIComponent("https://evil.com"));
-    getWebUserMock.mockResolvedValue(null);
-    signInWithEmailMock.mockResolvedValue({ ok: true });
-
+  it("验证码错误 → 显示错误文案，输入框保留原值，「重新发送」可点，且不 acceptTermsOnce / 不跳转", async () => {
+    signInOtpMock.mockResolvedValue({ data: null, error: { status: 400, message: "Invalid OTP" } });
     await renderAccountPage();
-    await fillAndSubmit();
+    await submitEmail();
+    await enterCodeAndVerify("654321");
+    expect(await screen.findByText("验证码不正确或已过期，请重试")).toBeInTheDocument();
+    expect((screen.getByLabelText("验证码") as HTMLInputElement).value).toBe("654321");
+    const resend = screen.getByRole("button", { name: "重新发送" });
+    expect(resend).toBeEnabled();
+    expect(acceptTermsOnceMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(signInWithEmailMock).toHaveBeenCalledWith("existing@example.com", undefined, undefined));
+    // 重新发送：再调一次 sendVerificationOtp
+    sendOtpMock.mockClear();
+    await act(async () => {
+      fireEvent.click(resend);
+    });
+    expect(sendOtpMock).toHaveBeenCalledWith({ email: "me@example.com", type: "sign-in" });
+  });
+
+  it("「更换邮箱」回到邮箱步骤", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    fireEvent.click(await screen.findByRole("button", { name: "更换邮箱" }));
+    expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
+  });
+});
+
+describe("已登录视图", () => {
+  beforeEach(() => {
+    getAccountSummaryMock.mockResolvedValue(signedInSummary);
+  });
+
+  it("显示邮箱、会员与额度区、登出按钮、注销区；不再出现邮箱输入", async () => {
+    await renderAccountPage();
+    expect(await screen.findByText("me@example.com")).toBeInTheDocument();
+    expect(await screen.findByTestId("billing-tier")).toHaveTextContent("免费");
+    expect(screen.getByText("本月已用 0/30")).toBeInTheDocument();
+    expect(await screen.findByText("登出")).toBeInTheDocument();
+    expect(await screen.findByTestId("danger-zone")).toBeInTheDocument();
+    expect(screen.queryByLabelText("邮箱地址")).toBeNull();
+  });
+
+  it("billing 状态走同源 fetch，不带 Authorization 头", async () => {
+    await renderAccountPage();
+    await screen.findByTestId("billing-tier");
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).startsWith("/api/billing/status"));
+    expect(call).toBeTruthy();
+    const init = (call as unknown[])[1] as { headers?: Record<string, string> } | undefined;
+    expect(init?.headers?.Authorization).toBeUndefined();
+  });
+
+  it("登出 → authClient.signOut()，回到登录视图", async () => {
+    await renderAccountPage();
+    await act(async () => {
+      fireEvent.click(await screen.findByText("登出"));
+    });
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
+  });
+
+  it("注销：勾选确认后 POST /api/account/delete（无 Authorization 头）", async () => {
+    await renderAccountPage();
+    fireEvent.click(await screen.findByText("注销账号"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("确认注销"));
+    });
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/api/account/delete");
+    expect(call).toBeTruthy();
+    const init = (call as unknown[])[1] as { method: string; headers: Record<string, string> };
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBeUndefined();
+  });
+
+  it("注销失败 → 显示服务端错误或通用失败文案", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/account/delete") return new Response(JSON.stringify({}), { status: 500 });
+      return defaultFetch(url);
+    });
+    await renderAccountPage();
+    fireEvent.click(await screen.findByText("注销账号"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("确认注销"));
+    });
+    expect(await screen.findByText("注销失败，请重试")).toBeInTheDocument();
   });
 });
 
 /**
- * UI v3 C4-1（03-screens 我的+账号 6c）：版式断言。
- * 每条对应一个可独立回退的实现点（订阅等级字级 / 未绑定项朱砂 / 危险区 Emphasis），
- * 删掉对应实现即只有对应用例变红（mutation 复验输出见实施报告）。
+ * UI v3 C4-1（03-screens 我的+账号 6c）：版式断言（订阅等级字级 / 危险区 Emphasis）。
  */
 describe("UI v3 C4-1：6c 版式", () => {
   beforeEach(() => {
-    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
+    getAccountSummaryMock.mockResolvedValue(signedInSummary);
   });
 
   it("订阅等级用 serif 19px 呈现（6c：等级 serif 19px + 用量）", async () => {
@@ -219,28 +257,11 @@ describe("UI v3 C4-1：6c 版式", () => {
     expect(tier.className).toContain("text-[19px]");
   });
 
-  it("绑定与登录：已绑定项墨色、未绑定项朱砂（两侧都钉，不是只钉一侧）", async () => {
-    await renderAccountPage();
-    await waitFor(() => expect(screen.getByTestId("identity-email").textContent).toBe("me@example.com"));
-    expect((screen.getByTestId("identity-email") as HTMLElement).style.color).toBe("var(--color-ink)");
-    cleanup();
-
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: null }), { status: 200 });
-      return defaultFetch(url);
-    });
-    await renderAccountPage();
-    await waitFor(() => expect(screen.getByTestId("identity-email").textContent).toBe("未绑定"));
-    expect((screen.getByTestId("identity-email") as HTMLElement).style.color).toBe("var(--color-cinnabar)");
-  });
-
   it("危险区走强调手法（Emphasis 2px 朱砂左线 + 浅朱砂淡出底），不再是朱砂边框盒", async () => {
     await renderAccountPage();
     const dz = (await screen.findByTestId("danger-zone")) as HTMLElement;
     expect(dz).toHaveStyle({ borderLeft: "2px solid var(--color-cinnabar)" });
-    // 整圈朱砂边框盒已被取代——border shorthand 不再存在（只剩 borderLeft）
     expect(dz.style.border).toBe("");
-    // 不可逆警告仍在强调块内（版式重排没把警告弄丢）
     expect(dz.textContent).toContain("此操作不可逆");
   });
 });

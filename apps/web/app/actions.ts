@@ -12,7 +12,23 @@ import {
   type SolarHou,
   type ZiweiHoroscope,
 } from "@sojan/core";
+import { getViewer } from "@/lib/account/uid";
+import { resolveAccess } from "@/lib/access";
 import { polishDailyFortune, dailyBehaviorAdvice, generateTimeline, summarizeSpiritMemory, summarizeDreamEntry, summarizeJiaoEntry, generateDailySpiritGreeting, resolveLlmConfig, isLlmConfigured, type ReadingLanguage } from "@sojan/llm";
+
+/**
+ * 辅助 LLM action 的统一前置（review #4）：LLM 已配置且会话已登录（邮箱已验证）才放行。
+ * 不满足一律让调用方返回 null——这些 action 的调用方都把 null 当作"无 LLM、静默降级"。
+ * 私有 helper：`"use server"` 文件只能导出 async 函数，故不 export。
+ */
+async function llmAllowed(): Promise<boolean> {
+  if (!isLlmConfigured(resolveLlmConfig())) return false;
+  try {
+    return (await resolveAccess(await getViewer())).level !== "anonymous";
+  } catch {
+    return false; // 会话/库异常按未登录处理，保持"辅助 action 失败即 null"的容错约定
+  }
+}
 
 /** 建档排盘：一次性算出完整命盘（EP-007 冻结存档用）。 */
 export async function computeChartAction(
@@ -50,7 +66,7 @@ export async function solarHouAction(dateStr: string): Promise<SolarHou> {
 
 /** 运势日历轻润色：确定性流日 → 一句温和提点（EP-cal-llm）。无 key 时返回 null（静默降级）。 */
 export async function dailyPolishAction(fortune: DailyFortune, nickname?: string): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try {
     return await polishDailyFortune(fortune, { nickname });
   } catch {
@@ -60,7 +76,7 @@ export async function dailyPolishAction(fortune: DailyFortune, nickname?: string
 
 /** 当日心理行为宜忌：3 宜 3 忌、现代可执行、成长向。无 key 返回 null（降级用确定性趋吉避祸）。 */
 export async function dailyBehaviorAction(fortune: DailyFortune, nickname?: string): Promise<{ do: string[]; dont: string[] } | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try {
     const r = await dailyBehaviorAdvice(fortune, { nickname });
     return r.do.length && r.dont.length ? r : null;
@@ -80,7 +96,7 @@ export async function ziweiHoroscopeAction(birthInput: BirthInput, dateStr: stri
 
 /** 当下时序（EP-521 接入）：大限/流年四化 + 八字大运 → 本年内在主题（非预测）。按年缓存。 */
 export async function timelineAction(birthInput: BirthInput, chart: UnifiedChart, dateStr: string): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try {
     const horoscope = computeZiweiHoroscope(birthInput, dateStr);
     return await generateTimeline(chart, horoscope, { nickname: birthInput.nickname });
@@ -91,7 +107,7 @@ export async function timelineAction(birthInput: BirthInput, chart: UnifiedChart
 
 /** 关系记忆摘要（EP-spirit-05）：把一段对话提炼为灵记住的关切。无 key/失败返回 null。 */
 export async function spiritMemoryAction(history: { role: "user" | "spirit"; content: string }[], prior?: string): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try { return await summarizeSpiritMemory(history, prior); } catch { return null; }
 }
 
@@ -103,7 +119,7 @@ export async function dreamSummaryAction(
   replyText: string,
   language: ReadingLanguage,
 ): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try { return await summarizeDreamEntry(dreamText, replyText, { language }); } catch { return null; }
 }
 
@@ -115,13 +131,13 @@ export async function jiaoSummaryAction(
   replyText: string,
   language: ReadingLanguage,
 ): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try { return await summarizeJiaoEntry(question, replyText, { language }); } catch { return null; }
 }
 
 /** 每日问今（EP-spirit-06）：灵据确定性五维+干支+记忆的第一人称问候。无 key/失败返回 null。 */
 export async function dailySpiritGreetingAction(chart: UnifiedChart, daily: DailyFortune, dateStr: string, memory?: string, questionnaire?: string): Promise<string | null> {
-  if (!isLlmConfigured(resolveLlmConfig())) return null;
+  if (!(await llmAllowed())) return null;
   try { const { text } = await generateDailySpiritGreeting(chart, daily, dateStr, { language: "zh", memory, questionnaire }); return text; } catch { return null; }
 }
 

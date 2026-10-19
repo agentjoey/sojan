@@ -17,6 +17,8 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
 vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
+const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
+vi.mock("@/lib/account/uid", () => ({ getViewer: () => getViewerMock() }));
 const consumeLlmMock = vi.fn(async (..._a: unknown[]) => ({ ok: true }));
 vi.mock("@/lib/entitlements", () => ({
   consumeLlm: (...a: unknown[]) => consumeLlmMock(...a),

@@ -3,6 +3,7 @@ import type { UnifiedChart } from "@sojan/core";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
+import { getViewer } from "@/lib/account/uid";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
@@ -42,7 +43,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!userId) {
     return new Response("未登录", { status: 401 });
   }
-  const access = await resolveAccess(userId);
+  const access = await resolveAccess(await getViewer());
   if (access.level === "anonymous") {
     return new Response("未登录", { status: 401 });
   }

@@ -7,6 +7,8 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
 vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
+const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
+vi.mock("@/lib/account/uid", () => ({ getViewer: () => getViewerMock() }));
 // 类型显式标注为 `{ ok: boolean; reason?: "paywall" }`（与 lib/entitlements.ts 的
 // consumeLlm 真实返回类型一致）：若省略，vi.fn 会从初始返回值 `{ ok: true }` 推出
 // 更窄的 `{ ok: boolean }`，导致下面 `mockResolvedValue({ ok: false, reason: "paywall" })`

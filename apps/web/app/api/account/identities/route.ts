@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveUid } from "@/lib/account/uid";
+import { getViewer, resolveUid } from "@/lib/account/uid";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { SYNTHETIC_EMAIL_DOMAIN, resolveAccess } from "@/lib/access";
 import { recordConsentOnce, TERMS_VERSION } from "@/lib/consent";
@@ -14,7 +14,7 @@ export async function GET(req: Request): Promise<Response> {
   }
   const { uid } = resolved;
 
-  const access = await resolveAccess(uid);
+  const access = await resolveAccess(await getViewer());
   if (access.level !== "anonymous") {
     void recordConsentOnce(uid, "terms", TERMS_VERSION); // best-effort，幂等，不 await
   }

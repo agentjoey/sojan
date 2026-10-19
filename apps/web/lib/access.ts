@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import type { Viewer } from "@/lib/account/uid";
 import { getEntitlement, isMember } from "@/lib/entitlements";
 
 /**
@@ -18,33 +18,22 @@ export type AccessLevel = "anonymous" | "identified" | "member";
 
 export type AccessInfo = {
   level: AccessLevel;
-  /** 真实、已验证、非合成域名的邮箱——不认 email_confirmed_at 的表面值。 */
+  /** Neon Auth 里邮箱已验证（emailVerified）。 */
   hasVerifiedEmail: boolean;
 };
 
 /**
- * 全站唯一访问层级事实源（EP-account2-01）。三层语义：
- *   anonymous  — 无真实已验证邮箱：只能排盘/看确定性内容
- *   identified — 有真实已验证邮箱：可用 LLM 解读，计入免费额度
+ * 全站唯一访问层级事实源（EP-account2-01，Neon Auth 版）。三层语义：
+ *   anonymous  — 无会话，或邮箱未验证：只能排盘/看确定性内容
+ *   identified — 邮箱已验证：可用 LLM 解读，计入免费额度
  *   member     — identified + 有效订阅：会员权益
  * 纯读取，无副作用——身份建立时的条款记录（consent）是独立的调用点，不在这里做。
+ * 入参是 `getViewer()` 的结果：身份信息已在会话里，不再回查 auth 用户表。
  */
-export async function resolveAccess(uid: string): Promise<AccessInfo> {
-  const sb = supabaseAdmin();
+export async function resolveAccess(viewer: Viewer | null): Promise<AccessInfo> {
+  if (!viewer || !viewer.emailVerified) return { level: "anonymous", hasVerifiedEmail: false };
 
-  const { data: userRes } = await sb.auth.admin.getUserById(uid);
-
-  const email = userRes.user?.email ?? null;
-  const emailConfirmed = !!userRes.user?.email_confirmed_at;
-  const isSynthetic = !!email && email.endsWith(`@${SYNTHETIC_EMAIL_DOMAIN}`);
-  const hasVerifiedEmail = emailConfirmed && !!email && !isSynthetic;
-
-  const identified = hasVerifiedEmail;
-  let level: AccessLevel = identified ? "identified" : "anonymous";
-  if (identified) {
-    const ent = await getEntitlement(uid);
-    if (isMember(ent)) level = "member";
-  }
-
-  return { level, hasVerifiedEmail };
+  let level: AccessLevel = "identified";
+  if (isMember(await getEntitlement(viewer.uid))) level = "member";
+  return { level, hasVerifiedEmail: true };
 }

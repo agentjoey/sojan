@@ -1,21 +1,42 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { auth } from "@/lib/auth/server";
+import { UnauthenticatedError } from "@/lib/errors";
+
+export type Viewer = { uid: string; email: string; emailVerified: boolean };
 
 /**
- * 全站唯一 uid 解析入口（EP-account2-02）。
- *
- * 只认 `Authorization: Bearer <access_token>`（TG session cookie 分支已随 TG 下线移除）。
- *
- * ⚠️ 故意只读 `req.headers`，不用 `next/headers` 的 `cookies()`：那个 API 依赖
- * Next 请求处理内部的 AsyncLocalStorage 上下文，只有真正经过 Next 路由分发时才会
- * 被填充。这个仓库的 route 测试统一是「直接 import handler、拿手搓 Request 调用」
- * （不经过 Next 开发/构建服务器），cookies() 在这种调用方式下不可靠。
+ * 全站唯一身份入口：Neon Auth 会话（cookie）→ Viewer。
+ * 无会话、会话出错、或会话里没有 user 一律返回 null（匿名）。
+ * 仅服务端使用（Server Component / Server Action / Route Handler）。
+ */
+export async function getViewer(): Promise<Viewer | null> {
+  const { data, error } = await auth.getSession();
+  if (error || !data?.user) return null;
+  const { id, email, emailVerified } = data.user;
+  return { uid: id, email, emailVerified: !!emailVerified };
+}
+
+export async function getUid(): Promise<string | null> {
+  return (await getViewer())?.uid ?? null;
+}
+
+/** 无会话抛 UnauthenticatedError。只在服务端内部使用，别把异常直接抛给客户端。 */
+export async function requireUid(): Promise<string> {
+  const uid = await getUid();
+  if (!uid) throw new UnauthenticatedError();
+  return uid;
+}
+
+/**
+ * 旧的 Supabase Bearer token 解析（仅读 `req.headers`，不用 `next/headers`）。
+ * @deprecated Task 10 删除；新代码一律用 getViewer/getUid/requireUid。
  */
 export async function resolveUid(
   req: Request,
 ): Promise<{ uid: string; via: "web" } | null> {
-  const auth = req.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    const token = auth.slice(7);
+  const authz = req.headers.get("authorization");
+  if (authz?.startsWith("Bearer ")) {
+    const token = authz.slice(7);
     const { data } = await supabaseAdmin().auth.getUser(token);
     if (data.user) return { uid: data.user.id, via: "web" };
   }

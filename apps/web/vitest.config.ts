@@ -15,6 +15,10 @@ export default defineConfig({
     },
   },
   test: {
+    // @neondatabase/auth 的 ESM 产物里写的是不带扩展名的 `next/headers`，
+    // 被 vitest externalize 后由 Node 原生 ESM 解析会失败；inline 交给 vite 解析。
+    // （uid.ts 间接 import 它，没 mock `@/lib/auth/server` 的测试文件也要能加载。）
+    server: { deps: { inline: ["@neondatabase/auth"] } },
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],

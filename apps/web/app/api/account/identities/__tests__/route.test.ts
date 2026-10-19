@@ -3,10 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const resolveUidMock = vi.fn();
 const resolveAccessMock = vi.fn();
+const getViewerMock = vi.fn();
 const recordConsentOnceMock = vi.fn();
 const getUserByIdMock = vi.fn();
 
-vi.mock("@/lib/account/uid", () => ({ resolveUid: (...a: unknown[]) => resolveUidMock(...a) }));
+vi.mock("@/lib/account/uid", () => ({
+  resolveUid: (...a: unknown[]) => resolveUidMock(...a),
+  getViewer: () => getViewerMock(),
+}));
 vi.mock("@/lib/access", () => ({
   resolveAccess: (...a: unknown[]) => resolveAccessMock(...a),
   SYNTHETIC_EMAIL_DOMAIN: "zhaojian.local",
@@ -26,6 +30,7 @@ const { GET } = await import("../route");
 beforeEach(() => {
   vi.clearAllMocks();
   resolveUidMock.mockResolvedValue({ uid: "u1", via: "web" });
+  getViewerMock.mockResolvedValue({ uid: "u1", email: "a@x.com", emailVerified: true });
   resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
   getUserByIdMock.mockResolvedValue({ data: { user: { email: null } } });
 });
@@ -41,6 +46,7 @@ describe("GET /api/account/identities", () => {
   it("已识别（非 anonymous）→ 记一次 consent（best-effort，不阻塞响应）", async () => {
     const res = await GET(new Request("http://x"));
     expect(res.status).toBe(200);
+    expect(resolveAccessMock).toHaveBeenCalledWith({ uid: "u1", email: "a@x.com", emailVerified: true });
     expect(recordConsentOnceMock).toHaveBeenCalledWith("u1", "terms", "2026-08-20");
   });
 

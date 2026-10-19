@@ -12,6 +12,7 @@
     "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.6.0-beta",
     "@neondatabase/serverless": "^1.2.0",
     "@sojan/core": "workspace:*",
     "@sojan/llm": "workspace:*",

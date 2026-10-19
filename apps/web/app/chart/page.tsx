@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getActiveProfile, getQuestionnaire, saveReading, type Profile } from "@/lib/profiles";
+import { getActiveProfile, getProfile, getQuestionnaire, type Profile } from "@/lib/profiles";
 import { timelineAction } from "@/app/actions";
-import { Card, BellLogo, cn } from "@/components/ui";
+import { Card, BellLogo, Button, cn } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
@@ -21,19 +21,9 @@ import { ChartToc } from "@/components/chart/ChartToc";
 import { SelfPortrait } from "./SelfPortrait";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
-
-type Section = { key: string; title: string; body: string; accent?: "fire" | "water" | "metal" };
-
-function splitSections(md: string): Section[] {
-  const parts = md.split(/^##\s+/m).filter(Boolean);
-  return parts.map((p, i) => {
-    const nl = p.indexOf("\n");
-    const title = (nl === -1 ? p : p.slice(0, nl)).trim();
-    const body = (nl === -1 ? "" : p.slice(nl + 1)).trim();
-    const accent = title.includes("命理") ? "fire" : title.includes("心理") ? "water" : /成长|建议|共振/.test(title) ? "metal" : undefined;
-    return { key: `${i}-${title}`, title, body, accent };
-  });
-}
+import { Paywall } from "@/components/Paywall";
+import { UnauthenticatedError } from "@/lib/errors";
+import { READING_ERROR_MARKER, splitSections } from "@/lib/reading-sections";
 
 const YEAR = new Date().getFullYear();
 const todayYmd = `${YEAR}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
@@ -46,6 +36,7 @@ export default function ChartPage() {
   const [reading, setReading] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [paywall, setPaywall] = useState(false);
   const [timeline, setTimeline] = useState<string | null>(null);
   const [qAnswers, setQAnswers] = useState<Awaited<ReturnType<typeof getQuestionnaire>>>(null);
 
@@ -88,11 +79,14 @@ export default function ChartPage() {
     }
   }
 
+  // 解读由 /api/reading 在流正常结束、四分节齐全时于服务端落库（review #1）；
+  // 页面只发 profileId，不再自己保存——此前会把「⚠️ 错误」或截断文本存成永久解读。
   async function generate() {
     if (!profile) return;
     setStreaming(true);
     setReading("");
     setErr(null);
+    setPaywall(false);
     // 打字机：把（按行到达的）文本逐字铺出，标点处自然停顿——书写感，而非整段刷新
     let target = "";
     let shown = 0;
@@ -100,19 +94,26 @@ export default function ChartPage() {
     let pause = 0;
     let rafId = 0;
 
-    // 只做展示收尾；保存在流读完时就已发出（见下方 streamDone），不在这里重复
     const finalize = () => {
       setReading(target);
-      if (target.trim()) setProfile({ ...profile, reading: target });
+      setProfile({ ...profile, reading: target });
+      setStreaming(false);
+    };
+    const fail = (message: string) => {
+      cancelAnimationFrame(rafId);
+      setReading("");
+      setErr(message);
       setStreaming(false);
     };
     const tick = () => {
+      // 流未结束时扣住末尾一段不铺：失败标记只会出现在结尾，别让它半截闪现在正文里
+      const limit = streamDone ? target.length : Math.max(0, target.length - READING_ERROR_MARKER.length);
       if (pause > 0) {
         pause--;
-      } else if (shown < target.length) {
-        const remaining = target.length - shown;
+      } else if (shown < limit) {
+        const remaining = limit - shown;
         // 接近书写速度：通常 1–2 字/帧(~60–120cps)，落后太多时追赶，临近收尾放慢
-        const step = remaining > 500 ? 5 : remaining > 120 ? 2 : 1;
+        const step = Math.min(remaining > 500 ? 5 : remaining > 120 ? 2 : 1, remaining);
         const last = target[shown + step - 1] ?? "";
         shown += step;
         setReading(target.slice(0, shown));
@@ -128,12 +129,31 @@ export default function ChartPage() {
       const res = await fetch("/api/reading", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-zj-locale": locale },
-        body: JSON.stringify(profile.birthInput),
+        body: JSON.stringify({ profileId: profile.id }),
       });
-      if (!res.ok || !res.body) {
+      if (res.status === 401) {
+        fail("");
+        gate.handleAuthError(new UnauthenticatedError());
+        return;
+      }
+      if (res.status === 402) {
+        fail("");
+        setPaywall(true);
+        return;
+      }
+      if (res.status === 409) {
+        // 别处（另一个标签页）已生成并保存：读回已存的那份
         cancelAnimationFrame(rafId);
-        setErr(await res.text());
-        setStreaming(false);
+        const saved = await getProfile(profile.id);
+        if (saved?.reading) {
+          setProfile(saved);
+          setReading(saved.reading);
+          setStreaming(false);
+        } else fail(t("chart.readingFailed"));
+        return;
+      }
+      if (!res.ok || !res.body) {
+        fail((await res.text()) || t("chart.readingFailed"));
         return;
       }
       const reader = res.body.getReader();
@@ -143,20 +163,14 @@ export default function ChartPage() {
         if (done) break;
         target += dec.decode(value, { stream: true });
       }
-      streamDone = true; // tick 追平后自行 finalize（仅收尾）
-      // 流一读完就落库，不等打字机播完：长解读要播一分钟左右，中途离开/刷新，
-      // 或标签页在后台（rAF 降频乃至暂停）都会让解读丢失、LLM 额度白花（EP-reading-save-timing）
-      if (target.trim()) {
-        try {
-          await saveReading(profile.id, target);
-        } catch (e) {
-          if (!gate.handleAuthError(e)) console.error("saveReading failed:", e);
-        }
+      // 服务端没落库（流中出错/缺分节/写库失败）时以标记收尾：丢弃已收到的正文
+      if (target.endsWith(READING_ERROR_MARKER)) {
+        fail(t("chart.readingFailed"));
+        return;
       }
+      streamDone = true; // tick 追平后自行 finalize（仅展示收尾，库里已由服务端写好）
     } catch (e) {
-      cancelAnimationFrame(rafId);
-      setErr(e instanceof Error ? e.message : String(e));
-      setStreaming(false);
+      fail(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -237,7 +251,7 @@ export default function ChartPage() {
         // 那条分隔线仍是有意义的分隔，必须断点门控，不能无条件去掉。
         className="xl:mt-6 xl:border-t-0 xl:pt-0"
       >
-        {!reading && !streaming && (
+        {!reading && !streaming && !err && !paywall && (
           <button
             onClick={generate}
             className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"
@@ -269,8 +283,12 @@ export default function ChartPage() {
             </p>
           </Card>
         )}
-        {err && (
-          <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{err}</div>
+        {paywall && <Paywall reason="quota" onClose={() => setPaywall(false)} />}
+        {err && !streaming && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>
+            <span>{err}</span>
+            <Button variant="secondary" onClick={generate}>{t("chart.regenerateReading")}</Button>
+          </div>
         )}
         {reading && <ReadingTabs sections={sections} chart={chart} streaming={streaming} />}
       </ChartBlock>

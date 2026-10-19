@@ -92,14 +92,8 @@ export async function createProfile(input: {
   });
 }
 
-/** 保存生成好的解读（命盘冻结，仅写 reading*）。 */
-export async function saveReading(profileId: string, markdown: string, model?: string): Promise<ActionResult<void>> {
-  return withUid(async (uid) => {
-    await sql()`
-      update profiles set reading = ${markdown}, reading_model = ${model ?? null}, reading_at = now()
-      where id = ${profileId} and user_id = ${uid}`;
-  });
-}
+// 解读不在这里写：由 /api/reading 流正常结束且四分节齐全后经 `lib/data/reading.ts` 服务端落库
+// （review #1）。别再加回可被浏览器直接调用的 saveReading action——那会让客户端重新能存任意文本。
 
 /** 删档（dream_history / jiao_history 由外键级联删除）。 */
 export async function deleteProfile(id: string): Promise<ActionResult<void>> {

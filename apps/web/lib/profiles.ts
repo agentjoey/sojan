@@ -49,10 +49,6 @@ export async function createProfile(input: {
   return profile;
 }
 
-export async function saveReading(profileId: string, markdown: string, model?: string): Promise<void> {
-  unwrap(await data.saveReading(profileId, markdown, model));
-}
-
 export async function deleteProfile(id: string): Promise<void> {
   unwrap(await data.deleteProfile(id));
   if (getActiveProfileId() === id) localStorage.removeItem(ACTIVE_KEY);

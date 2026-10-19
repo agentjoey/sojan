@@ -40,7 +40,7 @@ const profile = {
 vi.mock("@/lib/profiles", () => ({
   getActiveProfile: vi.fn(async () => profile),
   getQuestionnaire: vi.fn(async () => null),
-  saveReading: vi.fn(async () => {}),
+  getProfile: vi.fn(async () => null),
 }));
 
 const timelineActionMock = vi.fn(async (..._a: unknown[]): Promise<string | null> => null);
@@ -248,52 +248,82 @@ describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
   });
 });
 
-describe("Task 6：会话中途失效（Review Focus 3）", () => {
+// review #1：解读改由 /api/reading 服务端在流正常结束、四分节齐全时落库；
+// 客户端只发 { profileId }，不再自己 saveReading（此前把「⚠️ 错误」或截断文本存成永久解读）。
+describe("解读生成：服务端保存 + 失败可重新生成（review #1）", () => {
+  const FULL = "## 概览\n总起一句。\n## 命理 · 紫微/八字\n命理正文末句。\n## 心理 · 心理占星\n心理正文。\n## 成长建议\n成长正文。\n";
+  const MARKER = "\n\n[[SOJAN_READING_ERROR]]";
+
   afterEach(() => vi.unstubAllGlobals());
 
-  it("生成解读后 saveReading 抛 UnauthenticatedError → 转为登录引导", async () => {
-    const { UnauthenticatedError } = await import("@/lib/errors");
-    const profiles = await import("@/lib/profiles");
-    vi.mocked(profiles.saveReading).mockRejectedValueOnce(new UnauthenticatedError());
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("## 命理\n好", { status: 200 })));
-    await renderChart();
+  async function clickGenerate() {
     fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
+  }
+
+  // 客户端「不再保存」由 lib/profiles 门面已删除 saveReading 在类型层面保证；这里钉请求体与展示
+  it("请求体只有 profileId；成功后显示解读、不出现重新生成", async () => {
+    const fetchMock = vi.fn(async (..._a: unknown[]) => new Response(FULL, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await renderChart();
+    await clickGenerate();
+    expect(await screen.findByText(/命理正文末句。/, {}, { timeout: 3000 })).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/reading");
+    expect(JSON.parse(init.body as string)).toEqual({ profileId: "p1" });
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
+    expect(screen.queryByText("重新生成解读")).toBeNull();
+  });
+
+  it("流末尾是错误标记 → 不展示半截正文与标记，显示错误与「重新生成」，点击后重新请求", async () => {
+    const fetchMock = vi
+      .fn(async (..._a: unknown[]) => new Response(FULL, { status: 200 }))
+      .mockResolvedValueOnce(new Response("## 概览\n半截内容" + MARKER, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await renderChart();
+    await clickGenerate();
+    const retry = await screen.findByRole("button", { name: "重新生成解读" }, { timeout: 3000 });
+    expect(screen.getByText("解读没有完整生成，这次不会保存。请重新生成。")).toBeInTheDocument();
+    expect(screen.queryByText(/SOJAN_READING_ERROR/)).toBeNull();
+    expect(screen.queryByText(/半截内容/)).toBeNull();
+
+    fireEvent.click(retry);
+    expect(await screen.findByText(/命理正文末句。/, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("重新生成解读")).toBeNull();
+  });
+
+  it("非 2xx（500）→ 显示错误与「重新生成」", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("服务暂时不可用", { status: 500 })));
+    await renderChart();
+    await clickGenerate();
+    expect(await screen.findByRole("button", { name: "重新生成解读" })).toBeInTheDocument();
+    expect(screen.getByText("服务暂时不可用")).toBeInTheDocument();
+  });
+
+  it("402 → 显示付费墙（额度用尽），不显示裸错误体", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "paywall" }, { status: 402 })));
+    await renderChart();
+    await clickGenerate();
+    expect(await screen.findByText("升级会员，解锁无限")).toBeInTheDocument();
+    expect(screen.queryByText(/"error"/)).toBeNull();
+  });
+
+  it("401 → 转为登录引导", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("未登录", { status: 401 })));
+    await renderChart();
+    await clickGenerate();
     const prompt = await screen.findByTestId("sign-in-prompt", {}, { timeout: 3000 });
     expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fchart");
   });
-});
 
-// EP-reading-save-timing：保存曾挂在 rAF 打字机播完之后。长解读要播一分钟左右，
-// 用户中途离开、或标签页在后台（rAF 被降频乃至暂停），解读就不落库。
-describe("解读保存时机（EP-reading-save-timing）", () => {
-  const fullText = "## 命理\n第一段。\n## 心理\n第二段。";
-
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("流读完即以全文 saveReading，不等打字机（rAF 永不推进也要落库）", async () => {
+  it("409（别处已生成）→ 重新读档案并展示已保存的解读", async () => {
     const profiles = await import("@/lib/profiles");
-    vi.mocked(profiles.saveReading).mockClear();
-    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1)); // 模拟后台标签页：帧永远不来
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(fullText, { status: 200 })));
+    vi.mocked(profiles.getProfile).mockResolvedValueOnce({ ...profile, reading: FULL });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("已有解读", { status: 409 })));
     await renderChart();
-    fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
-    await waitFor(() => expect(profiles.saveReading).toHaveBeenCalledWith("p1", fullText));
-    expect(profiles.saveReading).toHaveBeenCalledTimes(1);
-  });
-
-  it("打字机播完收尾时不重复保存", async () => {
-    const profiles = await import("@/lib/profiles");
-    vi.mocked(profiles.saveReading).mockClear();
-    // 单分节：末句落在默认可见的「命理」页签里，才能据此判断打字机已铺完全文
-    const oneSection = "## 命理\n第一段。末句收尾。";
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(oneSection, { status: 200 })));
-    await renderChart();
-    fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
-    await screen.findByText(/末句收尾。/, {}, { timeout: 3000 });
-    // 铺完后 finalize 还要再跑一帧收尾，留足余量再数调用次数
-    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
-    expect(profiles.saveReading).toHaveBeenCalledTimes(1);
-    expect(profiles.saveReading).toHaveBeenCalledWith("p1", oneSection);
+    await clickGenerate();
+    // 非流式态下 ReadingTabs 的摘要卡与页签会同时出现这句，故用 findAll
+    expect((await screen.findAllByText(/命理正文末句。/, {}, { timeout: 3000 })).length).toBeGreaterThan(0);
+    expect(profiles.getProfile).toHaveBeenCalledWith("p1");
   });
 });

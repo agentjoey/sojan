@@ -20,8 +20,8 @@ import { useT } from "@/lib/i18n/I18nProvider";
  * 已经因为同一个形状的恒真断言栽过一次（`47e9faa`）。
  * 日后真有「数量上限」场景，照着 quota/member 的写法重新加一个分支即可。
  *
- * ⚠️ 新增 reason 分支不等于新增计费形态——这里没有引入任何支付机制（Stripe /
- * TG Stars 仍然只是"即将开放"的占位文案），只是把已有付费墙的措辞说准。
+ * ⚠️ 新增 reason 分支不等于新增计费形态——这里没有引入任何支付机制（Stripe
+ * 仍然只是"即将开放"的占位文案），只是把已有付费墙的措辞说准。
  */
 export function Paywall({
   reason = "quota",
@@ -99,13 +99,6 @@ export function Paywall({
             {t("paywall.comingSoon")}
           </p>
         )}
-
-        <p
-          className="mt-3 text-center text-xs"
-          style={{ color: "var(--color-muted)" }}
-        >
-          {t("paywall.telegramIAP")}
-        </p>
       </div>
     </div>
   );

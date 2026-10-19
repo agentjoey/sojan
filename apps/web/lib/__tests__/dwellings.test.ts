@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 
 /**
  * `toDwelling` 是 DB 行 → 领域对象的映射，含两个判别三元与两个 `??` 兜底。
- * 它本身不发网络请求，但被包在会发请求的模块里，所以先 mock 掉 supabase 依赖，
- * 再通过 `listDwellings` 走一遍真实映射——这样测的是映射逻辑，不是 Supabase。
+ * 它本身不发网络请求，但被包在会发请求的模块里，所以先 mock 掉 `sql()` 与会话 uid，
+ * 再通过 `listDwellings` 走一遍真实映射——这样测的是映射逻辑，不是数据库。
  *
  * 为什么值得单独测：DB 的 kind/tenancy/facing 都是无约束的 text 列（无 CHECK），
  * 脏值、历史值、null 都可能出现；而 Task 9 起页面会直接依赖这里的收敛结果，
@@ -11,16 +11,10 @@ import { describe, it, expect, vi } from "vitest";
  */
 
 const rows: unknown[] = [];
-vi.mock("@/lib/supabase", () => ({
-  ensureSession: vi.fn(async () => "u1"),
-  supabase: () => ({
-    from: () => ({
-      select: () => ({ order: async () => ({ data: rows, error: null }) }),
-    }),
-  }),
-}));
+vi.mock("@/lib/db", () => ({ sql: () => async () => rows }));
+vi.mock("@/lib/account/uid", () => ({ getUid: async () => "u1" }));
 
-const { listDwellings } = await import("../dwellings");
+const { listDwellings } = await import("../data/dwellings");
 
 function setRows(...rs: unknown[]) {
   rows.length = 0;

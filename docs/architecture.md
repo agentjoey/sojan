@@ -1,7 +1,7 @@
 # Architecture — 照见 Sojan
 
 > 东方命理（八字 + 紫微）× 西方心理占星（利兹·格林）双引擎。系统架构总览；PRD 见 Obsidian `P028-Miro-Zhaojian`，调研依据见 `research/`，决策见 `docs/decisions/`。
-> 现状：MVP 全链路已上线（production `sojan.app` · staging `zhaojian.agentjoey.ai`）。本文随引擎演进同步更新。
+> 现状：MVP 全链路已上线（production `sojan.app` · staging `zhaojian.agentjoey.ai`）。**数据库与认证由 Supabase 迁到 Neon（Postgres + Neon Auth）、Telegram bot / Mini App 下线的代码已完成于 `feat/neon-migration`，staging/生产切换待执行**（上述线上环境在切换完成前仍跑旧 Supabase 版本）。本文随引擎演进同步更新。
 
 ## 1. 设计总原则
 
@@ -14,6 +14,8 @@
 
 ![照见 Sojan 系统架构](assets/architecture.png)
 
+> ⚠️ 上图 PNG 为迁移前（Supabase）版本，⑤ 持久化层已过时，**以下方 Mermaid 源为准**（PNG 待重绘）。
+
 <details><summary>Mermaid 源（可维护版）</summary>
 
 ```mermaid
@@ -24,7 +26,7 @@ flowchart TB
   end
   subgraph SV["② 服务端边界 · apps/web（密钥仅服务端）"]
     ACT["Server Actions<br/>computeChart·dailyFortune·dailyPolish·dailyBehavior·geocode"]
-    API["Route /api/reading<br/>流式三段式解读"]; LIB["lib/ profiles·supabase·fortune-images"]
+    API["Route /api/reading<br/>流式三段式解读"]; LIB["lib/data(use server)·auth·fortune-images"]
   end
   subgraph CORE["③ 排盘核心 @sojan/core — 纯函数·确定性·Zod"]
     NB["normalizeBirth<br/>真太阳时(经度+EoT)·农历·时辰索引"]
@@ -36,8 +38,8 @@ flowchart TB
     EF["extractFacts 承重事实"]-->PR["buildPrompt 三声部+守护栏"]-->CH["chat/stream<br/>MiniMax(anthropic)/DeepSeek(openai)"]
     GUARD["反幻觉链: facts→prompt硬规则→sanitize→correctMutagens→eval"]
   end
-  subgraph PER["⑤ 持久化 · Supabase + Vercel"]
-    SB["Supabase 匿名+RLS·命盘冻结·解读持久化"]; IMG["配图库 public/+清单"]
+  subgraph PER["⑤ 持久化 · Neon + Vercel"]
+    SB["Neon Postgres + Neon Auth<br/>会话 uid 过滤·命盘冻结·解读持久化"]; IMG["配图库 public/+清单"]
   end
   CL-->SV-->CORE-->|extractFacts JSON|LLM-->PER
 ```
@@ -48,7 +50,7 @@ flowchart TB
 **A. 建档解读（一次性，持久化）**
 ```
 BirthInput → Zod 校验 → normalizeBirth(真太阳时+EoT / 农历 / 子时索引)
-  → 三引擎共用归一时刻并行 → UnifiedChart(Zod) → createProfile(Supabase, 冻结)
+  → 三引擎共用归一时刻并行 → UnifiedChart(Zod) → createProfile(lib/data → Neon, 需登录, 冻结)
   → /api/reading: extractFacts → 三声部 prompt → MiniMax-M3 流式
      → sanitize(西方降级兜底) → correctMutagens(四化纠正) → 四分节卡片 → 存档(不重算)
 ```
@@ -66,7 +68,7 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 |------|------|--------|------|
 | `@sojan/core` | 排盘 + 统一 Schema + 每日运势 + 共振映射 | lunar-typescript, iztro, circular-natal-horoscope-js, zod | ✅ 上线（core 22 测试） |
 | `@sojan/llm` | 承重事实 + 三声部 Prompt + 双线 LLM 客户端 + 反幻觉链 + eval | fetch（provider 无关） | ✅ 上线（llm 26 测试） |
-| `apps/web` | 表单 + 命盘可视化 + 运势日历 + 档案 | Next.js 16, Supabase, tz-lookup | ✅ 上线 |
+| `apps/web` | 表单 + 命盘可视化 + 运势日历 + 档案 + 登录 | Next.js 16, Neon Postgres (`@neondatabase/serverless`), Neon Auth (`@neondatabase/auth`), tz-lookup | ✅ 上线（Neon 迁移代码已完成于 `feat/neon-migration`，staging/生产切换待执行） |
 
 ## 5. 解读层细节（反幻觉是重点）
 
@@ -88,7 +90,11 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 - **日主旺衰**：当前为启发式（得令/坐下/印比加权占比 → strong/weak/balanced），非用神级精算（见 §7 优化项）。
 - **西方盘可降级**：缺纬度/时辰未知 → `western=null`，仅出东方双盘 + 心理段降级提示。
 - **Swiss Ephemeris(AGPL) 规避**：用公有领域 circular-natal-horoscope-js（占星精度足够）。
-- **持久化**：Supabase 匿名登录 + RLS 按设备隔离；命盘建档即冻结（DB 触发器禁改 chart/birth_input）；解读一次生成后存 `reading` 列，回访不重算。
+- **持久化**：Neon Postgres（`apps/web/db/migrations/0001_baseline.sql`，由 `pnpm --filter @sojan/web db:migrate` 应用，记录在 `schema_migrations`）。命盘建档即冻结（`profiles_freeze` 触发器禁改 chart/birth_input）；解读一次生成后存 `reading` 列，回访不重算。**不用 RLS、业务表不设指向 `neon_auth` 的外键**，每条 SQL 自己按会话 uid 过滤。
+- **身份**：Neon Auth（Managed Better Auth，邮箱验证码登录，同源 HTTP-only cookie）。`lib/account/uid.ts` 的 `getViewer()/getUid()/requireUid()` 是全站唯一身份入口，路由与 server action 只认会话、不读请求里的 uid、无 Bearer。**没有匿名账号**：未登录访客不能存档，`useSignInGate` + `SignInPrompt` 引导登录，起盘表单草稿暂存 sessionStorage `zhaojian.readingDraft`。
+- **数据访问全收口到服务端**：`lib/data/*.ts`（`"use server"`，经 `withUid`，写操作返回 `ActionResult`——Next 生产构建会脱敏 server action 抛出的错误）+ 客户端门面 `lib/{profiles,dwellings,fengshui-report,dream-history,jiao-history}.ts`（`unwrap`）。
+- **注销**：一个事务先删 8 张业务表再删 `neon_auth."user"`（托管 `delete-user` 端点 404，故走 SQL；session/account 由外键级联），随后清 `__Secure-neon-auth.*` cookie（SDK 缓存会话数据 TTL 300s）。
+- **部署拓扑**：Vercel 函数固定 `sin1`（`apps/web/vercel.json`）与 Neon 同在新加坡。Neon 分支 production ↔ `sojan.app`、staging ↔ `zhaojian.agentjoey.ai`、dev ↔ 本地 + `TEST_DATABASE_URL`，详见 `docs/deployment.md`。
 
 ## 7. 引擎深化 v2（✅ 已实施，2026-06，见 `specs/engine-v2-deepening.md`）
 
@@ -111,7 +117,7 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 - ✅ EP-521 `computeZiweiHoroscope` 大限/流年四化 → **时序声部** `generateTimeline`，已接入 /chart「当下时序」卡（按年缓存、非事件预测、东西时序共振）。
 - ✅ EP-522 `computeWesternChart(…, houseSystem)` 可选 Placidus（默认 whole-sign）。
 
-## 7b. 风水「境」（✅ Layer 0 + Layer 1 + TG 适配均已实施，2026-08，见 `superpowers/specs/2026-08-14-fengshui-environment-design.md` 与 `2026-08-15-fengshui-telegram-adaptation.md`）
+## 7b. 风水「境」（✅ Layer 0 + Layer 1 已实施，2026-08，见 `superpowers/specs/2026-08-14-fengshui-environment-design.md`；原 TG 适配随 Telegram 下线已删除，历史见 `2026-08-15-fengshui-telegram-adaptation.md`）
 
 补齐「命·运·**境**」第三条线：人与居住空间的关系。`NEXT_PUBLIC_FENGSHUI_ENABLED` flag 门控，**2026-08-16 起线上已开启**（Production + Preview）。
 
@@ -140,12 +146,12 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 
 **`apps/web`**
 - 页面：`/fengshui`（Tab：盘 / 化解 / 物件；八方位盘图 `BaguaWheel` + 分节叙述 + 化解清单 + 合看 chips）、`/fengshui/dwellings`（居所增删改）、`/fengshui/object`（物件顾问表单——注意 `/fengshui` 的「物件」tab 只是带链接的引导卡，表单只存在于这个独立页）。
-- 路由：`api/fengshui/{reading,object}`（web）+ `api/tg/fengshui`（TG 中介）。闸门规则抽在 `lib/fengshui-reading.ts` 的 `isFengshuiEntitledForUid`，**两条路由共用单一事实源**：`BILLING_ENABLED !== "1"` 无条件放行、`!uid` fail-closed。
+- 路由：`api/fengshui/{reading,object}`。闸门规则抽在 `lib/fengshui-reading.ts` 的 `isFengshuiEntitledForUid`，**两条路由共用单一事实源**：`BILLING_ENABLED !== "1"` 无条件放行、`!uid` fail-closed。（原 `api/tg/fengshui` TG 中介臂已随 Telegram 下线删除。）
 - 持久化：报告存 `fengshui_reports` 表，按 `(uid, input_fingerprint)` upsert（`fengshuiFingerprint()` djb2）。**波 1 的 localStorage 缓存已删除**（`lib/fengshui-cache.ts` 不再存在）。
-- 宿主分流收口在**数据层**（`lib/dwellings.ts` / `lib/fengshui-report.ts` 按 `hasTgSession()` 分流），页面只调 `listDwellings()`，不关心自己在哪个宿主里。
+- 数据层：`lib/data/{dwellings,fengshui-report}.ts`（server action，按会话 uid 过滤）+ 客户端门面 `lib/dwellings.ts` / `lib/fengshui-report.ts`，页面只调 `listDwellings()`。（此前按 `hasTgSession()` 做的宿主分流已随 Telegram 下线删除。）
 - **降级是设计内路径**：盘图、着色、化解清单、物件建议全部确定性计算，LLM 挂了页面仍完整可用，只少叙述文字。
 
-**会员边界（spec §11）**：免费 = Layer 0 + 物件顾问；会员 = 住宅实盘 + 分级化解 + 合看。全部受 `BILLING_ENABLED` 门控，该 env 不为 `"1"`（默认）时无任何限制。**多套居所曾被闸门挡住，最终评审已撤除**——`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套不被任何代码读取，为零可观察产出收费不可辩护。日后做切换器需**同时**新建服务端写入路由（`createDwelling` 是浏览器直写 Supabase，届时纯客户端闸门可绕过）。
+**会员边界（spec §11）**：免费 = Layer 0 + 物件顾问；会员 = 住宅实盘 + 分级化解 + 合看。全部受 `BILLING_ENABLED` 门控，该 env 不为 `"1"`（默认）时无任何限制。**多套居所曾被闸门挡住，最终评审已撤除**——`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套不被任何代码读取，为零可观察产出收费不可辩护。日后做切换器时，闸门必须加在服务端 `lib/data/dwellings.ts` 的 `createDwelling` 里（现为只按会话 uid 过滤的 server action，不含数量闸门；纯客户端闸门可绕过）。
 
 **未实施**：Layer 2 玄空飞星（`dwellings` schema 已为其预留可空字段）、物件级化解。
 
@@ -161,11 +167,11 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 
 **危机前置拦截**（`apps/web/lib/jiao-crisis.ts`）：在掷筊**之前**拦自伤/轻生意图，命中则不掷、不烧额度、直接给求助资源。必须极窄——不拦这一层的代价是真随机掷出阴筊后把「不允」大字展示给一个正在问「我该不该活下去」的人，且这发生在 LLM 介入**之前**，prompt 兜底来不及。中文用多字短语避开裸「死」字、英文用词边界 + 负向前瞻排 `suicide mission` 等习语；**中文医疗急症词整组下线**（中文无时态标记，「我爸中风后…」这类既往语境是高频正常问题，而真在发作的人不会开占卜 App）。
 
-**存储**：`jiao_history`（迁移 `0019`）照抄 `dream_history` 的红线——**不存问题原文**，只存 `omen` + 第三人称摘要 + 灵的回复全文；续追问用回复全文当锚点。最近 10 条裁剪在应用层做（不开新 RPC 面，仓库有两次 security definer 权限漏洞前科）。
+**存储**：`jiao_history`（`0001_baseline.sql`；原 Supabase 迁移 `0019`，读写走 `lib/data/jiao-history.ts`）照抄 `dream_history` 的红线——**不存问题原文**，只存 `omen` + 第三人称摘要 + 灵的回复全文；续追问用回复全文当锚点。最近 10 条裁剪在应用层做（不开新 RPC 面，仓库有两次 security definer 权限漏洞前科）。
 
-**「本命之灵」自由对话形态已不存在**：`deriveSpirit` / `buildSpiritSystemPrompt` 仍是解梦、TG 分享卡、五行印记的共用地基不可删；`apps/web/lib/spirit.ts` 已删除，`SpiritPanel` 改为一次性会话不再读写 `spirit_messages`（该表仍由 TG bot 的 `lib/tg/data.ts` 使用）。
+**「本命之灵」自由对话形态已不存在**：`deriveSpirit` / `buildSpiritSystemPrompt` 仍是解梦、掷筊、五行印记的共用地基不可删；`apps/web/lib/spirit.ts` 已删除，`SpiritPanel` 改为一次性会话不再读写 `spirit_messages`（该表已随 Telegram 下线不再迁移到 Neon）。
 
-**⚠️ TG 侧未上**：`/spirit` 取 token 走浏览器侧 Supabase 会话，TG Mini App webview 里没有，每次掷筊必 401——`TG_ENTRIES` 的「灵」入口已摘除并有回归测试钉住。补 `/api/tg/jiao` 中介臂见 BACKLOG `EP-jiao-tg`。
+**TG 侧**：Telegram 已整体下线（2026-10），原「`/api/tg/jiao` 中介臂待补」（`EP-jiao-tg`）随之关闭；重新接入见 BACKLOG `EP-tg-replan`。
 
 ## 8. 非 MVP（后续评估）
-关系合盘(synastry×合婚)、规则引擎(YAML)+RAG 知识库、大限/流年时序解读、账号升级(跨设备同步)、建档心理问卷。详见 `.agent/BACKLOG.md`。
+关系合盘(synastry×合婚)、规则引擎(YAML)+RAG 知识库、大限/流年时序解读、建档心理问卷、Telegram 重新接入（`EP-tg-replan`）。详见 `.agent/BACKLOG.md`。

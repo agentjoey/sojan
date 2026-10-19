@@ -24,25 +24,12 @@ vi.mock("@sojan/llm", () => ({
 
 /**
  * 会员闸门（Task 10，EP-fs-17）依赖两组外部信息：
- *  1) 用户是谁——`readSession`（TG cookie）与 `supabaseAdmin().auth.getUser`（Bearer 兜底）。
- *     EP-account2-02 后 route.ts 收敛为调用 lib/account/uid.ts 的 resolveUid()
- *     （它内部同样走这两个依赖，且只读 req.headers、不再依赖 next/headers），
- *     所以这里 mock 的仍是 session/admin 这两个底层模块，覆盖链路不变。
+ *  1) 用户是谁——`getUid()`（Neon Auth 会话 cookie）。
  *  2) 用户是不是会员——`getEntitlement`/`isMember`。
- * 全部 mock 掉，逐条控制「谁在请求、是不是会员」，不依赖真实 Supabase。
+ * 全部 mock 掉，逐条控制「谁在请求、是不是会员」，不依赖真实数据库 / 会话。
  */
-const readSessionMock = vi.fn<(...args: unknown[]) => { uid: string; tgId: number } | null>(() => null);
-vi.mock("@/lib/tg/session", () => ({
-  TG_COOKIE: "zj_tg",
-  readSession: (...a: unknown[]) => readSessionMock(...a),
-}));
-
-const getUserMock = vi.fn<(...args: unknown[]) => Promise<{ data: { user: { id: string } | null } }>>(
-  async () => ({ data: { user: null } }),
-);
-vi.mock("@/lib/tg/admin", () => ({
-  supabaseAdmin: () => ({ auth: { getUser: (...a: unknown[]) => getUserMock(...a) } }),
-}));
+const getUidMock = vi.fn<() => Promise<string | null>>(async () => null);
+vi.mock("@/lib/account/uid", () => ({ getUid: () => getUidMock() }));
 
 const getEntitlementMock = vi.fn<(...args: unknown[]) => Promise<{ tier: string; memberUntil: string | null }>>(
   async () => ({ tier: "free", memberUntil: null }),
@@ -72,16 +59,10 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
-/** GET 请求构造（会员闸门探测，Task 10）：不带 body，只带 headers（cookie/Authorization）。 */
-function getReq(headers: Record<string, string> = {}): Request {
-  return new Request("http://localhost/api/fengshui/reading", { method: "GET", headers });
-}
-
 beforeEach(() => {
   isLlmConfiguredMock.mockReset().mockReturnValue(true);
   generateFengshuiReadingMock.mockReset();
-  readSessionMock.mockReset().mockReturnValue(null);
-  getUserMock.mockReset().mockResolvedValue({ data: { user: null } });
+  getUidMock.mockReset().mockResolvedValue(null);
   getEntitlementMock.mockReset().mockResolvedValue({ tier: "free", memberUntil: null });
   isMemberMock.mockReset().mockReturnValue(false);
   delete process.env.BILLING_ENABLED;
@@ -231,11 +212,11 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
 
   it("BILLING_ENABLED 未开启（pre-prod 默认态）：非会员带 dwelling 的请求仍正常处理——不做任何限制", async () => {
     generateFengshuiReadingMock.mockResolvedValue(VALID_READING);
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
-    const res = await POST(req({ ...birth, dwelling: dwellingBody }, { cookie: "zj_tg=t1" }));
+    const res = await POST(req({ ...birth, dwelling: dwellingBody }));
 
     expect(res.status).toBe(200);
     expect(generateFengshuiReadingMock).toHaveBeenCalledTimes(1);
@@ -243,11 +224,11 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
 
   it("BILLING_ENABLED=1 且非会员：带 dwelling 的请求返回 402，不调用 generateFengshuiReading（对照组：证明开闸后确实会拦，不是环境本来就没限制）", async () => {
     process.env.BILLING_ENABLED = "1";
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
-    const res = await POST(req({ ...birth, dwelling: dwellingBody }, { cookie: "zj_tg=t1" }));
+    const res = await POST(req({ ...birth, dwelling: dwellingBody }));
 
     expect(res.status).toBe(402);
     expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
@@ -257,12 +238,12 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
 
   it("BILLING_ENABLED=1 且非会员：只带 cohabitants（不带 dwelling）同样受限——判别条件是「二者任一存在」", async () => {
     process.env.BILLING_ENABLED = "1";
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
     const res = await POST(
-      req({ ...birth, cohabitants: [{ profileId: "p2", name: "阿乙", birth }] }, { cookie: "zj_tg=t1" }),
+      req({ ...birth, cohabitants: [{ profileId: "p2", name: "阿乙", birth }] }),
     );
 
     expect(res.status).toBe(402);
@@ -272,11 +253,11 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
   it("BILLING_ENABLED=1 且非会员：不带 dwelling/cohabitants 的 Layer 0 请求不受影响，正常处理（免费层不能被误伤）", async () => {
     process.env.BILLING_ENABLED = "1";
     generateFengshuiReadingMock.mockResolvedValue(VALID_READING);
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
-    const res = await POST(req(birth, { cookie: "zj_tg=t1" }));
+    const res = await POST(req(birth));
 
     expect(res.status).toBe(200);
     expect(generateFengshuiReadingMock).toHaveBeenCalledTimes(1);
@@ -295,13 +276,13 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
   it("BILLING_ENABLED=1 且非会员：带 `cohabitants: []` 空数组（线上客户端每次都这么发）的 Layer 0 请求同样不受影响", async () => {
     process.env.BILLING_ENABLED = "1";
     generateFengshuiReadingMock.mockResolvedValue(VALID_READING);
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
     // `dwelling: undefined` 会被 JSON.stringify 丢掉，所以真实 body 就是
     // `{...birth, cohabitants: []}`——与 page.tsx 里那段 fetch 逐字对应。
-    const res = await POST(req({ ...birth, dwelling: undefined, cohabitants: [] }, { cookie: "zj_tg=t1" }));
+    const res = await POST(req({ ...birth, dwelling: undefined, cohabitants: [] }));
 
     expect(res.status).toBe(200);
     expect(generateFengshuiReadingMock).toHaveBeenCalledTimes(1);
@@ -313,17 +294,17 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
   it("BILLING_ENABLED=1 且是会员：带 dwelling 的请求正常处理（不会被过度拦截）", async () => {
     process.env.BILLING_ENABLED = "1";
     generateFengshuiReadingMock.mockResolvedValue(VALID_READING);
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "member", memberUntil: "2999-01-01" });
     isMemberMock.mockReturnValue(true);
 
-    const res = await POST(req({ ...birth, dwelling: dwellingBody }, { cookie: "zj_tg=t1" }));
+    const res = await POST(req({ ...birth, dwelling: dwellingBody }));
 
     expect(res.status).toBe(200);
     expect(generateFengshuiReadingMock).toHaveBeenCalledTimes(1);
   });
 
-  it("BILLING_ENABLED=1 且请求方身份无法识别（无 TG cookie、无 Authorization）：视同非会员，返回 402", async () => {
+  it("BILLING_ENABLED=1 且请求方身份无法识别（无会话）：视同非会员，返回 402", async () => {
     process.env.BILLING_ENABLED = "1";
 
     const res = await POST(req({ ...birth, dwelling: dwellingBody }));
@@ -334,17 +315,15 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
     expect(getEntitlementMock).not.toHaveBeenCalled();
   });
 
-  it("BILLING_ENABLED=1 且非会员：Authorization Bearer 兜底也能正确识别身份并按会员状态判断（非 TG 场景）", async () => {
+  it("BILLING_ENABLED=1 且非会员：会话 uid 被用来查会员状态", async () => {
     process.env.BILLING_ENABLED = "1";
-    readSessionMock.mockReturnValue(null); // 没有 TG 会话
-    getUserMock.mockResolvedValue({ data: { user: { id: "web-u1" } } });
+    getUidMock.mockResolvedValue("web-u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
-    const res = await POST(req({ ...birth, dwelling: dwellingBody }, { authorization: "Bearer tok123" }));
+    const res = await POST(req({ ...birth, dwelling: dwellingBody }));
 
     expect(res.status).toBe(402);
-    expect(getUserMock).toHaveBeenCalledWith("tok123");
     expect(getEntitlementMock).toHaveBeenCalledWith("web-u1");
   });
 });
@@ -357,7 +336,7 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
  */
 describe("GET /api/fengshui/reading — 会员闸门探测（Task 10，EP-fs-17）", () => {
   it("BILLING_ENABLED 未开启：entitled 恒为 true", async () => {
-    const res = await GET(getReq());
+    const res = await GET();
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     expect((await res.json()).entitled).toBe(true);
@@ -365,22 +344,22 @@ describe("GET /api/fengshui/reading — 会员闸门探测（Task 10，EP-fs-17�
 
   it("BILLING_ENABLED=1 且非会员：entitled 为 false", async () => {
     process.env.BILLING_ENABLED = "1";
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
     isMemberMock.mockReturnValue(false);
 
-    const res = await GET(getReq({ cookie: "zj_tg=t1" }));
+    const res = await GET();
 
     expect((await res.json()).entitled).toBe(false);
   });
 
   it("BILLING_ENABLED=1 且是会员：entitled 为 true", async () => {
     process.env.BILLING_ENABLED = "1";
-    readSessionMock.mockReturnValue({ uid: "u1", tgId: 1 });
+    getUidMock.mockResolvedValue("u1");
     getEntitlementMock.mockResolvedValue({ tier: "member", memberUntil: "2999-01-01" });
     isMemberMock.mockReturnValue(true);
 
-    const res = await GET(getReq({ cookie: "zj_tg=t1" }));
+    const res = await GET();
 
     expect((await res.json()).entitled).toBe(true);
   });
@@ -388,7 +367,7 @@ describe("GET /api/fengshui/reading — 会员闸门探测（Task 10，EP-fs-17�
   it("BILLING_ENABLED=1 且未登录：entitled 为 false", async () => {
     process.env.BILLING_ENABLED = "1";
 
-    const res = await GET(getReq());
+    const res = await GET();
 
     expect((await res.json()).entitled).toBe(false);
   });

@@ -8,7 +8,7 @@ import { getCurrentSolarHou } from "@sojan/core";
  * `getCurrentSolarHou()` 来自 `@sojan/core` 的单一 barrel（`packages/core/src/index.ts`），
  * 该 barrel 把 iztro/circular-natal-horoscope-js 等整条排盘依赖链一并重导出，
  * **没有子路径 `exports`**——任何对 `@sojan/core` 的静态 import，哪怕只要一个函数，
- * 都会把整条依赖链打进消费它的客户端 chunk。而 `/` 正是 Telegram Mini App 的入口路由，
+ * 都会把整条依赖链打进消费它的客户端 chunk。而 `/` 是站点入口路由，
  * 这条 chunk 因此白白多背了 ~2MB（详见
  * `.superpowers/sdd/2026-08-26-ui-v3-c1-daily/bundle-fix-report.md`）。
  *

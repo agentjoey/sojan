@@ -1,8 +1,8 @@
 import { resolveLlmConfig, isLlmConfigured, generateJiaoReply, continueJiaoReply, JIAO_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
 import type { UnifiedChart, Omen } from "@sojan/core";
-import { supabaseAdmin } from "@/lib/tg/admin";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
+import { getUid, getViewer } from "@/lib/account/uid";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ const VALID_OMENS: readonly string[] = ["圣筊", "笑筊", "阴筊"];
 
 /**
  * POST /api/spirit/jiao —— 掷筊问事。chart 与问题随 body 传来，回复不落库
- * （落库的只有 jiao_history 的摘要/回复全文，由客户端写）。
+ * （落库的只有 jiao_history 的摘要/回复全文，由客户端经 server action 写）。
  *
  * ⚠️ `omen` 由**客户端**掷出后传入（掷是即时物理动作，服务端往返会毁掉手感，
  * 见 apps/web/lib/jiao.ts 的注释）。服务端只校验它在三词闭集内——不重新掷、
@@ -46,14 +46,10 @@ export async function POST(req: Request): Promise<Response> {
 
   // 鉴权闸门与 /api/spirit/dream 完全一致：必须解析出身份，且不能是 anonymous 级。
   // 顺序上先鉴权再计量——鉴权失败不该扣额度。
-  const authHeader = req.headers.get("authorization");
-  let userId: string | undefined;
-  if (authHeader?.startsWith("Bearer ")) {
-    const { data } = await supabaseAdmin().auth.getUser(authHeader.slice(7));
-    userId = data.user?.id;
-  }
+  // 身份只取会话 cookie（getUid），不再读 Authorization 头。
+  const userId = await getUid();
   if (!userId) return new Response("未登录", { status: 401 });
-  const access = await resolveAccess(userId);
+  const access = await resolveAccess(await getViewer());
   if (access.level === "anonymous") return new Response("未登录", { status: 401 });
   const gate = await consumeLlm(userId);
   if (!gate.ok) return Response.json({ error: "paywall" }, { status: 402 });

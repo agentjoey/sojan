@@ -1,8 +1,8 @@
 import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
 import type { UnifiedChart } from "@sojan/core";
-import { supabaseAdmin } from "@/lib/tg/admin";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
+import { getUid, getViewer } from "@/lib/account/uid";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
@@ -31,18 +31,14 @@ export async function POST(req: Request): Promise<Response> {
   if (dreamRaw && dreamRaw.length > DREAM_MAX_CHARS) return new Response("梦境过长", { status: 400 });
   if (followUp && followUp.length > DREAM_MAX_CHARS) return new Response("追问过长", { status: 400 });
 
-  const authHeader = req.headers.get("authorization");
-  let userId: string | undefined;
-  if (authHeader?.startsWith("Bearer ")) {
-    const { data } = await supabaseAdmin().auth.getUser(authHeader.slice(7));
-    userId = data.user?.id;
-  }
-  // EP-account2-05：与 api/spirit/chat 同一处漏洞（原 `if (userId)` 未带 token
-  // 时静默跳过闸门）。解梦没有开场白分支，任何一次调用都必须已识别身份。
+  // EP-account2-05：原 `if (userId)` 在未带身份时会静默跳过闸门。
+  // 解梦没有开场白分支，任何一次调用都必须已识别身份。
+  // 身份只取会话 cookie（getUid），不再读 Authorization 头。
+  const userId = await getUid();
   if (!userId) {
     return new Response("未登录", { status: 401 });
   }
-  const access = await resolveAccess(userId);
+  const access = await resolveAccess(await getViewer());
   if (access.level === "anonymous") {
     return new Response("未登录", { status: 401 });
   }

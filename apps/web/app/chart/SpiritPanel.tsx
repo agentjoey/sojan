@@ -5,37 +5,49 @@ import Link from "next/link";
 import type { Omen } from "@sojan/core";
 import { deriveSpirit } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
-import { isTelegram } from "@/lib/tg/client";
-import { useTgMainButton, haptics } from "@/lib/tg/ui";
-import { supabase } from "@/lib/supabase";
 import { Markdown } from "@/components/Markdown";
 import { Paywall } from "@/components/Paywall";
-import { Bubble } from "@/components/tg/native";
 import { QuickPrompts } from "@/components/spirit/QuickPrompts";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 
 type Turn = { id: string; role: "user" | "spirit"; content: string };
 
+/** 对话气泡：用户朱砂底、灵纸底细线边。 */
+function Bubble({ role, children }: { role: "spirit" | "user"; children: React.ReactNode }) {
+  const isUser = role === "user";
+  return (
+    <div
+      className={`max-w-[84%] rounded-[var(--radius-card)] px-4 py-3 text-[14px] leading-relaxed ${
+        isUser ? "ml-auto text-white" : "text-[var(--color-ink-2)]"
+      }`}
+      style={
+        isUser
+          ? { background: "var(--color-cinnabar)" }
+          : { background: "var(--color-paper)", border: "1px solid var(--color-line)" }
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
  * 掷筊问事的追问面板（EP-jiao 最终评审 C2 + I4 合并修复）。
  *
- * 这个组件此前叫「本命之灵通用聊天面板」，挂在 /chart 页做常驻多轮对话：读写
- * `spirit_messages`（`apps/web/lib/spirit.ts` 的 `listMessages`/`appendMessage`，
- * 该文件按 profile 存全量历史、不按会话切分），追问打通用 `/api/spirit/chat`。
- * EP-jiao 把它挪来 /spirit 承载「掷完筊之后的追问」，只加了 `seedTurns` 去渲染
- * 开场，但 `listMessages`/`appendMessage`/`/api/spirit/chat` 三处都原样留着，
- * 于是：
- *   1) 第二次问卦时，`listMessages` 拉出的是同一 profile 下**上一卦的全部追问
- *      记录**，倒序拼在新一卦的 seed 后面——时序错乱、旧对话污染新卦上下文
+ * 这个组件此前叫「本命之灵通用聊天面板」，挂在 /chart 页做常驻多轮对话：把整段
+ * 历史按 profile 持久化、追问走一条通用聊天接口（二者均已删除）。EP-jiao 把它挪来
+ * /spirit 承载「掷完筊之后的追问」时，持久化与通用接口都原样留着，于是：
+ *   1) 第二次问卦时，拉出的是同一 profile 下**上一卦的全部追问记录**，倒序拼在
+ *      新一卦的 seed 后面——时序错乱、旧对话污染新卦上下文
  *      （最终评审 C2，100% 复现于每个用户的第二次问卦）。
- *   2) 追问打通用 `/api/spirit/chat`，不带掷筊的 `JIAO_RULES_*` 与
- *      `correctOmen` 后置校验——掷筊守护栏在第二轮就消失（最终评审 I4）。
+ *   2) 通用接口不带掷筊的 `JIAO_RULES_*` 与 `correctOmen` 后置校验——掷筊守护栏
+ *      在第二轮就消失（最终评审 I4）。
  *
  * 现在的形态：**整个组件一次性、不持久化，追问统一走 `/api/spirit/jiao` 的
  * `followUp` 分支（`continueJiaoReply`）**。本仓库唯一的挂载点就是掷筊后的对话
  * （`app/spirit/page.tsx`），不再有别的调用方需要「常驻可续、写库」的语义——
  * 历史续问走的是 `jiao_history` 的 `full_text` 锚点（见 spec §2），与这里的
- * `turns` state 完全无关，从不读写 `spirit_messages`。追问因此与首轮同一套
+ * `turns` state 完全无关，从不读写任何持久化消息表。追问因此与首轮同一套
  * `JIAO_RULES_*`/`correctOmen`，掷筊守护栏覆盖整场对话，不再有「第一轮受管、
  * 第二轮起失控」的缺口。
  *
@@ -80,13 +92,6 @@ export function SpiritPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useTgMainButton({
-    text: streaming ? t("jiao.reading") : t("jiao.followUpSubmit"),
-    onClick: () => handleSubmit(),
-    enabled: !streaming && !!input.trim(),
-    visible: isTelegram(),
-  });
-
   // 新消息到达时滚动到底部
   useEffect(() => {
     const el = scrollRef.current;
@@ -120,15 +125,13 @@ export function SpiritPanel({
       setTurns((prev) => [...prev, userTurn]);
       setInput("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
-      try { haptics.light(); } catch {}
 
       setStreaming(true);
       try {
-        const { data: sessionData } = await supabase().auth.getSession();
-        const token = sessionData.session?.access_token;
+        // 身份由会话 cookie 带（同源 fetch 自动附上），不再手拼 Authorization。
         const res = await fetch("/api/spirit/jiao", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          headers: { "Content-Type": "application/json", "x-zj-locale": locale },
           body: JSON.stringify({
             chart: profile.chart,
             followUp: trimmed,
@@ -155,7 +158,6 @@ export function SpiritPanel({
         if (!res.ok) throw new Error((await res.text()) || t("spirit.unavailable"));
         const reply = await res.text();
         setTurns((prev) => [...prev, { id: `spirit-${Date.now()}`, role: "spirit", content: reply }]);
-        try { haptics.success(); } catch {}
       } catch (e) {
         setTurns((prev) => prev.slice(0, -1));
         setError(e instanceof Error ? e.message : String(e));
@@ -163,7 +165,7 @@ export function SpiritPanel({
         setStreaming(false);
       }
     },
-    [streaming, turns, question, omen, exhausted, profile.chart, memory, questionnaire, locale, t],
+    [streaming, turns, question, omen, exhausted, profile.chart, memory, questionnaire, locale, t, setError, setNeedLogin, setTurns, setInput, setStreaming],
   );
 
   async function handleSubmit(e?: React.FormEvent) {
@@ -285,16 +287,14 @@ export function SpiritPanel({
           className="flex-1 resize-none rounded-[var(--radius-button)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 text-[14px] text-ink placeholder:text-muted focus:border-[var(--color-cinnabar)] focus:outline-none disabled:opacity-60"
           style={{ minHeight: 44, maxHeight: 120 }}
         />
-        {!isTelegram() && (
-          <button
-            type="submit"
-            disabled={streaming || !input.trim()}
-            className="inline-flex h-[44px] shrink-0 items-center justify-center px-4 text-[14px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-button)" }}
-          >
-            {t("jiao.followUpSubmit")}
-          </button>
-        )}
+        <button
+          type="submit"
+          disabled={streaming || !input.trim()}
+          className="inline-flex h-[44px] shrink-0 items-center justify-center px-4 text-[14px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-button)" }}
+        >
+          {t("jiao.followUpSubmit")}
+        </button>
       </form>
     </div>
   );

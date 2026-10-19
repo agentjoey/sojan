@@ -4,6 +4,15 @@ import { render, screen, cleanup, act, within } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart, getCurrentSolarHou, type DailyFortune } from "@sojan/core";
 
 /**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
+
+/**
  * UI v3 · Task 5：运势 `app/calendar/page.tsx` 按 8a 重建（桌面两栏 + 移动单列）。
  *
  * `page.tsx` 没有模块顶层的 `process.env.NEXT_PUBLIC_*` 门控常量（与
@@ -34,11 +43,6 @@ const fortune: DailyFortune = {
 
 vi.mock("@/lib/profiles", () => ({
   getActiveProfile: vi.fn(async () => profile),
-}));
-
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  tgGetProfile: vi.fn(),
 }));
 
 const dailyFortuneActionMock = vi.fn(async (..._a: unknown[]) => fortune);
@@ -195,5 +199,34 @@ describe("UI v3 运势（8a）", () => {
     expect(emphasis.className).toContain("text-[40px]");
     expect(emphasis.className).toContain("leading-none");
     expect(emphasis.className).toContain("xl:text-[64px]");
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderCalendar();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Fcalendar");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("尚无命盘档案，无法生成每日运势。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderCalendar();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n/I18nProvider";
 // 上限的单一事实源，与 api/fengshui/reading/route.ts 的 `z.array(...).max()` 同源。
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
 import { zh } from "@/lib/i18n/messages/zh";
+import { UnauthenticatedError } from "@/lib/errors";
 import { DwellingForm } from "../DwellingForm";
 
 const createDwelling = vi.fn(async (d: unknown) => ({ id: "d1", ...(d as object) }));
@@ -33,32 +34,6 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfileId: () => "p1",
 }));
 
-/**
- * 最终评审 I3：本表单现在会为「合看是不是会员功能」向服务端探测一次
- * （GET /api/fengshui/reading，与 /fengshui、/fengshui/object 同一个端点、同一份
- * 服务端判断）。`@/lib/supabase` 的真实实现在没配 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY
- * 时会抛错（与 fengshui/__tests__/page.test.tsx、dwellings/__tests__/page.test.tsx
- * 踩过的是同一个坑），必须 mock。会话内容做成共享可变量，好让「探测请求到底带不带
- * Authorization」这条链路可断言——写死 null 就等于零断言。
- */
-const supabaseSession = { current: null as { access_token: string } | null };
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
- * EP-fs-tg：TG 分流是可变的——文件末尾「TG 会话」describe 把 inTg 翻成 true，
- * 断言候选人走 tgListProfiles 中介、保存走 MainButton。默认 false，
- * 既有用例行为不变（真实模块在 jsdom 下本来也恒 false，mock 只是让它可控）。
- */
-const tgEnv = { inTg: false };
-const tgListProfiles = vi.fn(async (): Promise<unknown[]> => []);
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => tgEnv.inTg,
-  isTelegram: () => tgEnv.inTg,
-  tgListProfiles: () => tgListProfiles(),
-}));
-
 /** 闸门探测响应；route 返回 JSON `{ entitled }`。 */
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" }, ...init });
@@ -74,10 +49,6 @@ beforeEach(() => {
   // 不清空调用记录的话，后续测试里「listProfiles 确实被调用过」这类断言会被前一条
   // 测试的调用记录污染成假阳性——即便本测试的组件压根没发起过请求也会通过。
   listProfiles.mockReset().mockResolvedValue([PROFILE_MAIN, PROFILE_B, PROFILE_C]);
-  supabaseSession.current = null;
-  tgEnv.inTg = false;
-  tgListProfiles.mockReset().mockResolvedValue([]);
-  delete window.Telegram;
   // 默认 entitled:true（对应「未开闸」= 默认配置，或「已是会员」）——保证 Task 9b
   // 既有的同住人用例无需逐条改动。非会员分支由本文件末尾的 I3 describe 专门覆盖。
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ entitled: true })));
@@ -123,6 +94,20 @@ describe("EP-fs-14 居所录入", () => {
     fireEvent.click(screen.getByText("保存"));
     await waitFor(() => expect(createDwelling).toHaveBeenCalled());
     expect(createDwelling.mock.calls[0]![0]).toMatchObject({ tenancy: "rent" });
+  });
+});
+
+describe("会话中途失效", () => {
+  it("保存抛 UnauthenticatedError → 交给 onAuthError 处理，不向外抛未捕获异常，onSaved 不触发", async () => {
+    createDwelling.mockRejectedValueOnce(new UnauthenticatedError());
+    const onAuthError = vi.fn((_e: unknown) => true);
+    const onSaved = vi.fn();
+    render(<DwellingForm onSaved={onSaved} onAuthError={onAuthError} />, { wrapper: Wrapper });
+    fireEvent.click(screen.getByRole("button", { name: /不确定/ }));
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(onAuthError).toHaveBeenCalledTimes(1));
+    expect(onAuthError.mock.calls[0]![0]).toBeInstanceOf(UnauthenticatedError);
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });
 
@@ -425,8 +410,7 @@ describe("最终评审 I3：非会员必须在选择器处就知道合看是会�
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("探测请求带上 Supabase 会话 token——否则 BILLING_ENABLED=1 时每个邮箱/匿名会员都会被误判成非会员", async () => {
-    supabaseSession.current = { access_token: "tok-xyz" };
+  it("探测请求是同源 GET，不手工带 Authorization（会话 cookie 随请求发出）", async () => {
     const fetchSpy = vi.fn(async () => jsonResponse({ entitled: true }));
     vi.stubGlobal("fetch", fetchSpy);
     render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
@@ -435,113 +419,25 @@ describe("最终评审 I3：非会员必须在选择器处就知道合看是会�
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/fengshui/reading");
     expect(init.method).toBe("GET");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-xyz");
-  });
-
-  it("没有会话时不伪造 Authorization 头（对照组）", async () => {
-    supabaseSession.current = null;
-    const fetchSpy = vi.fn(async () => jsonResponse({ entitled: true }));
-    vi.stubGlobal("fetch", fetchSpy);
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
-
-    const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(init.headers).toBeUndefined();
   });
 });
 
-/**
- * EP-fs-tg：TG 会话下的 DwellingForm。两个实质断言点：
- *  1. 同住人候选必须走 tgListProfiles() 中介——真实模块在 TG 里走 listProfiles()
- *     （匿名 Supabase + RLS）只会拿到空列表，选择器永远不渲染，合看无从选起。
- *     TG 的「当前档案」约定为列表首条（profiles/page.tsx 同一约定），候选人要排除它。
- *  2. 保存由 TG MainButton 承担，页内按钮不渲染。
- *
- * 变异验证（实跑过）：把 DwellingForm 候选人 effect 里的 `hasTgSession()` 改成恒
- * false，第 1 条变红（走了 listProfiles、候选人里有「阿甲」）；把 `inTg` 改成恒
- * false，第 2/3 条变红。
- */
-describe("EP-fs-tg TG 会话：候选走中介 + MainButton 保存", () => {
-  let mainButtonClick: (() => void) | null;
-  let mb: Record<string, ReturnType<typeof vi.fn>>;
-
-  beforeEach(() => {
-    tgEnv.inTg = true;
-    mainButtonClick = null;
-    mb = {
-      setText: vi.fn(), enable: vi.fn(), disable: vi.fn(), show: vi.fn(), hide: vi.fn(),
-      onClick: vi.fn((cb: () => void) => { mainButtonClick = cb; }),
-      offClick: vi.fn(),
-    };
-    window.Telegram = {
-      WebApp: {
-        initData: "x",
-        MainButton: mb,
-        HapticFeedback: { impactOccurred: vi.fn(), notificationOccurred: vi.fn() },
-      },
-    };
-  });
-
-  it("同住人候选走 tgListProfiles 中介，排除列表首条（当前档案），不碰 listProfiles", async () => {
-    tgListProfiles.mockResolvedValue([PROFILE_MAIN, PROFILE_B]);
+describe("kind/tenancy 分段选择器接线", () => {
+  it("点「办公」「自有」→ 保存收到 office/own（Segmented 的 onChange 真的接上了）", async () => {
     render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(screen.getByRole("button", { name: "阿乙" })).toBeInTheDocument());
-    // 首条=当前档案「阿甲」，不该出现在候选里
-    expect(screen.queryByRole("button", { name: "阿甲" })).toBeNull();
-    expect(tgListProfiles).toHaveBeenCalled();
-    expect(listProfiles).not.toHaveBeenCalled();
-  });
-
-  it("页内保存按钮隐藏，MainButton 接管（setText=保存，未选朝向时禁用）", async () => {
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(mb.setText).toHaveBeenCalledWith("保存"));
-    expect(screen.queryByRole("button", { name: "保存" })).toBeNull();
-    expect(mb.disable).toHaveBeenCalled(); // touchedFacing=false → enabled:false
-  });
-
-  it("MainButton 点击触发保存（选朝向 → enable → 点击 → createDwelling 收到朝向）", async () => {
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(mb.setText).toHaveBeenCalledWith("保存"));
-    fireEvent.click(screen.getByRole("button", { name: new RegExp("^南$") }));
-    await waitFor(() => expect(mb.enable).toHaveBeenCalled());
-    expect(mainButtonClick).not.toBeNull();
-    await act(async () => {
-      mainButtonClick!();
-    });
-    await waitFor(() =>
-      expect(createDwelling).toHaveBeenCalledWith(expect.objectContaining({ facing: "S" })),
-    );
-  });
-
-  it("TG 的 kind/tenancy 选择器真的接线：点「办公」「自有」→ 保存收到 office/own（复审必修 B）", async () => {
-    // M1 把 TG 下这两个选择器换成了共享原生分段组件——「某个宿主渲染哪个组件」
-    // 是最高回归风险位置。本条的变异对照（复审实跑过）：把 TG 两个选择器的
-    // onChange 双双改成空函数，本条变红。
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(mb.setText).toHaveBeenCalledWith("保存"));
-    // 组模式的按钮带 aria-pressed；「办公」精确匹配（不与「住宅」混淆——中文
-    // 这里虽不互为子串，但沿用本文件的精确匹配纪律）。
+    // 组模式的按钮带 aria-pressed；「办公」精确匹配。
     const officeBtn = screen.getByRole("button", { name: new RegExp("^办公$") });
     expect(officeBtn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(officeBtn);
     fireEvent.click(screen.getByRole("button", { name: new RegExp("^自有$") }));
     expect(officeBtn).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: new RegExp("^南$") }));
-    await waitFor(() => expect(mb.enable).toHaveBeenCalled());
-    await act(async () => {
-      mainButtonClick!();
-    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() =>
       expect(createDwelling).toHaveBeenCalledWith(
         expect.objectContaining({ kind: "office", tenancy: "own", facing: "S" }),
       ),
     );
-  });
-
-  it("web 分支（对照组）：页内保存按钮在，MainButton 不被触碰", () => {
-    tgEnv.inTg = false;
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
-    expect(mb.setText).not.toHaveBeenCalled();
   });
 });

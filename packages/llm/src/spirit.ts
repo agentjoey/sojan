@@ -10,8 +10,7 @@ import { resolveLlmConfig, isLlmConfigured, type LlmConfig } from "./provider";
  * 本命之灵 · 口吻渲染层（EP-spirit-02/04）。
  *
  * 「附加层」：不重写已验证的三段式解读（见 reading.ts）。灵只新增：
- *   1) 第一人称开场白「认领」此命盘（generateSpiritIntro）
- *   2) 常驻多轮对话（streamSpiritChat）
+ *   常驻多轮对话（streamSpiritChat）
  * 人格「身份」由 core deriveSpirit 确定性派生；这里只把种子渲染成口吻。
  *
  * 反幻觉沿用解读层四道：只喂 extractFacts 事实 + 守护栏硬规则 + sanitizeReading + correctMutagens。
@@ -107,39 +106,6 @@ ${
 ${memoryBlock}${questionnaireBlock}
 # Language
 ${langLine}`;
-}
-
-/** 灵的开场白：第一人称用 2–3 句认领此命盘并邀请对话。非流式。 */
-export async function generateSpiritIntro(
-  chart: UnifiedChart,
-  opts: SpiritOptions = {},
-): Promise<{ text: string; model: string }> {
-  const cfg = opts.config ?? resolveLlmConfig();
-  if (!isLlmConfigured(cfg)) throw new Error("LLM 未配置：请设置 LLM_API_KEY。");
-  const language = opts.language ?? "en";
-  const persona = deriveSpirit(chart);
-  const facts = extractFacts(chart);
-  const zh = language === "zh";
-  const who = opts.nickname
-    ? zh
-      ? `对方称呼自己为：${opts.nickname}。\n`
-      : `The person you are speaking to goes by: ${opts.nickname}.\n`
-    : "";
-  const factsBlock = `\`\`\`json\n${JSON.stringify(facts, null, 2)}\n\`\`\``;
-  const introInstruction = zh
-    ? `${who}以下是确定性算出的命盘事实（你只能引用这些）：\n\n${factsBlock}\n\n这是你与这个人初次相见。请用简体中文、第一人称、2–3 句：认领这张命盘是 ta 的，点出你已经看见的一处确凿之处，并温暖地邀请 ta 与你交谈。不要标题、不要列表——只是你的声音。`
-    : `${who}Here are the deterministically computed chart facts (the ONLY facts you may use):\n\n${factsBlock}\n\nThis is the very first moment you meet this person. In 2–3 sentences, first person, claim this chart as theirs, name ONE grounded thing you already see in them, and warmly invite them to talk with you. No headers, no lists — just your voice.`;
-
-  const messages: ChatMessage[] = [
-    { role: "system", content: buildSpiritSystemPrompt(persona, chart, language, opts) },
-    { role: "user", content: introInstruction },
-  ];
-
-  const raw = await chat(cfg, messages, { signal: opts.signal, maxTokens: 600 });
-  const sanitized = sanitizeReading(raw, language, chart.western !== null);
-  const text = correctMutagens(sanitized, chart.ziwei.birthMutagens).text;
-  logSpiritMeta("intro", text, cfg.model, chart.western !== null, false);
-  return { text, model: cfg.model };
 }
 
 /** spirit 角色 → assistant；user → user。供多轮对话拼装。 */

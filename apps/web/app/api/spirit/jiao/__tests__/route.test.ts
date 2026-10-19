@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const getUserMock = vi.fn(async (_token?: string) => ({ data: { user: { id: "u1" } } }));
-vi.mock("@/lib/tg/admin", () => ({
-  supabaseAdmin: () => ({ auth: { getUser: (t: string) => getUserMock(t) } }),
-}));
-const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: false, hasTelegram: true }));
+// Neon 迁移（Task 8）：身份只取会话 cookie（getUid），不再读 Authorization 头。
+const getUidMock = vi.fn(async (): Promise<string | null> => "u1");
+const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
 vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
+const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
+vi.mock("@/lib/account/uid", () => ({ getViewer: () => getViewerMock(), getUid: () => getUidMock() }));
 // 类型显式标注为 `{ ok: boolean; reason?: "paywall" }`（与 lib/entitlements.ts 的
 // consumeLlm 真实返回类型一致）：若省略，vi.fn 会从初始返回值 `{ ok: true }` 推出
 // 更窄的 `{ ok: boolean }`，导致下面 `mockResolvedValue({ ok: false, reason: "paywall" })`
@@ -28,20 +28,20 @@ vi.mock("@sojan/llm", () => ({
 const { POST } = await import("../route");
 const CHART = { fake: true };
 
-function req(body: unknown, token = "tok") {
+function req(body: unknown, headers: Record<string, string> = {}) {
   return new Request("http://x/api/spirit/jiao", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
 
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SPIRIT_ENABLED", "1");
-  getUserMock.mockClear();
-  getUserMock.mockResolvedValue({ data: { user: { id: "u1" } } });
+  getUidMock.mockReset();
+  getUidMock.mockResolvedValue("u1");
   resolveAccessMock.mockClear();
-  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: false, hasTelegram: true });
+  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
   consumeLlmMock.mockClear();
   consumeLlmMock.mockResolvedValue({ ok: true });
   generateJiaoReplySpy.mockClear();
@@ -128,14 +128,30 @@ describe("追问分支", () => {
 });
 
 describe("鉴权闸门（与 /api/spirit/dream 同一套）", () => {
-  it("无 Bearer → 401，不消耗额度", async () => {
-    const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }, ""));
+  it("无会话（getUid 为 null）→ 401，不消耗额度、不调 LLM", async () => {
+    getUidMock.mockResolvedValue(null);
+    const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }));
+    expect(res.status).toBe(401);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(generateJiaoReplySpy).not.toHaveBeenCalled();
+  });
+
+  it("只带 Authorization 头、无会话 → 401（头不再被采信）", async () => {
+    getUidMock.mockResolvedValue(null);
+    const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }, { authorization: "Bearer tok" }));
     expect(res.status).toBe(401);
     expect(consumeLlmMock).not.toHaveBeenCalled();
   });
 
+  it("额度闸门查的是会话 uid", async () => {
+    getUidMock.mockResolvedValue("u-session");
+    const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }));
+    expect(res.status).toBe(200);
+    expect(consumeLlmMock).toHaveBeenCalledWith("u-session");
+  });
+
   it("anonymous 级 → 401", async () => {
-    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false, hasTelegram: false });
+    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
     const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }));
     expect(res.status).toBe(401);
     expect(consumeLlmMock).not.toHaveBeenCalled();

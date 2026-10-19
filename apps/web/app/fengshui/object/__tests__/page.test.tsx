@@ -1,7 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart, dwellingGua } from "@sojan/core";
 import type { Dwelling } from "@/lib/dwellings";
+
+/**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
 
 /**
  * 把 core 的 `adviseObject` 包一层记录入参（**不改行为**，透传真实实现），手法同
@@ -56,25 +65,7 @@ vi.mock("@/lib/dwellings", () => ({
     return dwellingsFixture.current;
   }),
 }));
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  isTelegram: () => false,
-  tgGetProfile: vi.fn(),
-  tgListProfiles: vi.fn(async () => []),
-}));
 vi.mock("next/navigation", () => ({ usePathname: () => "/fengshui/object" }));
-
-/**
- * EP-fs-18：本页新增会员闸门探测，要读 supabase 会话的 access_token 附到探测请求上
- * （TG 会话走 cookie，邮箱/匿名登录靠这个头）。`@/lib/supabase` 的真实实现在没配置
- * NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时会抛错，测试环境没配，必须 mock。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
 
 /**
  * 本页对同一个 URL 发两种请求：`GET /api/fengshui/reading`（会员闸门探测）与
@@ -170,7 +161,6 @@ beforeEach(() => {
   dwellingsFixture.current = [];
   dwellingsFixture.calls = 0;
   dwellingsFixture.error = null;
-  supabaseSession.current = null;
   vi.stubGlobal(
     "fetch",
     methodRouter({
@@ -410,9 +400,8 @@ describe("EP-fs-18 /fengshui/object 强版接线（会员 + 居所）", () => {
     expect(screen.queryByText("重新确认")).toBeNull();
   });
 
-  it("探测请求带上 Authorization（邮箱/匿名登录靠它被识别为会员）", async () => {
+  it("探测请求不手工带 Authorization（同源 cookie 识别会员）", async () => {
     dwellingsFixture.current = [CLASH_DWELLING];
-    supabaseSession.current = { access_token: "tok-abc" };
     const spy = methodRouter({ GET: () => jsonResponse({ entitled: true }), POST: () => new Response("好的。") });
     vi.stubGlobal("fetch", spy);
 
@@ -420,11 +409,11 @@ describe("EP-fs-18 /fengshui/object 强版接线（会员 + 居所）", () => {
     await waitFor(() => expect(probeCalls(spy)).toBe(1));
     const [url, init] = spy.mock.calls.find(([, i]) => (i?.method ?? "GET") === "GET")!;
     expect(url).toBe("/api/fengshui/reading");
-    expect(init!.headers).toMatchObject({ Authorization: "Bearer tok-abc" });
+    expect((init?.headers ?? {}) as Record<string, string>).not.toHaveProperty("Authorization");
   });
 
   it("居所读取失败 → 弱版（不崩、不发探测）", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     const spy = methodRouter({ POST: () => new Response("好的。") });
     vi.stubGlobal("fetch", spy);
 
@@ -437,5 +426,34 @@ describe("EP-fs-18 /fengshui/object 强版接线（会员 + 居所）", () => {
     expect(screen.queryByText(NOTE_TITLE)).toBeNull();
     expect(lastAdviseInput().dwellingSectors).toBeUndefined();
     expect(probeCalls(spy)).toBe(0);
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderPage();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Ffengshui%2Fobject");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("还没有命盘档案，先起一个盘。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
   });
 });

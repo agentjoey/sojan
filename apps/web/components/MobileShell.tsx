@@ -10,7 +10,7 @@ import { useShellContextValue } from "@/components/ShellContext";
 
 // 最终评审 C5：`NavGrid` 静态 import 会把它连带的 `@sojan/core`（lunar-typescript
 // + iztro 常量表，实测单 chunk 2,055,484 字节）打进每条经 `AppShell` 挂载的路由
-// 客户端包——包括 TG 里根本不渲染 `MobileShell` 的场景（在 `{!tg && …}` 内）。
+// 客户端包。
 // `NavGrid` 在 `open=false` 时本就返回 `null`、不参与首帧，`ssr: false` 安全。
 //
 // 复审二轮再证伪：`next/dynamic` 本质是 `React.lazy`，loader 在**元素首次被

@@ -1,6 +1,12 @@
 # Product Backlog — 照见 Sojan（sojan）
 > 线上 production https://sojan.app · staging https://zhaojian.agentjoey.ai · 排入 Sprint 后从此处移除。
 
+## 🔴 Neon 迁移遗留（2026-10-19，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`）
+- [ ] **[EP-tg-replan] Telegram 重新规划**：bot + Mini App + `/api/tg/*` + cron 已在迁移中整体下线（D2），代码留在 git 历史。重新接入必须按**新身份模型**设计（Neon Auth 会话 uid；TG initData 与邮箱账号如何绑定、合成邮箱/付费门槛漏洞要重新评估），**不要从历史原样恢复**。先 brainstorming 再决定是否做；TG 里没有 web 导航、webview 无浏览器侧会话这两条旧陷阱（见 git 历史里的 CLAUDE.md）重做时仍成立。关闭的 TG 条目：`EP-jiao-tg`、`EP-domain-2a/2b/2c`、`EP-tg-bot-close`、`EP-spirit-chat-orphan`、`EP-tg-bot-test`、`EP-billing-pay`（TG Stars 一项）。
+- [ ] **[EP-llm-unauth] LLM 入口未鉴权**：`/api/reading`（流式解读）与 `app/actions.ts` 的 `dailyPolishAction` / `dailyBehaviorAction`，以及 `/api/fengshui/object`、`/api/fengshui/reading`（Layer 0）同样不要求登录即可调用，会被任意消耗 LLM 额度。迁移前就存在，不在本次范围（设计 §1/§9）。方案：改走 `requireUid()` + 额度闸门（复用 `llm_usage` / `consume_llm_credit_account`）。
+- [ ] **[EP-session-cache-orphan] 注销后其他设备/标签页的会话缓存仍有效，可写出孤儿行**：Neon Auth 的 `__Secure-neon-auth.local.session_data` 是带签名的会话缓存 cookie，TTL 最长 300 s。账号注销后，**其他设备/标签页**不会被清 cookie，在缓存过期前 `getSession()` 仍返回已删除用户的 uid，此窗口内 `createProfile` / `createDwelling` / `saveFengshuiReport` 等写路径可能写入无人可达的孤儿行（`profiles` 等表无到 auth 用户的外键）。方案：`withUid` 的写路径改用 `auth.getSession({ query: { disableCookieCache: "true" } })` 绕开缓存直查上游（SDK 支持，见 `@neondatabase/auth` dist `server-pZf5ArnA.mjs` ~1065）；读路径可继续用缓存。代价：每次写多一次上游往返，需评估。
+- [ ] **[EP-supabase-sunset] Supabase 下线**：production 切换完成后**暂停**项目 `sxjcpoxhphlnwhpzachi`（Task 12 Step 5，暂停日期待补）；保留 2–4 周作为回滚后路，**到期删除须 owner 明确确认**（不可逆）。删除前确认 owner 数据已在 Neon 核对无误、Vercel 上已无 `SUPABASE*` env。
+
 ## 🔴 HIGH
 ### 账号登录（EP-account-login，owner 实测发现 2026-08-21，**同日修复**）
 换设备登录不了自己的账号——直接违背 `EP-account` 当初「跨设备同步档案」的初衷。两个独立根因均已修复：
@@ -13,7 +19,7 @@
 `entitlements`/`isMember`/月度额度闸门/Paywall UI 早在 2026-07-01 就绪（T1-4），但 T5(Stripe)/T6(TG Stars) 一直卡缺凭据未做——**这是目前唯一真正能收入的缺口**。`EP-account2` 上线后，付费门槛依赖的 `hasVerifiedEmail` 第一次是可信信号（此前 TG 影子邮箱会让门槛形同虚设），`requireVerifiedEmailForPayment()`（`apps/web/lib/billing-gate.ts`）已就绪待接。
 
 - [ ] **[EP-billing-pay] Web 支付（Stripe Checkout）**：`/api/billing/checkout`（发起前调 `requireVerifiedEmailForPayment`，不满足则引导去 `/account` 绑邮箱而非直接拒绝）+ `/api/billing/webhook`（`checkout.session.completed`/订阅续费/取消 → upsert `entitlements`）。需要用户提供 `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/价格 ID。
-- [ ] **[EP-billing-pay] TG 支付（Telegram Stars/XTR）**：bot 内 `sendInvoice`（发送前同一道 `requireVerifiedEmailForPayment` 校验）+ `pre_checkout_query`/`successful_payment` 处理器。不需要额外凭据（Stars 走 Telegram 自身结算）。
+- [x] ~~**[EP-billing-pay] TG 支付（Telegram Stars/XTR）**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）：bot 内 `sendInvoice`（发送前同一道 `requireVerifiedEmailForPayment` 校验）+ `pre_checkout_query`/`successful_payment` 处理器。不需要额外凭据（Stars 走 Telegram 自身结算）。
 - [ ] **[EP-billing-pay] 生产开关**：两条支付链路都完成后，`BILLING_ENABLED`（服务端）目前在 Vercel 上**未设置**（等同 pre-prod 放行模式，所有额度检查失效）——上线收费前必须显式设为 `1` 并核实 `FREE_LLM_MONTHLY`/`FREE_PROFILE_LIMIT` 的生产取值。
 
 ### 风水「境」（EP-fs-*，**flag 2026-08-16 起线上已开**）
@@ -159,17 +165,19 @@
 ## 🔴 上线前必做（owner 指定，2026-08-25）
 
 ### 改名遗留：生产 TG 链路全断（claude 核实发现 2026-08-25，**owner 决定本轮先不动**）
+> **2026-10-19 全部关闭**：Telegram 整体下线（bot / Mini App / `/api/tg/*` / webhook 一并删除），本节三条不再需要处理。重新接入见 `EP-tg-replan`。
 `EP-domain` 把 `zhaojian-mvp` 项目改名成 `sojan`、绑上 `sojan.app`，但**两处指向旧域名的配置留在了代码之外，没人重跑**。项目设置 `ssoProtection = all_except_custom_domains`——改名后 `zhaojian-mvp.vercel.app` 变成受 Vercel Authentication 保护的 `.vercel.app` 域名。
 
-- [ ] **[EP-domain-2a] 生产 Telegram webhook 仍指向旧域名 → 401**。`getWebhookInfo` 返回 `https://zhaojian-mvp.vercel.app/api/tg/webhook`；实测 `POST` 该路径 **401**、`GET` 302 到 `vercel.com/sso-api`。对照 `POST https://sojan.app/api/tg/webhook` → 403（应用自己的 webhook secret 校验在拒空请求体，说明这条通）。**生产 bot 收不到任何 Telegram 更新。** `pending_update_count: 0` 且无 `last_error`，大概率只是改名后还没人给 bot 发过消息，不是「没坏」。
+- [x] ~~**[EP-domain-2a] 生产 Telegram webhook 仍指向旧域名 → 401**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）。`getWebhookInfo` 返回 `https://zhaojian-mvp.vercel.app/api/tg/webhook`；实测 `POST` 该路径 **401**、`GET` 302 到 `vercel.com/sso-api`。对照 `POST https://sojan.app/api/tg/webhook` → 403（应用自己的 webhook secret 校验在拒空请求体，说明这条通）。**生产 bot 收不到任何 Telegram 更新。** `pending_update_count: 0` 且无 `last_error`，大概率只是改名后还没人给 bot 发过消息，不是「没坏」。
   修法：带现有 `TELEGRAM_WEBHOOK_SECRET` 重跑一次 `setWebhook` 指到 `https://sojan.app/api/tg/webhook`。
   **根因值得记住**：`EP-domain` 那条自己写了「`setWebhook` 是一次性 curl 不在代码中」——正因为不在代码里，域名迁移时它不会被任何测试或构建捕获。同类还有 BotFather `/setdomain`（Telegram 侧外部动作，本轮未验证是否也还指着旧域名）。
-- [ ] **[EP-domain-2b] 生产 `NEXT_PUBLIC_MINIAPP_URL` 仍是 `https://zhaojian-mvp.vercel.app`**（不是 `sojan.app` 兜底值，因为被显式设了）。就算 webhook 修好，`/start` 的「打开照见」按钮也会把用户送进一个要 Vercel 登录的页面。
+- [x] ~~**[EP-domain-2b] 生产 `NEXT_PUBLIC_MINIAPP_URL` 仍是 `https://zhaojian-mvp.vercel.app`**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）（不是 `sojan.app` 兜底值，因为被显式设了）。就算 webhook 修好，`/start` 的「打开照见」按钮也会把用户送进一个要 Vercel 登录的页面。
   额外约束：这条在 Vercel 上是 **production + preview 共用一个条目**，所以 `lib/tg/bot.ts:11-12` 注释要求的「staging 必须单独设成 `zhaojian.agentjoey.ai`」目前**做不到**——要先拆成两条独立条目。
-- [ ] **[EP-domain-2c] `lib/tg/bot.ts:30` 是 EP-jiao TG 缺口的第三个入口**（owner 决定暂不改）。`EP-jiao-tg` 记的「TG 首页入口已摘除」只覆盖了 `app/page.tsx` 的 `TG_ENTRIES`，但 `/start` 对**已有档案用户**的主 CTA 是 `MINIAPP_URL + "/spirit"`——正是在 TG webview 里必撞 401 的那个页面。`TG_ENTRIES` 摘了、`AppShell.NAV` 门控了，唯独没人想到 **bot 的按钮本身也是一个入口**。这是 CLAUDE.md 头号教训第三次同形状复现。
+- [x] ~~**[EP-domain-2c] `lib/tg/bot.ts:30` 是 EP-jiao TG 缺口的第三个入口**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）（owner 决定暂不改）。`EP-jiao-tg` 记的「TG 首页入口已摘除」只覆盖了 `app/page.tsx` 的 `TG_ENTRIES`，但 `/start` 对**已有档案用户**的主 CTA 是 `MINIAPP_URL + "/spirit"`——正是在 TG webview 里必撞 401 的那个页面。`TG_ENTRIES` 摘了、`AppShell.NAV` 门控了，唯独没人想到 **bot 的按钮本身也是一个入口**。这是 CLAUDE.md 头号教训第三次同形状复现。
   ⚠️ 与 `EP-domain-2a` 有耦合：**只要 bot 一恢复，TG 老用户 `/start` 就会撞死胡同**。两条要一起处理，不能只修 webhook。
 
 ### 自由对话收尾（EP-tg-bot-close + EP-spirit-chat-orphan，**设计已定、owner 决定本轮先不做**）
+> **2026-10-19 全部关闭**：`lib/tg/bot.ts`、`/api/tg/spirit`、`/api/spirit/chat` 均已随 Telegram 下线删除。下文为关闭前的历史设计记录。
 2026-08-25 走完 brainstorming（bounded 路径，无 spec 无 plan 文档），设计与决策全部落在这里，下轮可直接照做。
 
 **先更正两条原记载的事实**（claude 读代码核出，非评审转述）：
@@ -187,19 +195,19 @@
 **不能碰的共用地基**：`getMemory`/`saveMemory`（解梦 + 每日推送共用）、`deriveSpirit`/`buildSpiritSystemPrompt`。
 只服务自由对话的：`listMessages`/`appendMessage`、`spirit_messages` 表、`generateSpiritIntro`。
 
-- [ ] **[EP-tg-bot-close] 改 `lib/tg/bot.ts` 的 `message:text` handler**（owner 指示关闭）。现状：用户在 TG 私聊直接发消息即进入灵的**无边界闲聊**，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突。
+- [x] ~~**[EP-tg-bot-close] 改 `lib/tg/bot.ts` 的 `message:text` handler**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）（owner 指示关闭）。现状：用户在 TG 私聊直接发消息即进入灵的**无边界闲聊**，与 `EP-jiao` 定下的「灵收缩为占卜问事」语义直接冲突。
   - **必须保留** `if (text.startsWith("/")) return next()` 那一支——否则注册在它之后的 `/subscribe` `/unsubscribe` `/settings` 全部失效（文件里已有注释警告）。
   - 非命令文本 → 一句固定引导后 return。**不引导去掷筊**（owner 明确选「引导回命令」）：`EP-jiao-tg` 未做，TG 里的 `/spirit` 必撞 401，指过去是死胡同。拟用文案（可改）：
     > 我在。不过照见现在不走闲聊这条路了——/today 看今日流转，/start 打开你的命盘。
   - 删掉整个对话体：`consumeQuota`、`listMessages`/`appendMessage`、`getMemory`/`saveMemory`、`getQuestionnaire`、`streamSpiritChat`、`summarizeSpiritMemory`。
   - **顺带堵一个口子**：同时删掉该 handler 里的 `resolveOrCreateTgUser` + `getProfileForUser`。现在任何陌生人给 bot 发一句「hi」都会在 `auth.users` + `tg_users` 建一条真实记录；改完后非命令消息是纯静态回复，零查库、零 LLM、零写入。代价是发文字不再自动建号——引导语里就写着 `/start`，而 `/start` 本就负责建号。
   - **import 清理要小心**：`getMemory`/`getQuestionnaire`/`formatQuestionnaire`/`consumeQuota`/`generateDailySpiritGreeting` 在 `/today` handler 里仍在用，只能删 `streamSpiritChat`、`summarizeSpiritMemory`、`listMessages`、`appendMessage`、`saveMemory` 五个。
-- [ ] **[EP-spirit-chat-orphan] 删 `app/api/spirit/chat/`**（route.ts + `__tests__/route.test.ts`）。`generateSpiritIntro` 删后在 `apps/web` 零消费方，但它是 `@sojan/llm` 的库导出、有自己的测试，**留在 packages/llm 不动**。`spirit_messages` 表不动、不做迁移（`/api/tg/spirit` 还在读写它）。
-- [ ] **[EP-tg-bot-test] `lib/tg/bot.ts` 零测试覆盖** —— 上面两条落地时一并补，这是本条独立价值所在。`app/api/tg/webhook/__tests__/route.test.ts` 把 `getBot` 整个 mock 掉了，所以 bot.ts 的 7 个 handler **一条测试都没有**。这正是 `bot.ts:30` 的 `/spirit` CTA 能躲过整轮 EP-jiao 评审的结构性原因（见 `EP-domain-2c`）。
+- [x] ~~**[EP-spirit-chat-orphan] 删 `app/api/spirit/chat/`**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）（route.ts + `__tests__/route.test.ts`）。`generateSpiritIntro` 删后在 `apps/web` 零消费方，但它是 `@sojan/llm` 的库导出、有自己的测试，**留在 packages/llm 不动**。`spirit_messages` 表不动、不做迁移（`/api/tg/spirit` 还在读写它）。
+- [x] ~~**[EP-tg-bot-test] `lib/tg/bot.ts` 零测试覆盖**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文） —— 上面两条落地时一并补，这是本条独立价值所在。`app/api/tg/webhook/__tests__/route.test.ts` 把 `getBot` 整个 mock 掉了，所以 bot.ts 的 7 个 handler **一条测试都没有**。这正是 `bot.ts:30` 的 `/spirit` CTA 能躲过整轮 EP-jiao 评审的结构性原因（见 `EP-domain-2c`）。
   拟钉三条（grammY 标准做法：`bot.botInfo = {…}` + `bot.api.config.use()` 拦出站调用 + `bot.handleUpdate()` 喂假 update，harness 约 40–60 行）：①普通文本 → 回引导语且 `streamSpiritChat` **一次都没被调用**（判别力所在，改回旧实现必红）②普通文本 → `resolveOrCreateTgUser` 未被调用（不建号）③`/subscribe` 仍能到达（守住 `next()` 那一支，最容易被顺手改坏）。
   若嫌成本高可只做 ①②（直接导出 handler 函数单测，更轻），但那样 `next()` 那一支仍然无人守。
 
-- [ ] **[EP-jiao-tg] TG 侧掷筊未接入——`/api/tg/jiao` 中介臂待补**（最终评审 C1，owner 决定内测期不做）：`/spirit` 的 `askSpirit`（初次掷筊）与 `SpiritPanel`（追问）一律走浏览器侧 `supabase().auth.getSession()` 取 Bearer token 调 `/api/spirit/jiao`——Telegram Mini App webview 里**没有这份浏览器侧 Supabase 会话**，token 恒为 `undefined`，每次掷筊必然撞 401（引导去 `/account` 登录，对 TG 用户是死胡同）。
+- [x] ~~**[EP-jiao-tg] TG 侧掷筊未接入——`/api/tg/jiao` 中介臂待补**~~ —— **TG 已下线（2026-10-19，Neon 迁移），见 `EP-tg-replan`**。（以下为关闭前原文）（最终评审 C1，owner 决定内测期不做）：`/spirit` 的 `askSpirit`（初次掷筊）与 `SpiritPanel`（追问）一律走浏览器侧 `supabase().auth.getSession()` 取 Bearer token 调 `/api/spirit/jiao`——Telegram Mini App webview 里**没有这份浏览器侧 Supabase 会话**，token 恒为 `undefined`，每次掷筊必然撞 401（引导去 `/account` 登录，对 TG 用户是死胡同）。
   **为什么现在不上**：根因是 TG 认证机制与 web 完全不同——TG 侧向来是靠 `hasTgSession()` 分流到专门的 `api/tg/*` 中介端点（用 Telegram initData 校验身份，不是 Bearer JWT，参见 `api/tg/dream`/`api/tg/fengshui` 的既有模式），而掷筊/追问从未接入这条分流。这不是一个小补丁——需要新写一条 `api/tg/jiao` 中介端点（服务端读取 profile 关联的 memory/questionnaire，同 `api/tg/dream` 的既有模式）+ `SpiritPanel`/`askSpirit` 补 `hasTgSession()` 分流，工作量与已有 dream/fengshui 的 TG 适配相当，评审阶段时间不允许现做半成品。
   ⚠️ **入口清点不完整（2026-08-25 补）**：下面「已处理」只清到了 web/Mini App 的导航，漏了 `lib/tg/bot.ts:30`——`/start` 对已有档案用户的按钮直接指 `/spirit`。见 `EP-domain-2c`。
   **已处理**：TG 首页入口（`app/page.tsx` 的 `TG_ENTRIES`）已摘除「灵」这一项，回归测试见 `app/__tests__/page.test.tsx`；`/spirit` 页面本身仍可通过直接 URL 访问（TG webview 内），加了注释如实说明现状（能看到输入框、掷筊会在追问/首解那一步撞 401，不是静默失败）。

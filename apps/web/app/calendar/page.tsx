@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
-import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { dailyBehaviorAction, ziweiHoroscopeAction } from "@/app/actions";
 import { matchFortuneImage, MOOD_LABEL } from "@/lib/fortune-images";
 import { Emphasis, GanzhiBadge } from "@/components/ui";
@@ -65,14 +66,13 @@ const DIMS: ("career" | "wealth" | "love" | "health" | "travel")[] = [
 
 export default function CalendarPage() {
   const t = useT();
+  const gate = useSignInGate();
   const WK = t("calendar.weekDays").split(",");
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [today] = useState(() => new Date());
   const [selected, setSelected] = useState(() => ymd(new Date()));
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [horoscope, setHoroscope] = useState<ZiweiHoroscope | null>(null);
-  const [dark, setDark] = useState(false);
-  const [fortuneImgError, setFortuneImgError] = useState(false);
   const selYear = selected.slice(0, 4);
 
   // 七十二候：与卷首各自取值时机不同（本页有按日期的 localStorage 缓存），故各自现算一次
@@ -80,18 +80,9 @@ export default function CalendarPage() {
   const solarHou = getCurrentSolarHou();
 
   useEffect(() => {
-    const el = document.documentElement;
-    const read = () => setDark(el.getAttribute("data-tg-theme") === "dark");
-    read();
-    const mo = new MutationObserver(read);
-    mo.observe(el, { attributes: true, attributeFilter: ["data-tg-theme"] });
-    return () => mo.disconnect();
-  }, []);
-
-  useEffect(() => {
     (async () => {
       try {
-        const p = hasTgSession() ? await tgGetProfile() : await getActiveProfile();
+        const p = await getActiveProfile();
         setProfile(p);
       } catch {
         setProfile(null);
@@ -134,7 +125,8 @@ export default function CalendarPage() {
     };
   }, [profile, selected, fortune]);
 
-  if (profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/calendar" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("calendar.loadingProfile")} mode="pending" />;
   if (profile === null)
     return (
       <Centered>
@@ -154,8 +146,6 @@ export default function CalendarPage() {
   const img = fortune ? matchFortuneImage(fortune.relation, selected) : undefined;
   const g = fortune ? gradeOf(fortune.scores.overall) : "neutral";
   const verdictText = t("calendar.grade." + g);
-  const useDarkFile = dark && !!img?.darkFile && !fortuneImgError;
-  const imgSrc = useDarkFile ? img?.darkFile : img?.file;
 
   const header = (
     <>
@@ -271,16 +261,13 @@ export default function CalendarPage() {
             既有能力（EP-cal-img，20 张人工筛选图 + curate skill），设计包未说废弃，
             与「黄历桌面不出、移动保留」是同一条取舍线（见任务报告/ledger）。
             ⚠️ 已知副作用（非疏忽，如实记录）：`xl:hidden` 只是不显示，节点仍会挂载，
-            桌面视口下这张图与下面的深色兜底探测图仍会各发一次网络请求——这是「响应式
+            桌面视口下这张图仍会发一次网络请求——这是「响应式
             只能用 Tailwind 断点类、不许 matchMedia/JS 判视口」这条约束的必然代价（要
             完全不发请求就得在 JS 里判断视口再决定渲不渲染，那正是被禁止的做法）。桌面
             用户因此会有一点不可见的图片流量，规模是 20 张图里的 1 张，可接受。 */}
         {img && (
           <div className="mx-auto mt-8 max-w-[340px] xl:hidden">
-            <FortuneFrame src={imgSrc!} alt={img.alt} seed={selected} />
-            {/* 深色变体 404 兜底探测：display:none 的 img 仍会发请求，但 loading="lazy"
-                在没有布局盒时永不触发——所以这里绝不能加 lazy（C1 评审）。 */}
-            <img src={imgSrc} alt="" aria-hidden className="hidden" onError={() => { if (useDarkFile) setFortuneImgError(true); }} />
+            <FortuneFrame src={img.file} alt={img.alt} seed={selected} />
           </div>
         )}
       </div>

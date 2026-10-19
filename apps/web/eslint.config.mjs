@@ -36,8 +36,7 @@ const eslintConfig = defineConfig([
        * 逐条读完后分三类，**没有一条是它要防的东西**：
        *   A. 挂载后读浏览器专有值（sessionStorage / location / DOM / cookie）——
        *      服务端根本拿不到，SSR 首帧必须先给中性值再切，否则水合错位。
-       *      其中最普遍的「是否在 Telegram 里」已抽成 useIsTelegram()（见 lib/tg/ui.ts），
-       *      规则例外只在那一处声明；剩下 4 处各读各的值，抽不成同一个 hook。
+       *      各读各的值，抽不成同一个 hook。
        *   B. 重置状态再发异步请求（setLoading(true) 后 fetch）——effect 与外部系统
        *      同步的标准写法，React 官方文档就是这个形状。
        *   C. 动画触发（setCasting(true) + setTimeout 清除）。

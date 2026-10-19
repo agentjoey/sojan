@@ -1,35 +1,24 @@
 import { isLlmConfigured, resolveLlmConfig } from "@sojan/llm";
 import { localeFromRequest } from "@/lib/i18n/server";
-// 校验 schema / 会员闸门 / 生成逻辑与 TG 中介端点（api/tg/fengshui 的 reading action）
-// 共用同一份实现（EP-fs-tg），见 lib/fengshui-reading.ts 顶部注释——闸门规则只写一份。
+// 校验 schema / 会员闸门 / 生成逻辑见 lib/fengshui-reading.ts——闸门规则只写一份。
 import {
   ReadingRequestSchema,
   generateFengshuiSections,
   isFengshuiEntitledForUid,
   wantsLayer1,
 } from "@/lib/fengshui-reading";
-import { resolveUid } from "@/lib/account/uid";
+import { getUid } from "@/lib/account/uid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * EP-account2-02：resolveUid() 改造后不再依赖 next/headers 的 cookies()，
- * 两处曾经各自独立重复的手动 cookie 解析（本文件与 billing/status/route.ts）
- * 现在可以安全收敛成一处。
- */
-async function resolveUserId(req: Request): Promise<string | undefined> {
-  const resolved = await resolveUid(req);
-  return resolved?.uid;
-}
-
-/**
  * 会员闸门（Task 10，EP-fs-17）。规则本体在 `isFengshuiEntitledForUid`
- * （lib/fengshui-reading.ts），这里只负责「从请求解出 uid」这一入口特有的一步。
+ * （lib/fengshui-reading.ts），这里只负责「从会话 cookie 解出 uid」这一入口特有的一步。
  * GET（闸门探测）与 POST（叙述生成的服务端校验）共用这一份实现，不重复。
  */
-async function isFengshuiEntitled(req: Request): Promise<boolean> {
-  return isFengshuiEntitledForUid(await resolveUserId(req));
+async function isFengshuiEntitled(): Promise<boolean> {
+  return isFengshuiEntitledForUid((await getUid()) ?? undefined);
 }
 
 /**
@@ -40,8 +29,8 @@ async function isFengshuiEntitled(req: Request): Promise<boolean> {
  * 服务端。与下面 POST 的服务端校验共用 `isFengshuiEntitled`，避免同一条闸门规则
  * 写两份、日后改一处漏改另一处。
  */
-export async function GET(req: Request): Promise<Response> {
-  return Response.json({ entitled: await isFengshuiEntitled(req) });
+export async function GET(): Promise<Response> {
+  return Response.json({ entitled: await isFengshuiEntitled() });
 }
 
 /**
@@ -68,7 +57,7 @@ export async function GET(req: Request): Promise<Response> {
  * （住宅实盘 + 多住客合看），服务端独立校验——客户端闸门（/fengshui 页面上的
  * Paywall）只挡得住走页面 UI 的请求，直接打这个接口能绕过去，所以这里必须自己
  * 再判一次，不能只信任客户端不发这两个字段。未通过时返回 402（与
- * `/api/spirit/chat` 的 LLM 额度闸门同一个状态码语义），不触碰
+ * 其它 LLM 额度闸门同一个状态码语义），不触碰
  * `computeFengshui`/`generateFengshuiReading`，不产生任何 LLM 费用。
  */
 export async function POST(req: Request): Promise<Response> {
@@ -84,7 +73,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response(parsed.error.issues.map((i) => i.message).join("; "), { status: 400 });
   }
 
-  if (wantsLayer1(parsed.data) && !(await isFengshuiEntitled(req))) {
+  if (wantsLayer1(parsed.data) && !(await isFengshuiEntitled())) {
     return new Response(JSON.stringify({ error: "paywall" }), {
       status: 402,
       headers: { "content-type": "application/json" },

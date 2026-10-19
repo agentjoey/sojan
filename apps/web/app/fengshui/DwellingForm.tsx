@@ -5,10 +5,7 @@ import { DIRECTIONS, DIRECTION_LABEL, type Direction } from "@sojan/core";
 import { createDwelling, updateDwelling, type Dwelling } from "@/lib/dwellings";
 import { listProfiles, getActiveProfileId, type Profile } from "@/lib/profiles";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
-import { supabase } from "@/lib/supabase";
-import { hasTgSession, tgListProfiles } from "@/lib/tg/client";
-import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
-import { Segmented } from "@/components/tg/native";
+import { Segmented } from "@/components/Segmented";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { Button } from "@/components/ui";
 
@@ -27,7 +24,12 @@ import { Button } from "@/components/ui";
  *    cohabitantInputs : undefined`），选择器这头却完全开放——非会员勾完存下，
  *    没有付费墙、没有提示、什么都不出现。
  */
-export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved: (d: Dwelling) => void }) {
+export function DwellingForm({ initial, onSaved, onAuthError }: {
+  initial?: Dwelling;
+  onSaved: (d: Dwelling) => void;
+  /** 保存时会话已失效（`UnauthenticatedError`）：页面传 `gate.handleAuthError` 切到登录引导。返回 true = 已处理。 */
+  onAuthError?: (e: unknown) => boolean;
+}) {
   const t = useT();
   const [name, setName] = useState(initial?.name ?? "");
   const [kind, setKind] = useState<"home" | "office">(initial?.kind ?? "home");
@@ -65,27 +67,13 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
    * 用户白发一次网络往返。
    */
   const [cohabitantBlocked, setCohabitantBlocked] = useState(false);
-  // EP-fs-tg：TG 内保存走原生 MainButton（页内按钮隐藏）；web 路径保持页内按钮不变。
-  const inTg = useIsTelegram();
-
-  useTgMainButton({
-    text: saving ? t("fengshui.dwelling.saving") : t("fengshui.dwelling.save"),
-    onClick: () => save(),
-    enabled: touchedFacing && !saving,
-    visible: inTg,
-  });
 
   useEffect(() => {
     let cancelled = false;
-    // EP-fs-tg：TG 会话下匿名 Supabase 客户端读不到档案（RLS 下为空），候选人必须走
-    // tgListProfiles() 中介——否则 TG 里同住人选择器永远不渲染，合看无从选起。
-    // TG 的「当前档案」恒为列表第一条（getProfileForUser 按创建时间倒序取首条，
-    // profiles/page.tsx 用的是同一约定），过滤掉自己。
-    const fetcher = hasTgSession() ? tgListProfiles() : listProfiles();
-    fetcher
+    listProfiles()
       .then((list) => {
         if (cancelled) return;
-        const activeId = hasTgSession() ? (list[0]?.id ?? null) : getActiveProfileId();
+        const activeId = getActiveProfileId();
         setCandidates(list.filter((p) => p.id !== activeId));
       })
       .catch(() => {
@@ -104,14 +92,8 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
     let cancelled = false;
     (async () => {
       try {
-        // Authorization：TG 会话走 cookie（同源请求自动带上），本地匿名/邮箱登录靠
-        // 这个头，服务端才能识别出「其实是会员」，不会被误挡成非会员。
-        const { data } = await supabase().auth.getSession();
-        const token = data.session?.access_token;
-        const r = await fetch("/api/fengshui/reading", {
-          method: "GET",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        // 同源请求自带会话 cookie，服务端据此识别会员，无需手工拼 Authorization。
+        const r = await fetch("/api/fengshui/reading", { method: "GET" });
         if (cancelled || !r.ok) return; // 非 2xx = 基础设施失败，不是「判定你不是会员」
         const body = (await r.json().catch(() => null)) as { entitled?: boolean } | null;
         if (cancelled || typeof body?.entitled !== "boolean") return; // 同理：读不出布尔值 = 未知
@@ -133,7 +115,6 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
   }
 
   async function save() {
-    haptics.light();
     setSaving(true);
     try {
       const payload = {
@@ -144,6 +125,8 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
         ? (await updateDwelling(initial.id, payload), { ...initial, ...payload })
         : await createDwelling(payload);
       onSaved(saved);
+    } catch (e) {
+      if (!onAuthError?.(e)) throw e;
     } finally {
       setSaving(false);
     }
@@ -245,11 +228,9 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
         </div>
       )}
 
-      {!inTg && (
-        <Button onClick={save} disabled={saving || !touchedFacing}>
-          {saving ? t("fengshui.dwelling.saving") : t("fengshui.dwelling.save")}
-        </Button>
-      )}
+      <Button onClick={save} disabled={saving || !touchedFacing}>
+        {saving ? t("fengshui.dwelling.saving") : t("fengshui.dwelling.save")}
+      </Button>
     </div>
   );
 }

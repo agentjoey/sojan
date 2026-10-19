@@ -7,9 +7,9 @@ import {
   type FengshuiChart, type Direction, type DirectionVerdict,
 } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDwellings } from "@/lib/dwellings";
-import { supabase } from "@/lib/supabase";
-import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -19,7 +19,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
 
 /**
  * 物件顾问页（EP-fs-08 弱版 / EP-fs-18 强版）。与「境」主页面（../page.tsx）同一套
- * 骨架约定：flag 门控、档案读取（Telegram 会话优先，否则匿名档案）、加载/无档案态处理。
+ * 骨架约定：flag 门控、档案读取、加载/无档案态处理。
  * 落位建议本身（推荐方位/不宜方位/品类规则/与命主关系）由 ObjectAdvisorForm 内部调用
  * core 的 `adviseObject` 纯函数确定性算出，本页只负责准备入参并把它交下去。
  *
@@ -54,6 +54,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  */
 export default function FengshuiObjectPage() {
   const t = useT();
+  const gate = useSignInGate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   /**
    * 只取第一个居所——与 ../page.tsx 一致（本波未实现居所切换器）。这里只留下
@@ -71,7 +72,7 @@ export default function FengshuiObjectPage() {
 
   useEffect(() => {
     if (!ENABLED) return;
-    (hasTgSession() ? tgGetProfile() : getActiveProfile())
+    getActiveProfile()
       .then((p: Profile | null) => setProfile(p))
       .catch(() => setProfile(null));
   }, []);
@@ -103,14 +104,8 @@ export default function FengshuiObjectPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Authorization：TG 会话走 cookie（同源请求自动带上），本地匿名/邮箱登录靠
-        // 这个头，服务端才能识别出「其实是会员」，不会被误挡成非会员。
-        const { data } = await supabase().auth.getSession();
-        const token = data.session?.access_token;
-        const r = await fetch("/api/fengshui/reading", {
-          method: "GET",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        // 同源请求自带会话 cookie，服务端据此识别会员，无需手工拼 Authorization。
+        const r = await fetch("/api/fengshui/reading", { method: "GET" });
         if (cancelled) return;
         // 非 2xx / body 读不出布尔值 = 基础设施失败（冷启动、代理插手、离线占位页），
         // **不是**「服务端判定你不是会员」——本路由的正常回答永远是 200 + { entitled }。
@@ -160,7 +155,8 @@ export default function FengshuiObjectPage() {
   const showProbeFailedNote = !!facing && probeFailed;
 
   if (!ENABLED) return <Centered>{t("fengshui.notEnabled")}</Centered>;
-  if (profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
+  if (gate.signedOut) return <SignInPrompt next="/fengshui/object" />;
+  if (gate.pending || profile === undefined) return <CastingOverlay title={t("fengshui.loadingProfile")} mode="pending" />;
   if (profile === null) {
     return (
       <Centered>

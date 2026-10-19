@@ -53,9 +53,8 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 **Version:**  v0.1.0            ← release.sh 自动更新
 
 > **命名沿革**（避免后人困惑）：`照见/Zhaojian`（代号）→ 一度对外称 `Mira`（`2026-08-14-fengshui-environment-design.md` 有记载，已全部收回）→ 现定 `照见 / Sojan`。
-> **两处内部标识符刻意保留 `zhaojian` 旧名、不是漏改**（均已在代码里写了注释）：
-> ① `SYNTHETIC_EMAIL_DOMAIN = "zhaojian.local"`（`apps/web/lib/access.ts`）——生产库 `auth.users` 里已有真实用户邮箱是 `tg_<id>@zhaojian.local`，改常量会让存量 TG 用户不再被识别为合成邮箱、重开 EP-account2 堵上的付费门槛漏洞。
-> ② localStorage 缓存键前缀 `zhaojian.*`（`app/calendar/page.tsx`、`app/chart/page.tsx`、`lib/profiles.ts`）——改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度。
+> **内部标识符刻意保留 `zhaojian` 旧名、不是漏改**（已在代码里写了注释）：
+> localStorage 缓存键前缀 `zhaojian.*`（`app/calendar/page.tsx`、`app/chart/page.tsx`、`lib/profiles.ts`）——改前缀等于让全体存量用户缓存失效、白烧一轮 LLM 额度。
 
 **Technical docs:** [Architecture](docs/architecture.md) · [Deployment](docs/deployment.md) · [Operations](docs/operations.md)
 **前序资产:** Obsidian `research/fortune-engine-{prd,plan,tech-report}.md`（八字+紫微基础方案，本项目在其上叠加心理占星层）
@@ -64,7 +63,8 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 | Layer | Tech | 状态 |
 |-------|------|------|
 | Web 框架 | **Next.js 16 App Router (TS)** + React 19 + Tailwind 4 | ✅ `apps/web` 已建 |
-| 部署 | **Vercel**（无 DB / 无账号；匿名解读，命盘按需重算）| ✅ |
+| 部署 | **Vercel**（函数区域固定 `sin1`，见 `apps/web/vercel.json`，与 Neon 同在新加坡）| ✅ |
+| 数据库 + 认证 | **Neon Postgres**（项目 `lucky-lake-64982745`，ap-southeast-1，PG 18）+ **Neon Auth**（Managed Better Auth，邮箱验证码登录；`@neondatabase/auth` 锁 `0.6.0-beta`）| 🚧 代码已完成于 `feat/neon-migration`（自 Supabase 迁入）；staging/生产切换待执行，见 `.agent/CURRENT.md` |
 | 八字排盘 | lunar-typescript (MIT) | ✅ 已定 |
 | 紫微排盘 | iztro (MIT) | ✅ 已定 |
 | 西方星盘 | circular-natal-horoscope-js（公有领域，规避 Swiss Ephemeris AGPL）| ✅ 已定 |
@@ -85,8 +85,8 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 - **引擎深化派生事实在 facts 层算、不进冻结命盘**：旺衰证据(`deriveStrength`)/用神(`deriveUsefulElements`)/紫微三方四正(`deriveTriad`)/西方画像(`deriveWesternProfile`) 均由核心纯函数从既有 `UnifiedChart` 派生，`extractFacts` 时调用 → 新旧冻结命盘通吃、零迁移。旺衰/用神是扶抑启发式（prompt 标「据证判断」）。
 - **时序层按年现算、不进冻结**：`computeZiweiHoroscope`(大限/流年四化) → `generateTimeline` 时序声部（非事件预测）；/chart 当下时序卡 + /calendar 本年上下文，按 (档案,年) 缓存。
 - **MiniMax-M3 支持 prompt cache_control**（anthropic 线，`LLM_CACHE` 默认开）；LLM 客户端含退避重试(`withRetry`)+非流式 60s 超时（见 `docs/specs/engine-v2-deepening.md`）。
-- **Telegram 里没有 web 导航——加功能必须改两处**：`AppShell.tsx` 用 `{!tg && (…)}` 把桌面侧栏与移动底栏**整个**包住，TG 内唯一导航是 `app/page.tsx` 的 `TG_ENTRIES` 硬编码列表。只往 `AppShell.NAV` 加入口的新功能，在 Mini App 里**入口数为零**（风水就这么静默失踪过一次：flag 开着、页面上线、web 有入口、全套测试绿）。两处的 flag 门控条件也要一致。回归由 `app/__tests__/page.test.tsx` 守。
-  **另一半（EP-jiao 2026-08-25 又踩一次）：入口有、功能却在 TG 里是坏的。** TG webview **没有浏览器侧 Supabase 会话**——任何走 `supabase().auth.getSession()` 取 Bearer token 的新页面，在 TG 里 token 恒为 `undefined`、必然 401。需要 TG 可用的功能一律要配一条 `/api/tg/*` 中介臂（service-role + initData 鉴权），页面按 `hasTgSession()` 分流；`/dream` 是完整先例。**写计划时如果通篇没出现「Telegram」四个字，那基本就是漏了。** 同类的还有：`getQuestionnaire`/`listMessages` 这类浏览器侧直读 Supabase 的函数在 TG 里全部静默失败（`ensureSession()` 会顺手建一个游离匿名账号），必须配 `tgGetQuestionnaire()` 之类的对应臂。
+- **身份与数据访问约定（Neon 迁移后）**：身份只认会话——`lib/account/uid.ts` 的 `getViewer()/getUid()/requireUid()` 是全站唯一入口，**不读请求里传来的 uid、不再用 Bearer token**。数据库不走 RLS、不设指向 `neon_auth` 的外键，**每条 SQL 自己按会话 uid 过滤**。浏览器不直连数据库：`lib/data/*.ts` 是 `"use server"` 模块（写操作经 `withUid`、返回 `ActionResult`——Next 生产构建会脱敏 server action 抛出的错误，不能靠 throw 传业务错误），`lib/{profiles,dwellings,fengshui-report,dream-history,jiao-history}.ts` 是客户端门面（`unwrap`），页面 import 路径不变。**没有匿名账号**：未登录访客不能存档，用 `useSignInGate` + `SignInPrompt` 引导登录，起盘表单草稿暂存 sessionStorage `zhaojian.readingDraft`。注销是一个事务先删 8 张业务表再删 `neon_auth."user"`（托管 `delete-user` 端点 404），然后清 `__Secure-neon-auth.*` cookie。
+- **Telegram bot / Mini App 已整体下线**（2026-10，`lib/tg`、`/api/tg/*`、cron、grammy、`packages/core/src/tg` 全删）。重新接入见 BACKLOG `EP-tg-replan`，须按新身份模型设计，不要从 git 历史原样恢复。
 - **风水两套八方不得互推**：「本命八方」由命卦定、「房屋八方」由宅卦定，同一方位在两表里经常是不同的星。`verifyDirectionConsistency` 按分句→整句→块三层解析归属，**无法归属则弃权**而不是拿其中一张表去判另一张的陈述。
 - **八宅结构：命卦吉方 ∩ 宅卦吉方 只可能是 4 或 0**（同东/西四命组则四个全留、异组则一个不留）。推论：物件顾问「强版」与弱版的推荐方位**逐字节相同**，唯一差异是 `dwellingNote`。别再基于「强版给出不同方位」做设计。
 - **中文方位名互相嵌套**：北 ⊂ 东北，东/南/西 ⊂ 东南/西南/西北。任何按方位名做的字符串匹配或测试查询**必须精确匹配**（正则锚定 / `{ exact: true }`）。本仓库已咬过三次。
@@ -100,8 +100,11 @@ pnpm install
 pnpm --filter @sojan/web dev        # 本地起 Next 应用（http://localhost:3000）
 pnpm --filter @sojan/web build      # 生产构建（含 TS 校验）
 pnpm --filter @sojan/core test      # 排盘核心单测（边界/跨节气/子时/真太阳时）
+DATABASE_URL=<Neon 连接串> pnpm --filter @sojan/web db:migrate   # 应用 apps/web/db/migrations（记录在 schema_migrations 表）
+TEST_DATABASE_URL=<Neon dev 分支串> pnpm --filter @sojan/web exec vitest run <paths>  # *.db.test.ts 仅在设了它时才跑，否则 skip
 ./scripts/release.sh [patch|minor|major]
 ```
+> ⚠️ 跑 db 测试时**只 export `TEST_DATABASE_URL`**，别把整份 `.env.local` source 进 shell（会把 `DATABASE_URL` 等带进来）。
 **Monorepo:** `apps/web`（Next）+ `packages/core`（排盘）+ `packages/llm`（解读，均经 `transpilePackages` 接入）。
 集成边界：`apps/web/app/reading/actions.ts`（→ core 排盘）、`apps/web/app/api/reading/route.ts`（→ llm 流式解读）。
 **LLM 解读层（`@sojan/llm`）：** provider 无关 fetch 客户端，**双线协议**：`anthropic`（Messages `/v1/messages`）/ `openai`（`/chat/completions`），env 驱动（`LLM_PROVIDER`/`LLM_MODEL`/`LLM_BASE_URL`/`LLM_API_KEY`[/`LLM_WIRE`]）。

@@ -1,7 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 import type { Dwelling } from "@/lib/dwellings";
+
+/**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
 
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
 const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart: computeUnifiedChart(birth), createdAt: "", reading: null };
@@ -15,38 +24,8 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfileId: () => "p1",
 }));
 /**
- * EP-fs-tg：isTelegram 必须是**可变**的——本文件新增「TG 会话」describe 把它翻成
- * true 来断言原生分支（Group+Cell）真的被渲染。默认值 false，既有用例不受影响。
- */
-const { tgEnv } = vi.hoisted(() => ({ tgEnv: { inTg: false } }));
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  isTelegram: () => tgEnv.inTg,
-  tgGetProfile: vi.fn(),
-  tgListProfiles: vi.fn(async () => []),
-}));
-
-/**
- * `@/lib/supabase` 的真实实现在没配 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时会抛错
- * （同 lib/__tests__/dwellings.test.ts、fengshui/__tests__/page.test.tsx 踩过的同一个
- * 坑），必须 mock 掉。
- *
- * 最终评审 I2 之后**本页自己不再 import 它**（多居所闸门连同探测一并撤除），但
- * `DwellingForm`（本页下半部分永远渲染）会 import——它要为同住人选择器的合看闸门
- * （最终评审 I3）读会话 token。所以这个 mock 仍然是必需的，只是服务对象换了。
- * 会话内容保持可按测试改写的共享可变量（`vi.hoisted`，理由同
- * fengshui/__tests__/page.test.tsx 里的同名夹具）。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `DwellingForm`（本页下半部分永远渲染）也从 `@/lib/dwellings` 取
- * `createDwelling`/`updateDwelling`，一并在这里 mock，避免真的打 supabase——但本文件
+ * `createDwelling`/`updateDwelling`，一并在这里 mock，避免真的打服务端——但本文件
  * 不断言这两个函数的调用，所以直接内联桩实现即可（与 DwellingForm.test.tsx 里
  * `updateDwelling: vi.fn(async () => {})` 同一种写法）。只有 `listDwellings`/
  * `deleteDwelling` 需要外层 const + 间接包装：本文件要在各条测试里用
@@ -108,9 +87,6 @@ beforeEach(() => {
   listDwellings.mockReset().mockResolvedValue([]);
   deleteDwelling.mockReset().mockResolvedValue(undefined);
   updateDwelling.mockReset().mockResolvedValue(undefined);
-  supabaseSession.current = null;
-  tgEnv.inTg = false;
-  delete window.Telegram;
   // 默认 entitled:true。本页自己已不发请求（I2），这个桩留着是给 `DwellingForm`
   // 内部那条合看闸门探测兜底——本文件的 listProfiles 只返回主档案自己，选择器不
   // 渲染、探测也不会发起，但桩在这里意味着即使将来夹具变了也不会打到真 fetch。
@@ -137,7 +113,7 @@ describe("EP-fs-14 /fengshui/dwellings 管理页", () => {
     expect(screen.getByText("办公 · 自有 · 不确定")).toBeInTheDocument();
   });
 
-  // EP-fs-tg：原生 confirm() 已改为页内两步确认（web 与 TG 一致，spec §4）。
+  // 原生 confirm() 已改为页内两步确认。
   // 「点删除 → 出现确认行 → 点确认才删」这个两步结构本身是被断言守护的——
   // 若退化回单击直删，第一条测试当场变红（变异验证过）。
   it("两步确认：点「删除」只是进入确认态，不发起删除；点「取消」退出确认态", async () => {
@@ -291,71 +267,15 @@ describe("最终评审 I2：新增居所不再受会员闸门限制（挡住的�
 });
 
 /**
- * EP-fs-tg：TG 会话下的原生渲染分支。判别点选 Cell 的 chevron「›」——它只存在于
- * `<Group>`+`<Cell>` 原生列表里，web 的 Card 列表渲染不出这个字符，两个分支因此
- * 在 DOM 上可严格区分（不是「都显示了名字所以算通过」那种恒真断言）。
- *
- * 变异验证（实跑过）：把 page.tsx 里的 `inTg` 改成恒 false，本 describe 3 条全红。
- */
-describe("EP-fs-tg TG 会话：原生列表 + 页内两步确认", () => {
-  beforeEach(() => {
-    tgEnv.inTg = true;
-    // isTelegram 被 mock 成 true 后，useTgMainButton（DwellingForm 保存按钮）会真的
-    // 去读 window.Telegram.WebApp.MainButton——jsdom 里没有，必须连 SDK 面一起桩掉。
-    window.Telegram = {
-      WebApp: {
-        initData: "x",
-        MainButton: {
-          setText: vi.fn(), enable: vi.fn(), disable: vi.fn(),
-          show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn(),
-        },
-        BackButton: { show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn() },
-        HapticFeedback: { impactOccurred: vi.fn(), notificationOccurred: vi.fn() },
-      },
-    };
-  });
-
-  it("列表渲染为原生 Cell（带 chevron），web 分支则没有", async () => {
-    listDwellings.mockResolvedValue([D1, D2]);
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
-    // 两个居所各一条 Cell → 两个 chevron
-    expect(screen.getAllByText("›")).toHaveLength(2);
-    // Cell 副标题与 web 分支同一套拼接（精确整行，方位名子串陷阱见上方既有注释）
-    expect(screen.getByText("住宅 · 租住 · 南")).toBeInTheDocument();
-    expect(screen.getByText("办公 · 自有 · 不确定")).toBeInTheDocument();
-  });
-
-  it("web 分支（对照组）：不出现原生 Cell 的 chevron", async () => {
-    tgEnv.inTg = false;
-    listDwellings.mockResolvedValue([D1, D2]);
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
-    expect(screen.queryAllByText("›")).toHaveLength(0);
-  });
-
-  it("TG 分支里两步确认同样成立：点删除不删，点确认才删", async () => {
-    listDwellings.mockResolvedValue([D1]);
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "删除" }));
-    expect(deleteDwelling).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "确认" }));
-    await waitFor(() => expect(deleteDwelling).toHaveBeenCalledWith("d1"));
-    await waitFor(() => expect(screen.queryByText("家A")).toBeNull());
-  });
-});
-
-/**
  * spec §4.2 / 评审必修1：编辑居所入口。此前 `DwellingForm` 的 `initial` 编辑回显
  * 实现了、有单测，但没有任何调用方——生产不可达的死代码，而它是用户修正「同住人
- * 超限的历史居所」的唯一入口。现在 web（点「编辑」）与 TG（点 Cell）都能进入。
+ * 超限的历史居所」的唯一入口。现在点「编辑」即可进入。
  *
- * 变异验证（实跑过）：把 page.tsx 的编辑入口（Cell onClick + web「编辑」按钮）
- * 去掉，本 describe 三条全红。
+ * 变异验证（实跑过）：把 page.tsx 的编辑入口（「编辑」按钮）
+ * 去掉，本 describe 两条全红。
  */
-describe("EP-fs-tg spec §4.2：编辑居所入口（web + TG）", () => {
-  it("web：点「编辑」→ 底部换成带回显的编辑表单，保存走 updateDwelling", async () => {
+describe("spec §4.2：编辑居所入口", () => {
+  it("点「编辑」→ 底部换成带回显的编辑表单，保存走 updateDwelling", async () => {
     listDwellings.mockResolvedValue([D1]);
     await renderPage();
     await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
@@ -375,7 +295,7 @@ describe("EP-fs-tg spec §4.2：编辑居所入口（web + TG）", () => {
     expect(screen.getByText("住宅 · 租住 · 北")).toBeInTheDocument();
   });
 
-  it("web：编辑中点「取消」→ 回到新增表单，不发任何写请求", async () => {
+  it("编辑中点「取消」→ 回到新增表单，不发任何写请求", async () => {
     listDwellings.mockResolvedValue([D1]);
     await renderPage();
     await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
@@ -385,25 +305,33 @@ describe("EP-fs-tg spec §4.2：编辑居所入口（web + TG）", () => {
     expect(screen.getByText("添加居所")).toBeInTheDocument();
     expect(updateDwelling).not.toHaveBeenCalled();
   });
+});
 
-  it("TG：点居所 Cell 进入编辑（onClick 挂上后 chevron 才有正当性）", async () => {
-    tgEnv.inTg = true;
-    window.Telegram = {
-      WebApp: {
-        initData: "x",
-        MainButton: {
-          setText: vi.fn(), enable: vi.fn(), disable: vi.fn(),
-          show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn(),
-        },
-        BackButton: { show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn() },
-        HapticFeedback: { impactOccurred: vi.fn(), notificationOccurred: vi.fn() },
-      },
-    };
-    listDwellings.mockResolvedValue([D1]);
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
     await renderPage();
-    await waitFor(() => expect(screen.getByText("家A")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("家A"));
-    await waitFor(() => expect(screen.getByDisplayValue("家A")).toBeInTheDocument());
-    expect(screen.getByText("编辑居所")).toBeInTheDocument();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Ffengshui%2Fdwellings");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("还没有命盘档案，先起一个盘。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
   });
 });

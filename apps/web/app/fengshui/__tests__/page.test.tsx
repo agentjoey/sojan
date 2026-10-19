@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import {
   BirthInputSchema, computeUnifiedChart, computeFengshui, directionsFor, FENGSHUI_ENGINE_VERSION,
@@ -14,6 +14,15 @@ import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
 // 不存在了，于是它抓不到唯一要防的「改回 reason="limit"」回归）。同一次编辑不该能
 // 再造出恒真：文案在哪儿改，断言就跟到哪儿。
 import { zh } from "@/lib/i18n/messages/zh";
+
+/**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
 
 const birth = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
 const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart: computeUnifiedChart(birth), createdAt: "", reading: null };
@@ -124,7 +133,7 @@ const { dwellingsFixture, profilesById } = vi.hoisted(() => ({
  * 让「被挡时它从没收到过 dwelling/cohabitants」成为一条可断言的事实。
  * 记录器用 `vi.hoisted`：`renderPage()` 每次 `resetModules()` + 动态 `import("../page")`，
  * mock 工厂会重新执行，闭包到同一份可变对象才能读到页面真正调用的那些入参
- * （与 `dwellingsFixture` / `supabaseSession` 同一理由）。
+ * （与 `dwellingsFixture` 同一理由）。
  * 本文件顶层为算 `fs`/`l1` 也会调用它，那两次发生在收集阶段，`beforeEach` 里清空即可。
  */
 const { computeFengshuiCalls } = vi.hoisted(() => ({
@@ -151,42 +160,11 @@ vi.mock("@/lib/dwellings", () => ({
     return dwellingsFixture.current;
   }),
 }));
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  // EP-fs-tg：可变——文件末尾「TG 会话」describe 把它翻成 true 断言原生分段 Tab。
-  isTelegram: () => tgEnv.inTg,
-  tgGetProfile: vi.fn(),
-  tgListProfiles: vi.fn(async () => []),
-}));
 vi.mock("next/navigation", () => ({ usePathname: () => "/fengshui" }));
 
 /**
- * Task 10（EP-fs-17 会员闸门）：page.tsx 新增直接 import `@/lib/supabase`（读会话
- * access_token，附到 /api/fengshui/reading 的请求头上，供服务端识别非 TG 用户）。
- * `@/lib/supabase` 的真实实现会在没配置 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时抛错
- * （见 lib/__tests__/dwellings.test.ts 顶部注释，同一个坑），测试环境没配这两个
- * env，必须 mock 掉。默认 `session: null`（等价于「未登录/本地匿名」）——绝大多数
- * 测试不关心「服务端具体怎么识别身份」（那由 route.test.ts 独立覆盖）。
- *
- * 修复单 Important 4：会话内容改成可按测试改写的共享可变量（`vi.hoisted`，理由同
- * `dwellingsFixture`：renderPage() 每次 resetModules + 动态 import，mock 工厂可能
- * 重新执行，直接摆弄 mock 实例会打到一个 page.tsx 根本不会调用到的旧实例）。
- * 原来写死 `session: null` 意味着 `fengshuiAuthHeader()` 在**每一条**测试里都返回
- * `{}`，于是「客户端到底发不发 Authorization」全程零断言——把 POST 与两个探测请求
- * 的 Authorization 头整个删掉，全套测试照样绿，而 BILLING_ENABLED=1 时每个非
- * Telegram（邮箱/匿名 Supabase）会员都会被静默 402 并挡在付费墙外。
- */
-const { tgEnv } = vi.hoisted(() => ({ tgEnv: { inTg: false } }));
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `@/lib/fengshui-report` 的服务端读写（`readFengshuiReport`/`saveFengshuiReport`）本
- * 该打 Supabase，测试里用一个模块级 Map 顶替「服务端存储」。`reportStore` 用
+ * 该打服务端，测试里用一个模块级 Map 顶替「服务端存储」。`reportStore` 用
  * `vi.hoisted` 声明，是为了让下面 `vi.mock` 工厂（会被提升到本文件所有 import 之前
  * 执行）能安全闭包到它——工厂内部只在 `vi.fn` 的回调里读写 `reportStore`，真正调用
  * 发生在测试运行时（模块早已加载完毕），不是工厂函数体自身执行的那一刻，所以不存在
@@ -262,8 +240,6 @@ beforeEach(() => {
   reportStore.clear();
   dwellingsFixture.current = [];
   dwellingsFixture.error = null;
-  supabaseSession.current = null;
-  tgEnv.inTg = false;
   computeFengshuiCalls.args.length = 0;
   profilesById.clear();
   profilesById.set("p2", cohabProfile);
@@ -595,13 +571,13 @@ describe("EP-fs-15 Layer 1 指纹与缓存（复审必修1：指纹须真正随�
 
 describe("EP-fs-15 居所读取失败（复审必修2）", () => {
   it("listDwellings 失败时显示「居所读取失败」+ 重试入口，而不是「还没登记居所」；且留痕（console.warn）", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await renderPage();
 
     await waitFor(() => expect(screen.getByText(/居所读取失败/)).toBeInTheDocument());
-    // 两者对用户是完全不同的意思：读取失败 ≠ 确认为空。绝不能把一次 Supabase 抖动
+    // 两者对用户是完全不同的意思：读取失败 ≠ 确认为空。绝不能把一次数据库抖动
     // 误判成「还没登记」，那会诱导用户重复登记已存在的居所。
     expect(screen.queryByText(/还没登记居所/)).toBeNull();
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
@@ -611,7 +587,7 @@ describe("EP-fs-15 居所读取失败（复审必修2）", () => {
   });
 
   it("点击重试后重新调用 listDwellings，成功后恢复正常渲染、错误提示消失", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await renderPage();
@@ -1280,29 +1256,22 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Critical 1）：未知 ≠ �
 });
 
 /**
- * 修复单 Important 4：客户端到底发不发 `Authorization` 头，此前零断言——
- * 两个页面测试文件都把 supabase 会话写死成 `session: null`，于是
- * `fengshuiAuthHeader()` 在每一条测试里都返回 `{}`。把 POST 与探测请求的
- * Authorization 头整个删掉，全套测试照样绿，而 `BILLING_ENABLED=1` 时每个非
- * Telegram（邮箱 / 匿名 Supabase）会员都会被静默 402 并挡在付费墙外。
- * route.test.ts 证明了**服务端**会读 Bearer，但没有任何东西证明**客户端**会发。
+ * 身份只靠同源请求自带的会话 cookie：客户端不再手工拼 `Authorization`。
+ * 此前的实现读浏览器侧会话 token 附到探测 GET 与叙述 POST 上，两处漏掉任何一处都会让
+ * 会员被静默 402；改用 Neon Auth cookie 之后，这条断言守的是反方向——别把 Bearer 拼回来
+ * （服务端也已不读 `Authorization`，拼了只会制造「看似带了身份」的假象）。
  */
-describe("EP-fs-17 会员闸门（Task 10 修复单 Important 4）：客户端必须把会话 token 发出去", () => {
-  function recordingFetch(calls: { method: string; headers: Record<string, string> }[]) {
-    return vi.fn(async (_url: string, init?: RequestInit) => {
+describe("EP-fs-17 会员闸门：客户端不手工带 Authorization（身份走 cookie）", () => {
+  it("闸门探测 GET 与叙述 POST 都不带 Authorization，POST 原有的头保持不变", async () => {
+    dwellingsFixture.current = [dwellingL1()];
+    const calls: { method: string; headers: Record<string, string> }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ method, headers: (init?.headers ?? {}) as Record<string, string> });
       return method === "POST"
         ? jsonResponse({ sections: SECTIONS, degraded: false })
         : jsonResponse({ entitled: true });
-    });
-  }
-
-  it("有 Supabase 会话时：闸门探测 GET 与叙述 POST 都带上 Authorization: Bearer <access_token>", async () => {
-    supabaseSession.current = { access_token: "tok-abc" };
-    dwellingsFixture.current = [dwellingL1()];
-    const calls: { method: string; headers: Record<string, string> }[] = [];
-    vi.stubGlobal("fetch", recordingFetch(calls));
+    }));
 
     await renderPage();
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
@@ -1311,24 +1280,10 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Important 4）：客户端�
     const post = calls.find((c) => c.method === "POST");
     expect(get).toBeDefined();
     expect(post).toBeDefined();
-    expect(get!.headers.Authorization).toBe("Bearer tok-abc");
-    expect(post!.headers.Authorization).toBe("Bearer tok-abc");
-    // POST 原有的头不能被 authHeader 覆盖掉
+    expect(get!.headers.Authorization).toBeUndefined();
+    expect(post!.headers.Authorization).toBeUndefined();
     expect(post!.headers["content-type"]).toBe("application/json");
     expect(post!.headers["x-zj-locale"]).toBe("zh");
-  });
-
-  it("没有 Supabase 会话时不伪造 Authorization 头（对照组：证明上面那条断言真由会话驱动）", async () => {
-    supabaseSession.current = null;
-    dwellingsFixture.current = [dwellingL1()];
-    const calls: { method: string; headers: Record<string, string> }[] = [];
-    vi.stubGlobal("fetch", recordingFetch(calls));
-
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
-
-    expect(calls.find((c) => c.method === "GET")!.headers.Authorization).toBeUndefined();
-    expect(calls.find((c) => c.method === "POST")!.headers.Authorization).toBeUndefined();
   });
 });
 
@@ -1379,94 +1334,28 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Minor 3）：叙述 POST 不
 });
 
 /**
- * EP-fs-tg：TG 会话下 Tab 行渲染为原生分段选择器（`Segmented`，role=tablist/tab），
- * web 下划线 Tab 行不出现；切换行为不变。判别点选 ARIA role——两个分支渲染的都是
- * 「盘/化解/添置」三枚按钮，只看文字分不出来（恒真断言），role 是严格可区分的：
- * web 分支的按钮没有 tab 语义。
- *
- * 变异验证（实跑过）：把 page.tsx 里的 `inTg` 改成恒 false，本 describe 前两条全红；
- * 把 Cell 的 chevron 改回无条件渲染（评审 M2 的反向变异），「化解清单无 chevron」
- * 那条断言变红。
+ * Tab 行是下划线按钮（无 tablist/tab 语义，也没有 tabpanel——悬空的
+ * aria-labelledby 是无障碍回归）；切换行为照常。
  */
-describe("EP-fs-tg TG 会话：原生分段 Tab + 原生化解清单", () => {
-  beforeEach(() => {
-    tgEnv.inTg = true;
-  });
-
-  it("Tab 行渲染为 tablist（三枚 tab），且 tab↔tabpanel 契约配对完整（评审 M4）", async () => {
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
-    expect(screen.getByRole("tablist")).toBeInTheDocument();
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
-    expect(tabs.map((x) => x.textContent)).toEqual(["盘", "化解", "添置"]);
-    // 当前选中的 tab 有 aria-selected，roving tabindex（选中 0，其余 -1）
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[1]).toHaveAttribute("aria-selected", "false");
-    expect(tabs[0]).toHaveAttribute("tabindex", "0");
-    expect(tabs[1]).toHaveAttribute("tabindex", "-1");
-    // aria-controls 必须指向真实存在的 tabpanel。面板按当前 tab 条件渲染，
-    // 所以只有**选中那枚**的 aria-controls 当场可解析；逐枚点开验证其余。
-    for (const tb of tabs) {
-      expect(tb.getAttribute("aria-controls")).toBeTruthy();
-      fireEvent.click(tb);
-      const panel = screen.getByRole("tabpanel");
-      expect(panel).toHaveAttribute("id", tb.getAttribute("aria-controls"));
-      expect(panel).toHaveAttribute("aria-labelledby", tb.id);
-    }
-  });
-
-  it("方向键漫游：ArrowRight 切到下一枚 tab 并移动焦点（评审 M4）", async () => {
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
-    const tablist = screen.getByRole("tablist");
-    fireEvent.keyDown(tablist, { key: "ArrowRight" });
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(document.activeElement).toBe(tabs[1]);
-    // 化解面板成为当前 panel
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("id", "fs-panel-remedy");
-    // 到头回绕：从「添置」再 ArrowRight 回到「盘」
-    fireEvent.keyDown(tablist, { key: "ArrowRight" });
-    fireEvent.keyDown(tablist, { key: "ArrowRight" });
-    expect(screen.getAllByRole("tab")[0]).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("切 tab 行为在原生分段上照常工作（化解 tab 出清单）", async () => {
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
-    expect(screen.queryByText("可做的事")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "化解" }));
-    expect(screen.getByText("可做的事")).toBeInTheDocument();
-    // 评审 M2：化解清单的 Cell 没有 onClick → **不应**出现 chevron（它暗示可点）。
-    // 这条断言是「chevron 条件渲染」的反向守卫——改回无条件渲染时它变红。
-    expect(screen.queryAllByText("›")).toHaveLength(0);
-    // 原生分支判别依据（换掉 chevron 之后）：TG 的 Cell 副标题把成本与证据标注合成
-    // 一行「零成本 · 传统象征」；web 分支是两个独立 span 夹一个「·」span，没有任何
-    // 元素的直接文本节点能拼出这整行——getByText 只拼直接文本节点，两个分支因此
-    // 严格可分。同一组合可能出现在多条化解上，按组合聚合计数。
-    const combos = new Map<string, number>();
-    for (const r of fs.remedies) {
-      const key = `${r.effort} · ${r.evidence === "传统象征" ? "传统象征" : "传统 + 现代"}`;
-      combos.set(key, (combos.get(key) ?? 0) + 1);
-      expect(screen.getByText(r.action)).toBeInTheDocument();
-    }
-    for (const [key, n] of combos) {
-      expect(screen.getAllByText(key)).toHaveLength(n);
-    }
-  });
-
-  it("web 分支（对照组）：无 tablist，仍是下划线按钮，且**没有 tabpanel**", async () => {
-    tgEnv.inTg = false;
+describe("Tab 行：下划线按钮", () => {
+  it("无 tablist，仍是按钮，且没有 tabpanel", async () => {
     await renderPage();
     await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.getByRole("button", { name: "化解" })).toBeInTheDocument();
-    // 复审必修 A 的反向守卫：tabpanel 属性必须按 inTg 门控。web 上没有 tablist/tab，
-    // 出现 tabpanel 意味着 aria-labelledby 悬空（指向任何状态下都不存在的 id），
-    // 是无障碍回归 + 「web 零变化」红线的双重破坏。只断言 tablist 为 null 抓不到它。
     expect(screen.queryAllByRole("tabpanel")).toHaveLength(0);
     expect(document.getElementById("fs-panel-chart")).toBeNull();
+  });
+
+  it("点「化解」出清单（可做的事）", async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByText("坎1")).toBeInTheDocument());
+    expect(screen.queryByText("可做的事")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "化解" }));
+    expect(screen.getByText("可做的事")).toBeInTheDocument();
+    for (const r of fs.remedies) {
+      expect(screen.getByText(r.action)).toBeInTheDocument();
+    }
   });
 });
 
@@ -1834,5 +1723,34 @@ describe("UI v3 C4-2：境 6d 版式", () => {
     expect(dotOf(zero).style.background).toBe("var(--color-wood)");
     expect(dotOf(move).style.background).toBe("var(--color-earth)");
     expect(dotOf(add).style.background).toBe("var(--color-metal)");
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderPage();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Ffengshui");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("还没有命盘档案，先起一个盘。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
+    await renderPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
   });
 });

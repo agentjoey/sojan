@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { notoSerifSC, notoSansSC, cormorant } from "./fonts";
 import { AppShell } from "@/components/AppShell";
-import { TgUiProvider } from "@/components/tg/TgUiProvider";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import "./globals.css";
 
@@ -22,15 +20,9 @@ export default function RootLayout({
       className={`${notoSerifSC.variable} ${notoSansSC.variable} ${cormorant.variable} h-full`}
     >
       <body className="min-h-full">
-        <Script
-          src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
-        />
-        <TgUiProvider>
-          <I18nProvider>
-            <AppShell>{children}</AppShell>
-          </I18nProvider>
-        </TgUiProvider>
+        <I18nProvider>
+          <AppShell>{children}</AppShell>
+        </I18nProvider>
       </body>
     </html>
   );

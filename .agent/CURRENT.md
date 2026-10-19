@@ -3,10 +3,17 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成 + 2026-08-28 打磨批，只剩 D 块过场动效）**
-Last Updated:   2026-08-29 by claude（UI v3 打磨批已合 main 并发 staging，`zhaojian.agentjoey.ai` 实测 /spirit /dream /chart 均 200）
+Last Updated:   2026-10-19 by claude（Neon 迁移 Task 1–10 完成并在 `feat/neon-migration` 分支，文档收尾 Task 12a；staging/production 切换待做）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 193 · llm 279 · web 834（全绿；`lint` 0 errors 已为阻塞闸门）
-⚠️ `pnpm typecheck`：core/llm 全绿（`packages/llm/src/dream.test.ts:347` 的既存 `as never`/TS2698 已随 EP-002-cal-2 一并修复），**apps/web 仍有 7 处既存类型错误**（`account`/`dream`/`auth/callback`/`merge-anon` 各测试文件的 mock 类型，`EP-account-login` 47bd1b1 引入，2026-08-20，与近期改动无关）——见 BACKLOG `EP-web-typecheck-debt`。
+测试:           core 182 · llm 279 · web 727（另 36 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；2026-10-19 Neon 迁移分支实测，全绿；`lint` 0 errors 已为阻塞闸门）
+✅ `pnpm typecheck`：core / llm / apps/web 均 0 errors（此前 apps/web 的 7 处既存测试类型错误随 Neon 迁移中相关测试的删改一并消除，BACKLOG `EP-web-typecheck-debt` 可关闭）。
+
+> 🚚 **Supabase → Vercel + Neon 迁移（2026-10-19，进行中）**：分支 `feat/neon-migration`，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`，计划 `docs/superpowers/plans/2026-10-19-vercel-neon-migration.md`。
+>   · **进度**：Task 1–10 已完成（Neon 项目/分支/Auth 开通、schema 迁移工具、`lib/auth` + `lib/data` + 客户端门面、登录门控、注销事务、`sin1` 区域、Supabase 依赖移除）；Task 11（staging 切换 + 冒烟）、Task 12（production 切换 + owner 数据导入 + 暂停 Supabase）**待做**，Task 12a（本次文档收尾）完成。**production / staging 仍跑旧 Supabase 版本，直到切换完成**（切换日期待 Task 12 后补）。
+>   · **身份/数据**：Neon Auth（Managed Better Auth，邮箱验证码），**无匿名账号**——未登录不能存档；数据全走服务端 `lib/data/*`（会话 uid 过滤，无 RLS）；Neon 项目 `lucky-lake-64982745`（ap-southeast-1），分支 production `br-steep-firefly-a1zje5v4` / staging `br-dry-recipe-a1yu0b5m` / dev `br-sweet-shadow-a1j0jfsd`，见 `docs/deployment.md`。
+>   · **Telegram 已整体下线**（bot、Mini App、`/api/tg/*`、cron、grammy 全删）。重新接入见 BACKLOG `EP-tg-replan`；下文各节里 TG 相关内容均为**历史记录**。
+>   · **上线前必做**：Neon Console 关闭 production/staging 的 `allow_localhost`；配 Custom SMTP（Resend，`noreply@sojan.app`）。见 `docs/deployment.md`。
+>   · **遗留**：`EP-llm-unauth`（`/api/reading`、`dailyPolish`/`dailyBehavior` 未登录可调）、`EP-supabase-sunset`（切换后暂停 Supabase `sxjcpoxhphlnwhpzachi`，2–4 周后经 owner 确认删除）。
 
 > 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。
 >   · **A 地基外壳**：`lib/nav.ts` 成为导航单一事实源；移动端底栏删除，改「顶部胶囊 + 44px 菜单键 + 六宫格覆盖层」；`ui.tsx` 原语收敛——**`Emphasis` 是全站唯一强调手法**（删了 `Tag` 与 `Card.topAccent`）。
@@ -38,7 +45,7 @@ Last Updated:   2026-08-29 by claude（UI v3 打磨批已合 main 并发 staging
 
 ## 产品现状（一句话）
 东方命理（八字+紫微）× 西方心理占星（利兹·格林）双引擎，已上线完整闭环：
-**起盘 → 命盘建档（冻结存 Supabase）→ 三段式解读（持久化）+ 当下时序 → 运势日历（每日+本年上下文+水墨配图）→ 档案**。
+**起盘 → 登录 → 命盘建档（冻结存 Neon）→ 三段式解读（持久化）+ 当下时序 → 运势日历（每日+本年上下文+水墨配图）→ 档案**。
 
 ## 已上线能力
 | 模块 | 内容 |
@@ -46,18 +53,18 @@ Last Updated:   2026-08-29 by claude（UI v3 打磨批已合 main 并发 staging
 | 起盘 `/reading` | 地名→经纬度/时区(Nominatim+tz-lookup)、时辰实时显示+不知时辰开关、真太阳时(含 EoT) |
 | 命盘 `/chart` | 四柱/紫微/西方盘可视化 + 三段式解读(一次生成持久化、命盘冻结) + **当下时序卡**(大限/流年四化,按年缓存) |
 | 运势 `/calendar` | 每日流日(确定性五维+趋吉避祸) + **本年/本限上下文条** + 框景水墨配图 + 大字总评 + 五行干支 + 心理行为宜忌(LLM) + 轻润色（黄历块 2026-08-28 起全站移除） |
-| 档案 `/profiles` | Supabase 匿名+RLS 隔离、命盘触发器冻结 |
+| 档案 `/profiles` | Neon Postgres，按登录账号 uid 隔离（无匿名账号）、命盘触发器冻结 |
 | 掷筊 `/spirit` | 三态（筊杯卡/问事/揭晓+灵解）、危机前置拦截、真随机掷筊 |
 | 解梦 `/dream` | 输入→灵解读、最近 10 条摘要历史+可追问、不存原文 |
 | 境 `/fengshui` | 本命+房屋八方盘、生气方详情、可做的事化解清单、同住人合看 |
-| 账号 `/account` | 邮箱/Telegram 绑定、订阅与用量、危险区注销 |
+| 账号 `/account` | 邮箱验证码登录、订阅与用量、危险区注销（SQL 事务删业务数据 + Neon Auth 账号）|
 
 > **UI v3 重建（2026-08-26~27）已覆盖全部 8 个屏**（卷首/运势/命盘/解读/紫微棋盘/掷筊/解梦/我的+账号/境），依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`；仅剩 D 块（5s 七拍排盘过场）未做。详见上方叙述块与下方 Version History。
 
 ## 三层架构（详见 docs/architecture.md）
 - **@sojan/core**：三引擎 + `normalizeBirth`(真太阳时+EoT+子时sect) + `computeDailyFortune` + 引擎深化 v2 派生(见下) + 共振映射；纯函数/Zod/可缓存。
 - **@sojan/llm**：provider 无关双线(anthropic MiniMax-M3 / openai DeepSeek) + 三声部+时序声部 + **反幻觉链四道**(extractFacts→prompt硬规则→sanitize→correctMutagens)+eval + 重试/缓存/观测 + daily润色/行为/时序。
-- **apps/web**：Next 16/React 19/Tailwind 4，框景配图、Markdown 渲染、Supabase。
+- **apps/web**：Next 16/React 19/Tailwind 4，框景配图、Markdown 渲染、Neon（Postgres + Auth）。
 
 ## 引擎深化 v2（本轮重点，spec `docs/specs/engine-v2-deepening.md`，全 11 项✅，TDD）
 **核心原则**：新命理量在 facts 层派生、**不进冻结命盘**（新旧命盘通吃、零迁移）。
@@ -123,13 +130,14 @@ spec 同波1（§14 波2 表）· plan `docs/superpowers/plans/2026-08-15-fengsh
 1. ~~**【已解除 2026-08-16】TG 会话下身份不一致**~~ —— 由 **EP-fs-tg** 修复：新增 `api/tg/fengshui` 中介端点，`lib/dwellings.ts` / `lib/fengshui-report.ts` 按 `hasTgSession()` 在**数据层**分流，TG 路径的 uid 只从 HMAC 验签的 TG session 解，七处查询全带 `.eq("uid", s.uid)`。同时修掉一条 spec 未预见的：TG 的 RLS 下 `getProfile(id)` 逐条读拿 null，**合看在 TG 内一直静默失效**，改走 `tgListProfiles()` 中介。
 
 **其他已知限制（不阻塞合并）**
-- **多居所写入但不可读**：`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套及以后只作为管理列表里的一行存在。最终评审 I2 据此**撤除了多居所付费墙**——为零可观察产出收费不可辩护。日后做切换器时需**同时**新建服务端写入路由：`createDwelling` 是浏览器直写 Supabase，届时任何纯客户端闸门都可绕过。
+- **多居所写入但不可读**：`/fengshui` 与 `/fengshui/object` 都硬取 `dwellings[0]`，第 2 套及以后只作为管理列表里的一行存在。最终评审 I2 据此**撤除了多居所付费墙**——为零可观察产出收费不可辩护。日后做切换器时需把多居所闸门放在服务端：（Neon 迁移前 `createDwelling` 是浏览器直写 Supabase，属历史背景；现已是走会话 uid 的 server action，`lib/data/dwellings.ts`，闸门可直接落在其中。）
 - **`DwellingForm` 编辑回显不可达**：`initial` prop 与 `updateDwelling` 都实现且有单测，但页面无编辑入口 → 生产走不到。归 EP-fs-tg §4.2（与 §4.1 的原生 `confirm()` 一并修）。
 - 探测失败路径会发两次 LLM 调用（`unknown` 发 Layer-0 一次，重试进 `entitled` 改指纹再发一次）；两次都是真实缓存未命中，代价由用户显式点击封顶，接入支付后值得重估。
-- cookie 解析现存两份拷贝（EP-account2 已把 `api/fengshui/reading` / `billing/status` 收敛进 `resolveUid`，第三份留在 `GET /api/tg/session` 的内联解析——它需要 exp/uid 等 session 字段做续期判断，而 `resolveUid` 只返回 uid）；待 `resolveUid` 扩返回 session 字段后可收敛最后一份。
+- ~~cookie 解析现存两份拷贝~~（**历史**：`GET /api/tg/session` 与 `resolveUid` 已随 Telegram 下线、Neon Auth 迁移删除；身份现统一走 `lib/account/uid.ts` 的 `getViewer`/`getUid`）。
 - `packages/core/tsconfig.json` 的 `include` 只有 `["src"]` → `core/test/` 不过类型检查，写在那里的类型断言是**惰性的**。已从台账升入正式待办。
 
 ## 风水「境」· Telegram 适配（EP-fs-tg，2026-08-16）
+> ⚠️ **历史记录**：Telegram 已于 2026-10 下线，本节所述 `api/tg/fengshui` 等代码均已删除。
 spec `docs/superpowers/specs/2026-08-15-fengshui-telegram-adaptation.md` · pact: worker `kimi` 实现 / reviewer `claude` 验收（两轮 changes-requested）
 
 - `app/api/tg/fengshui/route.ts` 中介端点（GET 居所列表 / `?fingerprint=` 读报告；POST `action` 分发 CRUD、报告写入、解读生成）。鉴权手法与 `api/fengshui/reading` 一致（`req.headers` 读 cookie 而非 `cookies()`——后者依赖 Next 请求上下文，直接 import handler 的单测拿不到）。
@@ -197,3 +205,4 @@ spec `docs/superpowers/specs/2026-08-15-fengshui-telegram-adaptation.md` · pact
 | 🔧 backlog 三项收尾 | 2026-08-21 | claude 直接实施：①`EP-auth-return`——`/dream` 撞 `needLogin` 去登录后送不回原页、手动导航回来也丢草稿：`signInWithEmail`/`upgradeAnonymousToEmail` 新增可选 `next` 参数（`bind`/`next` 共用一个 `URLSearchParams` builder，替掉此前假设最多一个参数的字符串拼接），`/auth/callback` 新增 `next` 分支（`bind` 优先、同源相对路径校验防 open redirect）；`/dream` 的 `input` 换 `sessionStorage` 兜底草稿。②`EP-dream-history-2`——历史列表可点击续追问：新表列 `full_text`（迁移 0018，存灵的解读全文不存梦原文，不违 spec §5.1）；`continueDreamReply` 的 `dreamText` 改 `string | undefined`（重载区分返回类型），传 `undefined` 时不重建首轮"讲了个梦"的 user 消息、命盘事实并进 system，`priorTurns[0]` 直接是历史解读。③`EP-fs-debt`——`generateFengshuiSections` 的 `degraded` 时 `console.warn` 打出 corrections（此前到 route 边界即丢、无日志）；`ObjectQuery.color` 查证全链路死字段（表单从没收集过、i18n 键零引用）直接删；TG 首页「灵」补 `NEXT_PUBLIC_SPIRIT_ENABLED` 门控（此前无条件显示，与 `AppShell.NAV` 不一致）；`sessionStorage` polyfill 查证当前 Node/vitest 组合下不是真问题，未加不必要代码；"重试无上限"一条查无实据，"死 i18n 键"只独立验证了一个（`fengshui.group.*`，留给 `EP-fs-en` 接线不是删），两条待 owner 澄清/后续处理，backlog 已注明。web434→470/llm262/core159 绿（新增 36 测），typecheck 0，lint 0 errors（基线不变），build 通过，全部关键改动 mutation 复验。迁移 `0018_dream_history_full_text.sql` 已 apply 生产（2026-08-21，随本轮 push 一并处理，查库 `list_migrations` 确认 `dream_history_full_text` 已入库）。 |
 | 🎨 UI v3 打磨批 | 2026-08-28 | owner 九条指令（kimicode 实施于 `feat/ui-v3-polish`）：黄历全站去除（UI 块 + core 降级混入）；首页今日卡与运势同源（共享 `useDailyFortune` + `solarHouAction`，无档案不显示，M7 时区错位窗口消除）；胶囊显「照见」+ 风铃常驻微摆；转盘加深 + 去卷首/目录眉标 + 五印章统一朱文；`nav.spirit` 小字「问事」；过场全局化（`RouteCasting` 路由 1.2s 短版 + 全站 pending 过场，拆境/运每会话仪式）。core 192→193 / llm 279 / web 813→834，lint 2e/15w，mutation 14/14，真实浏览器三档实录。自查揪出一条**既有**缺口：`en` 无 cookie 首访全站 hydration mismatch（记 `EP-i18n-hydration`）。TG 冻结面零改动。2026-08-29 claude 合并 `main`（`fd746a4`）并推 `staging`，实测 `zhaojian.agentjoey.ai` 的 `/spirit`/`/dream`/`/chart` 均 200 |
 | 🎨 UI v3 重建（A/B/C1/C2/C3+C4） | 2026-08-26~27 | 依据新设计包全站重建，**8 屏完成**：A 地基外壳（`lib/nav.ts` 单一事实源、移动顶部胶囊+九宫格、`Emphasis` 收敛为唯一强调手法）→ B 命理可视化（`WuxingWheel`/`SeasonRuler`，core 新增七十二候索引）→ C1 桌面骨架+卷首+运势（`TwoColumn` 左定右动、`CompassWatermark` 五层水印）→ C2 命盘整页（左列 5b + 右列 3c/6b，core 新增 `deriveNayinZodiac`）→ C3+C4 掷筊/解梦/我的+账号（合并方向：两页都留只合导航）/境（外部 agent kimicode 实施，claude 验收两轮）。TG 外壳全程冻结。过程中定位并修复两个可复现的系统级坑：**Tailwind 4 自定义断点用 px 会因无法跨单位排序导致低断点反压高断点**（`--breakpoint-xl` 改 `75rem`）；**五行色系统性低于 WCAG AA**（`wood`/`earth`/`gold`/`line-strong` 纸底 1.38–3.06:1，改为文字用 `ink-2`、五行色只作装饰色点）。core 188→192 / llm 279 / web 738→813。|
+| 🚚 Neon 迁移（进行中） | 2026-10-19 | Supabase → Vercel + Neon（Postgres + Neon Auth）：邮箱验证码登录、无匿名账号、数据访问收口 `lib/data`（server action + 会话 uid 过滤）、函数区域 `sin1`、注销走 SQL 事务、Telegram 整体下线。`feat/neon-migration` Task 1–10 完成 + 文档收尾 12a；staging/production 切换与 Supabase 暂停**待 Task 11/12，日期待补**。 |

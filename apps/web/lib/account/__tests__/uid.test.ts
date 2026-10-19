@@ -1,52 +1,82 @@
 // @vitest-environment node
-//
-// 刻意不 mock next/headers——resolveUid 改造后只依赖 req.headers，
-// 用手搓 Request 直接验证（同 api/fengshui/reading route 测试的既有理由：
-// 这个仓库的 route 测试统一走「直接 import handler + Request」，不经过
-// Next 真实分发，next/headers 的 cookies() 在这种调用方式下不可靠）。
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { UnauthenticatedError } from "@/lib/errors";
 
-vi.stubEnv("TELEGRAM_WEBHOOK_SECRET", "test-secret");
-
-const getUserMock = vi.fn();
-vi.mock("@/lib/tg/admin", () => ({
-  supabaseAdmin: () => ({ auth: { getUser: (...a: unknown[]) => getUserMock(...a) } }),
+const getSessionMock = vi.fn();
+vi.mock("@/lib/auth/server", () => ({
+  auth: { getSession: (...a: unknown[]) => getSessionMock(...a) },
 }));
 
-const { resolveUid } = await import("../uid");
-const { makeSessionToken } = await import("@/lib/tg/session");
-
-function reqWithCookie(cookie: string): Request {
-  return new Request("http://x/api/whatever", { headers: { cookie } });
-}
+const { getViewer, getUid, requireUid } = await import("../uid");
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("resolveUid：不依赖 next/headers，只读 Request 本身", () => {
-  it("有效 zj_tg cookie → via=tg", async () => {
-    const token = makeSessionToken("u1", 42);
-    const r = await resolveUid(reqWithCookie(`zj_tg=${token}`));
-    expect(r).toEqual({ uid: "u1", via: "tg" });
+const session = (emailVerified = true) => ({
+  data: { session: { id: "s1" }, user: { id: "u1", email: "a@b.c", emailVerified } },
+  error: null,
+});
+
+describe("getViewer", () => {
+  it("无会话 → null", async () => {
+    getSessionMock.mockResolvedValue({ data: null, error: null });
+    expect(await getViewer()).toBeNull();
   });
 
-  it("无 zj_tg cookie，有 Bearer → via=web", async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: "u2" } } });
-    const req = new Request("http://x/api/whatever", { headers: { authorization: "Bearer tok" } });
-    const r = await resolveUid(req);
-    expect(r).toEqual({ uid: "u2", via: "web" });
+  it("有会话 → { uid, email, emailVerified }", async () => {
+    getSessionMock.mockResolvedValue(session());
+    expect(await getViewer()).toEqual({ uid: "u1", email: "a@b.c", emailVerified: true });
   });
 
-  it("cookie 与 Bearer 都没有 → null", async () => {
-    const r = await resolveUid(new Request("http://x/api/whatever"));
-    expect(r).toBeNull();
+  it("邮箱未验证 → emailVerified:false 原样带出", async () => {
+    getSessionMock.mockResolvedValue(session(false));
+    expect((await getViewer())?.emailVerified).toBe(false);
   });
 
-  it("cookie 存在但已过期/篡改，Bearer 兜底成立 → 走 web 分支", async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: "u3" } } });
-    const req = new Request("http://x/api/whatever", {
-      headers: { cookie: "zj_tg=garbage", authorization: "Bearer tok" },
-    });
-    const r = await resolveUid(req);
-    expect(r).toEqual({ uid: "u3", via: "web" });
+  it("getSession 返回 error → null", async () => {
+    getSessionMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    expect(await getViewer()).toBeNull();
+  });
+});
+
+describe("getViewer：getSession 抛异常时降级为匿名", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    errSpy.mockRestore();
+  });
+
+  it("getSession reject → null（不向上抛），并 console.error 留痕", async () => {
+    const boom = new Error("upstream down");
+    getSessionMock.mockRejectedValue(boom);
+    await expect(getViewer()).resolves.toBeNull();
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith("[getViewer] getSession threw", boom);
+  });
+
+  it("getSession reject → getUid 为 null，requireUid 抛 UnauthenticatedError", async () => {
+    getSessionMock.mockRejectedValue(new Error("cookies() set failed"));
+    expect(await getUid()).toBeNull();
+    await expect(requireUid()).rejects.toBeInstanceOf(UnauthenticatedError);
+  });
+});
+
+describe("getUid / requireUid", () => {
+  it("getUid 有会话 → uid；无会话 → null", async () => {
+    getSessionMock.mockResolvedValue(session());
+    expect(await getUid()).toBe("u1");
+    getSessionMock.mockResolvedValue({ data: null, error: null });
+    expect(await getUid()).toBeNull();
+  });
+
+  it("requireUid 有会话 → uid", async () => {
+    getSessionMock.mockResolvedValue(session());
+    expect(await requireUid()).toBe("u1");
+  });
+
+  it("requireUid 无会话 → 抛 UnauthenticatedError", async () => {
+    getSessionMock.mockResolvedValue({ data: null, error: null });
+    await expect(requireUid()).rejects.toBeInstanceOf(UnauthenticatedError);
   });
 });

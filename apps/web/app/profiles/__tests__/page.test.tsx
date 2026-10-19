@@ -1,7 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
+
+/**
+ * Task 6（D1）：页面用 `authClient.useSession()` 判断访客。默认已登录；访客用例里
+ * 改写 `authState`，并由下方 Task 6 describe 的 afterEach 复位。
+ */
+const authState = vi.hoisted(() => ({ data: { user: { id: "u1" } } as unknown, isPending: false }));
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { useSession: () => ({ data: authState.data, isPending: authState.isPending, error: null }) },
+}));
 
 const birth1 = BirthInputSchema.parse({ date: "1990-06-15", time: "14:30", gender: "male", trueSolarTime: false });
 const birth2 = BirthInputSchema.parse({ date: "1985-03-02", time: "09:15", gender: "female", trueSolarTime: false });
@@ -16,25 +25,16 @@ const listProfiles = vi.fn(async () => [active, inactive]);
 const getActiveProfileId = vi.fn(() => "p1");
 const setActiveProfile = vi.fn();
 const deleteProfile = vi.fn(async () => {});
+const renameProfile = vi.fn(async (_id: string, _nickname: string) => {});
 
 vi.mock("@/lib/profiles", () => ({
   listProfiles: (...a: unknown[]) => listProfiles(...(a as [])),
   getActiveProfileId: (...a: unknown[]) => getActiveProfileId(...(a as [])),
   setActiveProfile: (...a: unknown[]) => setActiveProfile(...(a as [])),
   deleteProfile: (...a: unknown[]) => deleteProfile(...(a as [])),
+  renameProfile: (id: string, nickname: string) => renameProfile(id, nickname),
 }));
 
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  tgListProfiles: vi.fn(async () => []),
-  tgDeleteProfile: vi.fn(),
-}));
-
-vi.mock("@/lib/tg/ui", () => ({ useIsTelegram: () => false }));
-
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: async () => ({ data: { session: null } }) } }),
-}));
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -58,6 +58,7 @@ beforeEach(() => {
   getActiveProfileId.mockClear();
   setActiveProfile.mockClear();
   deleteProfile.mockClear();
+  renameProfile.mockClear();
   push.mockClear();
 });
 
@@ -163,5 +164,63 @@ describe("UI v3 C4-1：6c 版式", () => {
       (_, el) => el?.tagName === "P" && el.textContent === "甲一 · 阳历 1990-06-15 · 未时",
     );
     expect(annotation).toBeInTheDocument();
+  });
+});
+
+describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
+  afterEach(() => {
+    authState.data = { user: { id: "u1" } };
+    authState.isPending = false;
+  });
+
+  it("未登录且无档案 → 渲染登录引导（/account?next=），不渲染无档案/错误态", async () => {
+    authState.data = null;
+    listProfiles.mockResolvedValueOnce([]);
+    await renderPage();
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    const link = prompt.querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/account?next=%2Fprofiles");
+    expect(link.getAttribute("href")!.startsWith("/account?next=")).toBe(true);
+    expect(screen.queryByText("尚无档案。建档后命盘一次生成并冻结，不再更改。")).toBeNull();
+    expect(document.querySelector('a[href="/reading"]')).toBeNull();
+  });
+
+  it("会话判定中（isPending）→ 不闪登录引导", async () => {
+    authState.data = null;
+    authState.isPending = true;
+    listProfiles.mockResolvedValueOnce([]);
+    await renderPage();
+    expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
+  });
+});
+
+describe("Task 6：改名走 renameProfile，会话中途失效转登录引导（Review Focus 3）", () => {
+  it("改名调用 renameProfile(id, 去空白后的昵称)，成功后刷新列表", async () => {
+    await renderPage();
+    fireEvent.click((await screen.findAllByText("重命名"))[0]!);
+    const input = screen.getByDisplayValue("甲一");
+    fireEvent.change(input, { target: { value: "  甲改  " } });
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(renameProfile).toHaveBeenCalledWith("p1", "甲改"));
+    await waitFor(() => expect(listProfiles).toHaveBeenCalledTimes(2));
+  });
+
+  it("改名抛 UnauthenticatedError → 显示登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    renameProfile.mockRejectedValueOnce(new UnauthenticatedError());
+    await renderPage();
+    fireEvent.click((await screen.findAllByText("重命名"))[0]!);
+    fireEvent.click(screen.getByText("保存"));
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fprofiles");
+  });
+
+  it("删除抛 UnauthenticatedError → 显示登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    deleteProfile.mockRejectedValueOnce(new UnauthenticatedError());
+    await renderPage();
+    fireEvent.click((await screen.findAllByText("删除"))[0]!);
+    fireEvent.click(screen.getByText("确认"));
+    expect(await screen.findByTestId("sign-in-prompt")).toBeInTheDocument();
   });
 });

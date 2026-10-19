@@ -10,10 +10,16 @@ export type Viewer = { uid: string; email: string; emailVerified: boolean };
  * 仅服务端使用（Server Component / Server Action / Route Handler）。
  */
 export async function getViewer(): Promise<Viewer | null> {
-  const { data, error } = await auth.getSession();
-  if (error || !data?.user) return null;
-  const { id, email, emailVerified } = data.user;
-  return { uid: id, email, emailVerified: !!emailVerified };
+  try {
+    const { data, error } = await auth.getSession();
+    if (error || !data?.user) return null;
+    const { id, email, emailVerified } = data.user;
+    return { uid: id, email, emailVerified: !!emailVerified };
+  } catch {
+    // SDK 的 getSession 可能直接 throw（上游非传输类错误会 rethrow；
+    // Server Component 渲染期写 Set-Cookie 也会抛）。统一降级为匿名，而不是 500。
+    return null;
+  }
 }
 
 export async function getUid(): Promise<string | null> {

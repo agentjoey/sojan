@@ -43,6 +43,19 @@ describe("getViewer", () => {
   });
 });
 
+describe("getViewer：getSession 抛异常时降级为匿名", () => {
+  it("getSession reject → null（不向上抛）", async () => {
+    getSessionMock.mockRejectedValue(new Error("upstream down"));
+    await expect(getViewer()).resolves.toBeNull();
+  });
+
+  it("getSession reject → getUid 为 null，requireUid 抛 UnauthenticatedError", async () => {
+    getSessionMock.mockRejectedValue(new Error("cookies() set failed"));
+    expect(await getUid()).toBeNull();
+    await expect(requireUid()).rejects.toBeInstanceOf(UnauthenticatedError);
+  });
+});
+
 describe("getUid / requireUid", () => {
   it("getUid 有会话 → uid；无会话 → null", async () => {
     getSessionMock.mockResolvedValue(session());

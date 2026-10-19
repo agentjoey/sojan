@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // 真 `server-only` 在非 react-server 条件下会直接 throw；测试里换成空桩
+      "server-only": path.resolve(__dirname, "test/server-only-stub.ts"),
     },
   },
   test: {

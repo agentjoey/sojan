@@ -40,12 +40,14 @@ export function computeWesternChart(
   const n = pre ?? normalizeBirth(input);
   if (!n.hasTime || input.latitude == null || input.longitude == null) return null;
 
+  // 真太阳时是八字/紫微概念；Origin 把输入当当地民用时（按经纬度查时区自行转 UTC）→ 必须喂钟表时间
+  const { civil } = n;
   const origin = new Origin({
-    year: n.year,
-    month: n.month - 1, // 0-indexed
-    date: n.day,
-    hour: n.hour,
-    minute: n.minute,
+    year: civil.year,
+    month: civil.month - 1, // 0-indexed
+    date: civil.day,
+    hour: civil.hour,
+    minute: civil.minute,
     latitude: input.latitude,
     longitude: input.longitude,
   });

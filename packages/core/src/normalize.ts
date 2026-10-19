@@ -5,7 +5,7 @@ import { hourToTimeIndex } from "./utils/elements";
 /**
  * 出生信息归一化 —— 三引擎共用的唯一时间真相。
  * 负责：农历→公历、真太阳时经度校准（含历史 DST，经 IANA 时区自动处理）、时辰索引。
- * 输出的 (year..minute) 即三引擎实际使用的「真太阳时」时刻，可审计。
+ * 输出的 (year..minute) 即八字/紫微实际使用的「真太阳时」时刻，可审计；西方盘用 `civil`（民用钟表时）。
  *
  * 真太阳时 = 钟表时 + 经度校正(平太阳时) + 均时差 EoT(±~16min)。EoT 近似公式精度约 ±10 秒，足够命理用。
  * 晚子时归日由 BaZi 引擎按 ziHourConvention 设 lunar sect（见 bazi/index.ts）。
@@ -28,6 +28,11 @@ export type NormalizedBirth = {
   day: number;
   hour: number; // 0–23（真太阳时），时辰未知时为 12（午时占位，仅 BaZi 时柱降级用）
   minute: number;
+  /**
+   * 民用钟表时刻（农历已转公历、**未做**真太阳时校正）。西方盘用它：
+   * circular-natal-horoscope-js 的 Origin 把输入当当地民用时，自行查时区换算 UTC。
+   */
+  civil: { year: number; month: number; day: number; hour: number; minute: number };
   hasTime: boolean;
   timeIndex: number; // iztro 时辰索引 0–12
   /** 可审计：实际计算时刻描述 */
@@ -67,11 +72,15 @@ export function normalizeBirth(input: BirthInput): NormalizedBirth {
     day = solar.getDay();
   }
 
+  const civil = { year, month, day, hour, minute };
+
   let correctionMin = 0;
   if (input.trueSolarTime && input.longitude != null && hasTime) {
     // 真太阳时 = 平太阳时(经度校正) + 均时差 EoT
-    const ref = new Date(Date.UTC(year, month - 1, day, hour, minute));
-    const offsetMin = tzOffsetMinutes(input.timezone, ref);
+    // 偏移须在出生的真实时刻取值：墙钟当 UTC 先猜一次偏移，换算出真实瞬时再取一次（两次迭代足以覆盖 DST 切换边界）
+    const guess = Date.UTC(year, month - 1, day, hour, minute);
+    const off1 = tzOffsetMinutes(input.timezone, new Date(guess));
+    const offsetMin = tzOffsetMinutes(input.timezone, new Date(guess - off1 * 60000));
     const standardMeridian = (offsetMin / 60) * 15; // 东经为正
     const lonCorr = (input.longitude - standardMeridian) * 4; // 经度差 × 4 分钟
     const eot = equationOfTimeMin(year, month, day);
@@ -92,5 +101,5 @@ export function normalizeBirth(input: BirthInput): NormalizedBirth {
     correctionMin ? ` (真太阳时校正 ${correctionMin > 0 ? "+" : ""}${correctionMin}min)` : ""
   }${hasTime ? "" : " [时辰未知]"}`;
 
-  return { year, month, day, hour, minute, hasTime, timeIndex, normalizedSolarTime };
+  return { year, month, day, hour, minute, civil, hasTime, timeIndex, normalizedSolarTime };
 }

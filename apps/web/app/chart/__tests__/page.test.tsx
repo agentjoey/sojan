@@ -262,3 +262,38 @@ describe("Task 6：会话中途失效（Review Focus 3）", () => {
     expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fchart");
   });
 });
+
+// EP-reading-save-timing：保存曾挂在 rAF 打字机播完之后。长解读要播一分钟左右，
+// 用户中途离开、或标签页在后台（rAF 被降频乃至暂停），解读就不落库。
+describe("解读保存时机（EP-reading-save-timing）", () => {
+  const fullText = "## 命理\n第一段。\n## 心理\n第二段。";
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("流读完即以全文 saveReading，不等打字机（rAF 永不推进也要落库）", async () => {
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.saveReading).mockClear();
+    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1)); // 模拟后台标签页：帧永远不来
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(fullText, { status: 200 })));
+    await renderChart();
+    fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
+    await waitFor(() => expect(profiles.saveReading).toHaveBeenCalledWith("p1", fullText));
+    expect(profiles.saveReading).toHaveBeenCalledTimes(1);
+  });
+
+  it("打字机播完收尾时不重复保存", async () => {
+    const profiles = await import("@/lib/profiles");
+    vi.mocked(profiles.saveReading).mockClear();
+    // 单分节：末句落在默认可见的「命理」页签里，才能据此判断打字机已铺完全文
+    const oneSection = "## 命理\n第一段。末句收尾。";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(oneSection, { status: 200 })));
+    await renderChart();
+    fireEvent.click(await screen.findByText("为我照见 · 生成完整解读"));
+    await screen.findByText(/末句收尾。/, {}, { timeout: 3000 });
+    // 铺完后 finalize 还要再跑一帧收尾，留足余量再数调用次数
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)); });
+    expect(profiles.saveReading).toHaveBeenCalledTimes(1);
+    expect(profiles.saveReading).toHaveBeenCalledWith("p1", oneSection);
+  });
+});

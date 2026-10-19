@@ -24,14 +24,6 @@ vi.mock("@/lib/profiles", () => ({
   deleteProfile: (...a: unknown[]) => deleteProfile(...(a as [])),
 }));
 
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  tgListProfiles: vi.fn(async () => []),
-  tgDeleteProfile: vi.fn(),
-}));
-
-vi.mock("@/lib/tg/ui", () => ({ useIsTelegram: () => false }));
-
 vi.mock("@/lib/supabase", () => ({
   supabase: () => ({ auth: { getSession: async () => ({ data: { session: null } }) } }),
 }));

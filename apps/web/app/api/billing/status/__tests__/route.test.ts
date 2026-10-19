@@ -11,7 +11,7 @@ vi.mock("@/lib/entitlements", () => ({
   isMember: (e: { tier: string; memberUntil: string | null }) =>
     e.tier === "member" && !!e.memberUntil && new Date(e.memberUntil).getTime() > Date.now(),
 }));
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({
     from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => usageMaybeSingleMock() }) }) }) }),
   }),
@@ -34,8 +34,8 @@ describe("GET /api/billing/status", () => {
     expect(getEntitlementMock).not.toHaveBeenCalled();
   });
 
-  it("resolveUid 解析出 uid（不论 via）→ 查 entitlements 与本月用量", async () => {
-    resolveUidMock.mockResolvedValue({ uid: "u1", via: "tg" });
+  it("resolveUid 解析出 uid→ 查 entitlements 与本月用量", async () => {
+    resolveUidMock.mockResolvedValue({ uid: "u1", via: "web" });
     const res = await GET(new Request("http://x"));
     const json = await res.json();
     expect(getEntitlementMock).toHaveBeenCalledWith("u1");

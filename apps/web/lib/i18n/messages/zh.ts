@@ -39,7 +39,7 @@ export const zh = {
     calendar: "运势",
     chart: "命盘",
     // UI v3 打磨批（owner 指令 6）：/spirit 导航小字改为「问事」；大字方印字符「灵」
-    // 不变（lib/nav.ts 的 char），TG_ENTRIES 的对应项不动（TG 冻结）。
+    // 不变（lib/nav.ts 的 char）。
     spirit: "问事",
     fengshui: "风水",
     dream: "解梦",
@@ -62,7 +62,6 @@ export const zh = {
     signOut: "登出",
     email: "邮箱",
     emailAddress: "邮箱地址",
-    loginWithTelegram: "用 Telegram 登录",
     sendMagicLink: "发送登录链接",
     linked: "已绑定",
     notLinked: "未绑定",
@@ -71,26 +70,20 @@ export const zh = {
     tierFree: "免费",
     expiresOn: "到期 {date}",
     usageThisMonth: "本月已用 {used}/{free}",
-    loggedInViaTelegram: "已通过 Telegram 登录",
-    linkEmailLabel: "绑定邮箱",
-    linkEmailSent: "确认邮件已发送，请查收后点击链接完成绑定",
     linkEmailInUse: "该邮箱已被占用",
-    linkEmailConflict: "本账号已绑定其他已验证邮箱，如需更换请先联系支持",
     bindConfirmTitle: "确认绑定邮箱",
     bindConfirmBody: "你正要把 {email} 绑定到当前这个照见账号。如果这不是你发起的，请点取消——绑定后这个邮箱将成为该账号的登录与找回方式。",
     bindConfirmAction: "确认绑定",
     bindCancel: "取消",
     bindExpired: "这个绑定链接已失效或已被使用，请回到账号页重新发起。",
     bindFailed: "绑定失败，请稍后重试。",
-    linkFailed: "绑定失败，请重试",
-    tgAlreadyLinked: "该 Telegram 已绑定其他账号，请改用登录并合并",
     invalidEmail: "请输入有效的邮箱地址",
     anonymousDescription:
       "当前为本地匿名模式，登录后可在不同设备间同步你的档案与解读记录。",
     magicLinkSent: "已发送，请查收邮件中的登录链接",
     dangerZone: "危险区 · 注销账号",
     deleteWarning:
-      "此操作不可逆。注销后，你的账号、所有档案、对话记录、会员权益与 Telegram 绑定将被永久删除，无法恢复。",
+      "此操作不可逆。注销后，你的账号、所有档案、对话记录、会员权益将被永久删除，无法恢复。",
     deleteAccount: "注销账号",
     confirmDelete: "确认注销",
     deleting: "注销中…",
@@ -105,7 +98,6 @@ export const zh = {
     monthly: "$9/月",
     yearly: "$99/年",
     comingSoon: "支付即将开放，敬请期待",
-    telegramIAP: "Telegram 内购即将开放",
     // 曾有 subtitleLimit（"已达免费版上限，升级会员后可继续保存"）。它唯一的调用点是
     // /fengshui/dwellings 的新增居所位，那道闸门在最终评审 I2 里被撤除（第 2 套居所
     // 不被任何东西读取），随之删除——留着一条没有调用点的文案，只会让引用它的反向
@@ -118,9 +110,6 @@ export const zh = {
   },
   home: {
     heroTitle1: "你的命盘，",
-    // kickerHero（卷 首）web 卷首已不用（打磨批指令 5），但 TG 首页 PageHeader
-    // 仍在用（HomeClient inTg 分支）——TG 冻结，键保留。kickerToc 已全废，删。
-    kickerHero: "卷 首",
     footerBrand: "照 见 · 东 方 命 理",
     ctaSecondary: "先看看流日 →",
     heroTitle2: "是一面镜子",
@@ -152,18 +141,6 @@ export const zh = {
     },
     disclaimer:
       "本产品为传统文化与心理学的自我探索工具，所有解读仅供自我反思，不构成医疗、法律、财务或心理诊断建议。",
-    tg: {
-      tagline: "你的命盘，是一面镜子",
-      entries: {
-        calendar: { title: "今日运势", subtitle: "流日 · 每日一推" },
-        chart: { title: "我的命盘", subtitle: "命理 + 心理解读" },
-        spirit: { title: "本命之灵", subtitle: "守护灵与年度指引" },
-        fengshui: { title: "居家风水", subtitle: "本命方位 · 居所实盘" },
-        dream: { title: "解梦", subtitle: "梦的映照 · 心理解读" },
-        reading: { title: "起盘建档", subtitle: "出生信息即时排盘" },
-        profiles: { title: "我的档案", subtitle: "已保存的命盘档案" },
-      },
-    },
   },
   reading: {
     heroTitle1: "告诉我，",
@@ -193,10 +170,8 @@ export const zh = {
     genderLabel: "性 别",
     male: "乾 · 男",
     female: "坤 · 女",
-    castMyChart: "为我起盘",
     submit: "排我的盘",
     submitting: "正在为你起盘…",
-    saveProfileError: "建档失败：{message}",
     saveChartError: "存档失败：{message}",
   },
   chart: {
@@ -207,8 +182,6 @@ export const zh = {
     loadingProfile: "正在读取档案…",
     noProfile: "尚无命盘档案。",
     goCast: "去起盘",
-    share: "分享 →",
-    shareText: "照见 · 东方命理 × 西方心理的自我观照",
     todayFortune: "今日运势 →",
 
     baziTitle: "八字四柱",
@@ -217,7 +190,6 @@ export const zh = {
     westernMissing: "缺出生时辰或出生地，已略去西方星盘与心理层。补全后可解锁。",
     readingTitle: "三段式解读",
 
-    castForMe: "为我照见",
     generating: "正在为你照见…",
     generateReading: "为我照见 · 生成完整解读",
     generateReadingSub: "命盘已就位 —— 用命理结构 + 深层心理，读出你的核心自我、成长课题与一句此刻之言",

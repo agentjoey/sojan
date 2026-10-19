@@ -36,11 +36,6 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfile: vi.fn(async () => profile),
 }));
 
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  tgGetProfile: vi.fn(),
-}));
-
 const dailyFortuneActionMock = vi.fn(async (..._a: unknown[]) => fortune);
 const dailyPolishActionMock = vi.fn(async (..._a: unknown[]): Promise<string | null> => null);
 const dailyBehaviorActionMock = vi.fn(async (..._a: unknown[]): Promise<{ do: string[]; dont: string[] } | null> => null);

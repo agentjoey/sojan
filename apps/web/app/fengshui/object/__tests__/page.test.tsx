@@ -56,17 +56,11 @@ vi.mock("@/lib/dwellings", () => ({
     return dwellingsFixture.current;
   }),
 }));
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  isTelegram: () => false,
-  tgGetProfile: vi.fn(),
-  tgListProfiles: vi.fn(async () => []),
-}));
 vi.mock("next/navigation", () => ({ usePathname: () => "/fengshui/object" }));
 
 /**
  * EP-fs-18：本页新增会员闸门探测，要读 supabase 会话的 access_token 附到探测请求上
- * （TG 会话走 cookie，邮箱/匿名登录靠这个头）。`@/lib/supabase` 的真实实现在没配置
+ * （邮箱/匿名登录靠这个头）。`@/lib/supabase` 的真实实现在没配置
  * NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时会抛错，测试环境没配，必须 mock。
  */
 const { supabaseSession } = vi.hoisted(() => ({

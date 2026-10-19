@@ -1,15 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { supabaseAdmin } from "./admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { SYNTHETIC_EMAIL_DOMAIN } from "@/lib/access";
 
 export type IdentityToAttach =
   | { kind: "email"; email: string }
-  | { kind: "telegram"; tgId: number; username?: string }
   | { kind: "google" }
   | { kind: "apple" };
 
 export type AttachError =
-  | "already_attached" // 本账号已绑过同类身份（TG：绑过别的 tgId；email：已有别的真实已验证邮箱）
+  | "already_attached" // 本账号已绑过同类身份（email：已有别的真实已验证邮箱）
   | "taken" // 目标身份被别的账号占用
   | "no_pending" // complete 阶段：nonce 不存在／已消费／已过期
   | "unverified" // complete 阶段：持票用户的邮箱未验证，不能作为所有权证明
@@ -57,8 +56,8 @@ function isRealVerifiedEmail(email: string | null | undefined, confirmedAt: unkn
 
 /**
  * 绑定对称化（EP-account2-04）：任何有效会话都可以绑定本账号尚未拥有的身份类型。
- * telegram 是唯一必须自定义的分支（非 Supabase 原生 provider）；google/apple
- * 本轮只留接缝，真正调用时抛错。
+ * Telegram 绑定已随 TG 下线移除；google/apple 本轮只留接缝，真正调用时抛错。
+ * 过渡文件：Neon 迁移 Task 5 随 /api/account/attach 一并删除。
  *
  * email 分支是两阶段流程的**第一阶段（prepare）**：只校验 + 发一个一次性 nonce，
  * 绝不提前把真实邮箱写到账号上——实测（2026-08-20 生产 GoTrue）
@@ -103,40 +102,6 @@ export async function attachIdentity(
 
     // nonce 回给客户端，由它拼进 signInWithOtp 的 emailRedirectTo。
     return { ok: true, nonce };
-  }
-
-  if (identity.kind === "telegram") {
-    // S3 前置反查：本账号是否已绑过「别的」TG。不做这步的话，重复绑定会撞
-    // tg_users.supabase_user_id 唯一索引，路由只能返 500——语义错误且难看。
-    const { data: mine, error: mineErr } = await sb
-      .from("tg_users")
-      .select("tg_user_id")
-      .eq("supabase_user_id", uid)
-      .maybeSingle();
-    // 查询失败必须拒绝，不能当作「没绑过」放行（评审 NEW-6：静默吞错等于绕过前置校验）。
-    if (mineErr) return { ok: false, error: "send_failed" };
-    if (mine && mine.tg_user_id !== identity.tgId) return { ok: false, error: "already_attached" };
-
-    const { data: existing, error: exErr } = await sb
-      .from("tg_users")
-      .select("supabase_user_id")
-      .eq("tg_user_id", identity.tgId)
-      .maybeSingle();
-    if (exErr) return { ok: false, error: "send_failed" };
-
-    if (!existing) {
-      const { error } = await sb.from("tg_users").insert({
-        tg_user_id: identity.tgId,
-        supabase_user_id: uid,
-        username: identity.username ?? null,
-      });
-      if (error) return { ok: false, error: "send_failed" };
-      return { ok: true };
-    }
-
-    if (existing.supabase_user_id === uid) return { ok: true }; // 已绑给自己：幂等
-
-    return { ok: false, error: "already_attached" };
   }
 
   // google / apple：本轮只留接缝，不实装（spec §8）。

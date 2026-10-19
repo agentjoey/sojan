@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveUid } from "@/lib/account/uid";
-import { supabaseAdmin } from "@/lib/tg/admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { SYNTHETIC_EMAIL_DOMAIN, resolveAccess } from "@/lib/access";
 import { recordConsentOnce, TERMS_VERSION } from "@/lib/consent";
 
@@ -24,14 +24,6 @@ export async function GET(req: Request): Promise<Response> {
   const email =
     rawEmail && !rawEmail.endsWith(`@${SYNTHETIC_EMAIL_DOMAIN}`) ? rawEmail : null;
 
-  const { data: tgRow } = await supabaseAdmin()
-    .from("tg_users")
-    .select("username")
-    .eq("supabase_user_id", uid)
-    .maybeSingle();
-
-  return NextResponse.json({
-    email,
-    telegram: tgRow ? { username: tgRow.username ?? null } : null,
-  });
+  // TG 绑定已随 TG 下线移除——只返回 email。过渡路由：Neon 迁移 Task 5 删除。
+  return NextResponse.json({ email });
 }

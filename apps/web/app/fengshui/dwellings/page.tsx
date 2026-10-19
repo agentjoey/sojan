@@ -4,20 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DIRECTION_LABEL } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
-import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
-import { useIsTelegram, haptics } from "@/lib/tg/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { listDwellings, deleteDwelling, type Dwelling } from "@/lib/dwellings";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
-import { Group, Cell } from "@/components/tg/native";
 import { DwellingForm } from "../DwellingForm";
 
 const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
 
 /**
  * 居所管理页（EP-fs-14）。与「境」系列页面同一套骨架约定（见 ../object/page.tsx）：
- * flag 门控 → 档案读取（Telegram 会话优先，否则匿名档案）→ 内容。居所记录本身按
+ * flag 门控 → 档案读取 → 内容。居所记录本身按
  * 会话存取、不绑定某个具体档案（见 lib/dwellings.ts），但方位判断的意义依附于命盘——
  * 沿用同一骨架，没有档案时同样先引导去起盘，而不是允许在没有命盘的情况下裸录朝向。
  *
@@ -36,14 +33,9 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  * 但那时还需要一条服务端写入路径：`createDwelling` 目前是浏览器直写 supabase，
  * 客户端闸门可以被直接绕过。别只把付费墙贴回来就当数。
  *
- * ── EP-fs-tg ─────────────────────────────────────────────────────────────
- * ① 删除确认从原生 `confirm()` 改为**页内两步确认**（与 profiles/page.tsx 同一模式：
- * 点删除 → 原地出现「确认删除?」+ 确认/取消）。原生阻塞对话框在 TG webview 里表现
- * 很差；页内确认在两个宿主里都不差于原生弹窗，所以 **web 与 TG 都改**（spec §4）。
- * ② TG 会话下列表渲染为 `<Group>` + `<Cell>` 原生观感；web 路径为细线分隔的
- *    编辑式清单（2026-08 当代东方重设计，原为 Card 列表）。
- * ③ 数据层分流不在本页：`listDwellings`/`deleteDwelling` 内部已按 hasTgSession()
- * 分流到 /api/tg/fengshui 中介（见 lib/dwellings.ts）。
+ * 删除确认是**页内两步确认**（与 profiles/page.tsx 同一模式：点删除 → 原地出现
+ * 「确认删除?」+ 确认/取消），不用原生阻塞的 `confirm()`。列表为细线分隔的编辑式清单
+ * （2026-08 当代东方重设计，原为 Card 列表）。
  */
 export default function DwellingsPage() {
   const t = useT();
@@ -55,16 +47,13 @@ export default function DwellingsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // 编辑入口（spec §4.2 / 评审必修1）：DwellingForm 的 `initial` 编辑回显此前没有
   // 任何调用方——生产不可达的死代码，且是用户修正「同住人超限的历史居所」的唯一
-  // 入口（见 DwellingForm 截断逻辑注释）。TG 点 Cell、web 点「编辑」进入编辑态，
-  // 底部表单区整个换成带回显的编辑表单（同一时刻只渲染一个 DwellingForm，
-  // 避免 TG 下两个 MainButton 钩子互相抢）。
+  // 入口（见 DwellingForm 截断逻辑注释）。点「编辑」进入编辑态，
+  // 底部表单区整个换成带回显的编辑表单（同一时刻只渲染一个 DwellingForm）。
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  const inTg = useIsTelegram();
 
   useEffect(() => {
     if (!ENABLED) return;
-    (hasTgSession() ? tgGetProfile() : getActiveProfile())
+    getActiveProfile()
       .then((p: Profile | null) => setProfile(p))
       .catch(() => setProfile(null));
   }, []);
@@ -108,8 +97,8 @@ export default function DwellingsPage() {
   }
 
   // M-b（复验顺手修）：进入编辑态时表单区在页面更下方，居所多于两套时它在首屏
-  // 之外——TG 里点 Cell 会「看起来像没反应」。进入编辑态就把表单区滚进视口；
-  // 被编辑的行同时给选中态（见下面两个列表分支的 tint 背景）。
+  // 之外。进入编辑态就把表单区滚进视口；
+  // 被编辑的行同时给选中态（见下面列表的 tint 背景）。
   const formSectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!editingId) return;
@@ -130,7 +119,7 @@ export default function DwellingsPage() {
     );
   }
 
-  /** 删除按钮 / 两步确认行（web 与 TG 两个分支共用同一个状态机）。 */
+  /** 删除按钮 / 两步确认行。 */
   function deleteControls(d: Dwelling) {
     const confirming = confirmDeleteId === d.id;
     return confirming ? (
@@ -140,7 +129,7 @@ export default function DwellingsPage() {
         </span>
         <button
           type="button"
-          onClick={() => { haptics.medium(); handleDelete(d.id); }}
+          onClick={() => handleDelete(d.id)}
           disabled={deletingId === d.id}
           className="text-[13px] disabled:opacity-50"
           style={{ color: "var(--color-cinnabar)" }}
@@ -158,7 +147,7 @@ export default function DwellingsPage() {
     ) : (
       <button
         type="button"
-        onClick={() => { haptics.light(); setConfirmDeleteId(d.id); }}
+        onClick={() => setConfirmDeleteId(d.id)}
         disabled={deletingId === d.id}
         className="text-[13px] disabled:opacity-50"
         style={{ color: "var(--color-cinnabar)" }}
@@ -194,28 +183,6 @@ export default function DwellingsPage() {
           <p className="text-[13px] text-muted">{t("common.loading")}</p>
         ) : dwellings.length === 0 ? (
           <p className="text-[13px] text-muted">{t("fengshui.dwelling.empty")}</p>
-        ) : inTg ? (
-          // TG：原生列表观感（Group + Cell，与 profiles 页同模式）；操作行贴着对应 Cell。
-          <Group>
-            {dwellings.map((d) => (
-              <div
-                key={d.id}
-                style={editingId === d.id ? { background: "var(--color-tint)" } : undefined}
-              >
-                {/* 点 Cell 进入编辑（spec §4.2）；chevron 只在有 onClick 时渲染（M2）。
-                    编辑中的行给 tint 选中态——没有它，TG 里点 Cell 像没反应（M-b）。 */}
-                <Cell
-                  icon={d.name.slice(0, 1)}
-                  title={d.name}
-                  subtitle={subtitleOf(d)}
-                  onClick={() => { haptics.light(); setEditingId(d.id); setConfirmDeleteId(null); }}
-                />
-                <div className="flex items-center justify-end gap-3 px-[14px] pb-[14px]">
-                  {deleteControls(d)}
-                </div>
-              </div>
-            ))}
-          </Group>
         ) : (
           // web：细线分隔的编辑式清单（2026-08 当代东方）——居所名宋体做行首，
           // 信息行小号 muted，操作按钮靠右；行间与列表上下各一条 1px 细线。

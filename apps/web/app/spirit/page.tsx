@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { phaseAfter, formatQuestionnaire, MAX_THROWS, type Omen, type BlockFace } from "@sojan/core";
 import { getActiveProfile, getSpiritMemory, getQuestionnaire, type Profile } from "@/lib/profiles";
-import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { supabase } from "@/lib/supabase";
 import { throwJiao } from "@/lib/jiao";
 import { detectJiaoCrisis } from "@/lib/jiao-crisis";
@@ -85,21 +84,6 @@ export default function SpiritPage() {
     if (!ENABLED) return;
     (async () => {
       try {
-        // EP-jiao 最终评审 C1：TG 首页入口已摘除（`app/page.tsx` 的 `TG_ENTRIES`），
-        // 但这个分支特意保留——用户仍可能在 TG webview 里直接打开 /spirit 的 URL
-        // （比如浏览器历史、别处的深链）。**如实说明现状**：这里能把 TG 身份下的
-        // profile 读出来、页面能正常渲染到「输入问题」这一步，但掷筊落定后的
-        // `askSpirit`（下面）与追问（`SpiritPanel`）一律走浏览器侧
-        // `supabase().auth.getSession()` 取 Bearer token——TG webview 里没有这份
-        // 浏览器侧 Supabase 会话，token 恒为 undefined，会在那一步撞 401（引导去
-        // /account 登录，对 TG 用户是死胡同）。这不是「看起来支持其实不支持」的
-        // 假象：会话真的成立，只是流程后半段确实无法完成，且会给出清晰的登录引导
-        // 而不是静默失败。TG 侧要接得起来需要照抄 `api/tg/dream` 补一条
-        // `api/tg/jiao` 中介臂，见 `.agent/BACKLOG.md` 的 EP-jiao-tg。
-        if (hasTgSession()) {
-          setProfile(await tgGetProfile());
-          return;
-        }
         const p = await getActiveProfile();
         setProfile(p);
         if (p) {

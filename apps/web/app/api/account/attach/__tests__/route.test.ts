@@ -5,14 +5,10 @@ const resolveUidMock = vi.fn();
 const attachIdentityMock = vi.fn();
 const completeEmailAttachMock = vi.fn();
 vi.mock("@/lib/account/uid", () => ({ resolveUid: (...a: unknown[]) => resolveUidMock(...a) }));
-vi.mock("@/lib/tg/identity-link", () => ({
+vi.mock("@/lib/account/identity-link", () => ({
   attachIdentity: (...a: unknown[]) => attachIdentityMock(...a),
   completeEmailAttach: (...a: unknown[]) => completeEmailAttachMock(...a),
 }));
-type VerifyResult = { ok: true; id: number; username?: string } | { ok: false; error: string };
-const verifyTelegramLoginMock = vi.fn<(p: unknown, token: string) => VerifyResult>(() => ({ ok: true, id: 999, username: "bob" }));
-vi.mock("@sojan/core", () => ({ verifyTelegramLogin: (p: unknown, token: string) => verifyTelegramLoginMock(p, token) }));
-
 const { POST } = await import("../route");
 
 function req(body: unknown): Request {
@@ -28,9 +24,6 @@ beforeEach(() => {
   resolveUidMock.mockResolvedValue({ uid: "u1", via: "web" });
   attachIdentityMock.mockResolvedValue({ ok: true, nonce: "n1" });
   completeEmailAttachMock.mockResolvedValue({ ok: true });
-  // clearAllMocks 只清调用记录、不清 mockReturnValue 的实现——必须在每个用例前
-  // 重设默认实现，否则「verifyTelegramLogin 失败」用例的 mockReturnValue 会泄漏给后续用例。
-  verifyTelegramLoginMock.mockReturnValue({ ok: true, id: 999, username: "bob" });
 });
 
 describe("POST /api/account/attach", () => {
@@ -121,38 +114,15 @@ describe("POST /api/account/attach", () => {
     expect(res.status).toBe(409);
   });
 
-  it("kind=telegram：verifyTelegramLogin 通过 → attachIdentity 收到解析出的 tgId/username", async () => {
-    const res = await POST(req({ kind: "telegram", id: 999, username: "bob", auth_date: 1, hash: "h" }));
-    expect(res.status).toBe(200);
-    expect(attachIdentityMock).toHaveBeenCalledWith("u1", { kind: "telegram", tgId: 999, username: "bob" });
-  });
-
-  it("kind=telegram：verifyTelegramLogin 失败 → 401，不调用 attachIdentity", async () => {
-    verifyTelegramLoginMock.mockReturnValue({ ok: false, error: "bad hash" });
-    const res = await POST(req({ kind: "telegram", id: 999, auth_date: 1, hash: "bad" }));
-    expect(res.status).toBe(401);
-    expect(attachIdentityMock).not.toHaveBeenCalled();
-  });
-
-  it("kind=telegram：attachIdentity 返回 already_attached → 409", async () => {
-    attachIdentityMock.mockResolvedValue({ ok: false, error: "already_attached" });
+  it("kind=telegram 已下线 → 400 unknown_kind，不调用 attachIdentity", async () => {
     const res = await POST(req({ kind: "telegram", id: 999, auth_date: 1, hash: "h" }));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(400);
+    expect(attachIdentityMock).not.toHaveBeenCalled();
   });
 
   it("kind 缺失或未知 → 400", async () => {
     const res = await POST(req({ kind: "bogus" }));
     expect(res.status).toBe(400);
     expect(attachIdentityMock).not.toHaveBeenCalled();
-  });
-
-  it("任何 kind 下 via 不再是「必须对应」的前提——TG 会话也能绑邮箱、web 会话也能绑 TG（对称化的核心断言）", async () => {
-    resolveUidMock.mockResolvedValue({ uid: "u1", via: "tg" });
-    const res1 = await POST(req({ kind: "email", email: "a@x.com" }));
-    expect(res1.status).toBe(200);
-
-    resolveUidMock.mockResolvedValue({ uid: "u1", via: "web" });
-    const res2 = await POST(req({ kind: "telegram", id: 999, auth_date: 1, hash: "h" }));
-    expect(res2.status).toBe(200);
   });
 });

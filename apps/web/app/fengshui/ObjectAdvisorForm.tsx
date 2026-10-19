@@ -7,8 +7,6 @@ import {
   type DirectionVerdict,
 } from "@sojan/core";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
-import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
-import { Group } from "@/components/tg/native";
 import { Card, Button } from "@/components/ui";
 
 // 与 core `MATERIAL_ELEMENT`/`SHAPE_ELEMENT`（packages/core/src/fengshui/object-advisor.ts）
@@ -56,18 +54,8 @@ export function ObjectAdvisorForm({
   const [dir, setDir] = useState<Direction | "">("");
   const [advice, setAdvice] = useState<ObjectAdvice | null>(null);
   const [prose, setProse] = useState<string | null>(null);
-  // EP-fs-tg：TG 内提交走原生 MainButton（页内按钮隐藏），表单项套原生分组观感；
-  // web 路径保持页内按钮不变。
-  const inTg = useIsTelegram();
-
-  useTgMainButton({
-    text: t("fengshui.object.submit"),
-    onClick: () => submit(),
-    visible: inTg,
-  });
 
   function submit() {
-    haptics.light();
     const a = adviseObject(
       { verdicts: fs.personalDirections, affinity: fs.elementAffinity, dwellingSectors },
       {
@@ -118,17 +106,10 @@ export function ObjectAdvisorForm({
 
   return (
     <div>
-      {inTg ? (
-        // TG：表单项套原生分组观感（Group 自带分隔线），提交由 MainButton 承担。
-        <Group>
-          <div className="flex flex-col gap-3 px-[14px] py-[12px]">{fields}</div>
-        </Group>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {fields}
-          <Button onClick={submit} className="mt-1">{t("fengshui.object.submit")}</Button>
-        </div>
-      )}
+      <div className="flex flex-col gap-3">
+        {fields}
+        <Button onClick={submit} className="mt-1">{t("fengshui.object.submit")}</Button>
+      </div>
 
       {advice && (
         <Card className="mt-6 p-4">

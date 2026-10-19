@@ -5,16 +5,32 @@ import Link from "next/link";
 import type { Omen } from "@sojan/core";
 import { deriveSpirit } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
-import { isTelegram } from "@/lib/tg/client";
-import { useTgMainButton, haptics } from "@/lib/tg/ui";
 import { supabase } from "@/lib/supabase";
 import { Markdown } from "@/components/Markdown";
 import { Paywall } from "@/components/Paywall";
-import { Bubble } from "@/components/tg/native";
 import { QuickPrompts } from "@/components/spirit/QuickPrompts";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
 
 type Turn = { id: string; role: "user" | "spirit"; content: string };
+
+/** 对话气泡：用户朱砂底、灵纸底细线边。 */
+function Bubble({ role, children }: { role: "spirit" | "user"; children: React.ReactNode }) {
+  const isUser = role === "user";
+  return (
+    <div
+      className={`max-w-[84%] rounded-[var(--radius-card)] px-4 py-3 text-[14px] leading-relaxed ${
+        isUser ? "ml-auto text-white" : "text-[var(--color-ink-2)]"
+      }`}
+      style={
+        isUser
+          ? { background: "var(--color-cinnabar)" }
+          : { background: "var(--color-paper)", border: "1px solid var(--color-line)" }
+      }
+    >
+      {children}
+    </div>
+  );
+}
 
 /**
  * 掷筊问事的追问面板（EP-jiao 最终评审 C2 + I4 合并修复）。
@@ -80,13 +96,6 @@ export function SpiritPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useTgMainButton({
-    text: streaming ? t("jiao.reading") : t("jiao.followUpSubmit"),
-    onClick: () => handleSubmit(),
-    enabled: !streaming && !!input.trim(),
-    visible: isTelegram(),
-  });
-
   // 新消息到达时滚动到底部
   useEffect(() => {
     const el = scrollRef.current;
@@ -120,7 +129,6 @@ export function SpiritPanel({
       setTurns((prev) => [...prev, userTurn]);
       setInput("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
-      try { haptics.light(); } catch {}
 
       setStreaming(true);
       try {
@@ -155,7 +163,6 @@ export function SpiritPanel({
         if (!res.ok) throw new Error((await res.text()) || t("spirit.unavailable"));
         const reply = await res.text();
         setTurns((prev) => [...prev, { id: `spirit-${Date.now()}`, role: "spirit", content: reply }]);
-        try { haptics.success(); } catch {}
       } catch (e) {
         setTurns((prev) => prev.slice(0, -1));
         setError(e instanceof Error ? e.message : String(e));
@@ -163,7 +170,7 @@ export function SpiritPanel({
         setStreaming(false);
       }
     },
-    [streaming, turns, question, omen, exhausted, profile.chart, memory, questionnaire, locale, t],
+    [streaming, turns, question, omen, exhausted, profile.chart, memory, questionnaire, locale, t, setError, setNeedLogin, setTurns, setInput, setStreaming],
   );
 
   async function handleSubmit(e?: React.FormEvent) {
@@ -285,16 +292,14 @@ export function SpiritPanel({
           className="flex-1 resize-none rounded-[var(--radius-button)] border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2.5 text-[14px] text-ink placeholder:text-muted focus:border-[var(--color-cinnabar)] focus:outline-none disabled:opacity-60"
           style={{ minHeight: 44, maxHeight: 120 }}
         />
-        {!isTelegram() && (
-          <button
-            type="submit"
-            disabled={streaming || !input.trim()}
-            className="inline-flex h-[44px] shrink-0 items-center justify-center px-4 text-[14px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-button)" }}
-          >
-            {t("jiao.followUpSubmit")}
-          </button>
-        )}
+        <button
+          type="submit"
+          disabled={streaming || !input.trim()}
+          className="inline-flex h-[44px] shrink-0 items-center justify-center px-4 text-[14px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: "var(--color-cinnabar)", borderRadius: "var(--radius-button)" }}
+        >
+          {t("jiao.followUpSubmit")}
+        </button>
       </form>
     </div>
   );

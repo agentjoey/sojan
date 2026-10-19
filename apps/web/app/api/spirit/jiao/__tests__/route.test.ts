@@ -2,10 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getUserMock = vi.fn(async (_token?: string) => ({ data: { user: { id: "u1" } } }));
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({ auth: { getUser: (t: string) => getUserMock(t) } }),
 }));
-const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: false, hasTelegram: true }));
+const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
 vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
 // 类型显式标注为 `{ ok: boolean; reason?: "paywall" }`（与 lib/entitlements.ts 的
 // consumeLlm 真实返回类型一致）：若省略，vi.fn 会从初始返回值 `{ ok: true }` 推出
@@ -41,7 +41,7 @@ beforeEach(() => {
   getUserMock.mockClear();
   getUserMock.mockResolvedValue({ data: { user: { id: "u1" } } });
   resolveAccessMock.mockClear();
-  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: false, hasTelegram: true });
+  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
   consumeLlmMock.mockClear();
   consumeLlmMock.mockResolvedValue({ ok: true });
   generateJiaoReplySpy.mockClear();
@@ -135,7 +135,7 @@ describe("鉴权闸门（与 /api/spirit/dream 同一套）", () => {
   });
 
   it("anonymous 级 → 401", async () => {
-    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false, hasTelegram: false });
+    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
     const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }));
     expect(res.status).toBe(401);
     expect(consumeLlmMock).not.toHaveBeenCalled();

@@ -1,7 +1,6 @@
 import { isLlmConfigured, resolveLlmConfig } from "@sojan/llm";
 import { localeFromRequest } from "@/lib/i18n/server";
-// 校验 schema / 会员闸门 / 生成逻辑与 TG 中介端点（api/tg/fengshui 的 reading action）
-// 共用同一份实现（EP-fs-tg），见 lib/fengshui-reading.ts 顶部注释——闸门规则只写一份。
+// 校验 schema / 会员闸门 / 生成逻辑见 lib/fengshui-reading.ts——闸门规则只写一份。
 import {
   ReadingRequestSchema,
   generateFengshuiSections,

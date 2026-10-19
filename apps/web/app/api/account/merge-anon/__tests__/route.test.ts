@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// 测法同 app/api/tg/fengshui/__tests__/route.test.ts：直接 import 路由处理函数、
+// 测法：直接 import 路由处理函数、
 // 拿 Node 原生 Request 调用。
 //
 // EP-account-login：换设备用已注册邮箱登录（account 页退回 signInWithEmail 后），
@@ -10,11 +10,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getUserMock = vi.fn(async (_token?: string) => ({ data: { user: { id: "real-u1" } } }));
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({ auth: { getUser: (t: string) => getUserMock(t) } }),
 }));
 const mergeAnonProfilesSpy = vi.fn(async (..._a: unknown[]) => ({ merged: 3 }));
-vi.mock("@/lib/tg/merge", () => ({
+vi.mock("@/lib/account/merge", () => ({
   mergeAnonProfiles: (...a: unknown[]) => mergeAnonProfilesSpy(...(a as [string, string])),
 }));
 

@@ -9,8 +9,6 @@ import {
 import { getActiveProfile, getProfile, type Profile } from "@/lib/profiles";
 import { listDwellings, type Dwelling } from "@/lib/dwellings";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
-import { hasTgSession, tgGetProfile, tgListProfiles } from "@/lib/tg/client";
-import { useIsTelegram, haptics } from "@/lib/tg/ui";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 import { BaguaWheel } from "@/components/charts/BaguaWheel";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -18,7 +16,6 @@ import { Markdown } from "@/components/Markdown";
 import { Card, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { TwoColumn } from "@/components/TwoColumn";
-import { Group, Cell, Segmented } from "@/components/tg/native";
 import { Paywall } from "@/components/Paywall";
 import { supabase } from "@/lib/supabase";
 import {
@@ -87,20 +84,12 @@ export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
- * 按 id 集合取同住人档案（EP-fs-tg）。TG 会话下匿名 Supabase 客户端没有会话、
- * RLS 下 `getProfile(id)` 逐条读只会拿到 null（合看在 TG 内因此静默失效）——
- * 改走 `tgListProfiles()` 中介一次拉全量再按 id 过滤。返回顺序跟随 `ids`
- * （居所上登记的成员顺序），与 TG 列表本身的排序无关。
+ * 按 id 集合取同住人档案。返回顺序跟随 `ids`（居所上登记的成员顺序）。
  * 单个档案读不到（已删除/不属于本用户）时过滤掉，不连累整体——与原逐条
  * `getProfile(id).catch(() => null)` 的容错语义一致。
  */
 async function loadProfilesByIds(ids: string[]): Promise<Profile[]> {
   if (ids.length === 0) return [];
-  if (hasTgSession()) {
-    const all = await tgListProfiles();
-    const byId = new Map(all.map((p) => [p.id as string, p]));
-    return ids.map((id) => byId.get(id)).filter((p): p is Profile => p != null);
-  }
   return (await Promise.all(ids.map((id) => getProfile(id).catch(() => null)))).filter(
     (p): p is Profile => p != null,
   );
@@ -108,7 +97,7 @@ async function loadProfilesByIds(ids: string[]): Promise<Profile[]> {
 
 /**
  * 会员闸门探测（Task 10，EP-fs-17，GET /api/fengshui/reading）要能让服务端识别当前
- * 用户。TG 会话走 cookie（同源请求自动带上，这里不用处理）；本地匿名 / 邮箱登录走
+ * 用户：本地匿名 / 邮箱登录走
  * Authorization Bearer——与 account/page.tsx、SpiritPanel.tsx 同一手法（读 supabase
  * 会话的 access_token）。取不到会话（真正匿名、从未 ensureSession() 过）时返回空
  * header，服务端据此按「未登录」处理，等价于非会员——这本身就是正确结果，不需要
@@ -193,8 +182,6 @@ export default function FengshuiPage() {
   // narrative 的 retryNonce 相同的手法：不改变 profile 也能强制重新跑一遍。
   const [dwellingsRetryNonce, setDwellingsRetryNonce] = useState(0);
   const [tab, setTab] = useState<Tab>("chart");
-  // EP-fs-tg：TG 会话下 Tab 行换原生分段观感、化解清单换 Group+Cell；web 路径零变化。
-  const inTg = useIsTelegram();
   const [viewAs, setViewAs] = useState<string>("main");
   const [sections, setSections] = useState<FengshuiSections | null>(null);
   const [failed, setFailed] = useState(false);
@@ -239,7 +226,6 @@ export default function FengshuiPage() {
   }, [profile]);
 
   function selectDirection(d: Direction) {
-    haptics.light();
     const next = dirFilter === d ? null : d;
     setDirFilter(next);
     if (next) setTab("remedy");
@@ -247,7 +233,7 @@ export default function FengshuiPage() {
 
   useEffect(() => {
     if (!ENABLED) return;
-    (hasTgSession() ? tgGetProfile() : getActiveProfile())
+    getActiveProfile()
       .then((p: Profile | null) => setProfile(p))
       .catch(() => setProfile(null));
   }, []);
@@ -475,9 +461,8 @@ export default function FengshuiPage() {
         // Task 10（EP-fs-17）：dwelling/cohabitants 只在 entitled 时携带——服务端
         // 收到这两个字段会独立校验会员资格（客户端闸门可绕过，这不是唯一防线，
         // 只是不希望非会员平白把这次本该成功的 Layer 0 叙述请求打成 402）。
-        // EP-fs-tg：请求经 `requestFengshuiReading` 分流——TG 会话打 /api/tg/fengshui
-        // 中介（同一契约同一闸门），否则打 /api/fengshui/reading 并附带 Authorization
-        // （本地匿名/邮箱登录靠它让服务端识别会员；TG 会话走 cookie，见该函数注释）。
+        // 请求经 `requestFengshuiReading` 发往 /api/fengshui/reading 并附带 Authorization
+        // （本地匿名/邮箱登录靠它让服务端识别会员）。
         const data = await requestFengshuiReading(
           {
             ...profile.birthInput,
@@ -574,15 +559,6 @@ export default function FengshuiPage() {
   /** 有居所、但资格未知（探测失败）—— 给「重新确认」，绝不给付费墙。 */
   const hasUnknownDwelling = hasDwellingChart && entitlementUnknown;
 
-  // tabpanel 契约（评审 M4）只在 TG 臂成立——那里才有对应的 tablist/tab。
-  // ⚠️ 绝不能无条件渲染（复审必修 A）：web 没有 tab 行，无条件渲染会留下一个
-  // 没有所属 tablist、aria-labelledby 悬空（任何状态下都不存在的 id）的
-  // tabpanel——为改善无障碍做的修复反而把 web 的无障碍改坏，且踩「web 零变化」红线。
-  const panelProps = (tb: Tab) =>
-    inTg
-      ? ({ role: "tabpanel", id: `fs-panel-${tb}`, "aria-labelledby": `fs-tab-${tb}` } as const)
-      : {};
-
   // 盘即导航：dirFilter 生效时清单只留落在该方位的化解；「不限方位」的通用化解
   // （色/材/物件类）单列一组照列——它们与方位无关，过滤掉就是丢内容。
   const visibleRemedies = dirFilter
@@ -592,7 +568,7 @@ export default function FengshuiPage() {
     ? f.remedies.filter((r) => remedyDirection(r.target) === null)
     : [];
 
-  /** 化解清单（TG=Group+Cell / web=Card 列表）。两个宿主共享同一份条目。 */
+  /** 化解清单（Card 列表）。 */
   // 6d + 验收返工 C1：成本分级的五行色**只进标签左侧 6px 色点**（装饰元素，
   // aria-hidden），标签文字保持 --color-ink-2（5.42:1）——wood 3.06 / earth 2.33 /
   // line-strong 1.38 全部低于 11px 正文的 AA 4.5:1，而改动前的 --color-muted
@@ -607,41 +583,7 @@ export default function FengshuiPage() {
     装修: "var(--color-metal)",
   };
   function renderRemedyList(items: typeof f.remedies) {
-    return inTg ? (
-      // TG：化解清单用原生 Group+Cell。诚实标注（传统象征 vs 传统+现代）与
-      // 成本分级一并保留在副标题——它们是产品可信度的核心，不能在原生化的
-      // 名义下丢掉。
-      <div className="mt-3">
-      <Group>
-        {items.map((r) => (
-          <Cell
-            key={r.id}
-            icon={t(`fengshui.effortLabel.${r.effort}`).slice(0, 1)}
-            title={r.action}
-            subtitle={
-              <span className="flex flex-col gap-1 pt-0.5">
-                <span>
-                  {t(`fengshui.effortLabel.${r.effort}`)} ·{" "}
-                  {r.evidence === "传统象征" ? t("fengshui.evidenceSymbolic") : t("fengshui.evidenceBoth")}
-                </span>
-                <span>{t("fengshui.traditionalLabel")}：{r.traditional}</span>
-                {r.modern && <span>{t("fengshui.modernLabel")}：{r.modern}</span>}
-                {SPIRIT_ENABLED && (
-                  <Link
-                    href={`/spirit?ask=${encodeURIComponent(truncateForSpiritQuery(r.action))}`}
-                    className="inline-block"
-                    style={{ color: "var(--color-cinnabar)" }}
-                  >
-                    {t("fengshui.askSojan")}
-                  </Link>
-                )}
-              </span>
-            }
-          />
-        ))}
-      </Group>
-      </div>
-    ) : (
+    return (
       // web：细线分隔的编辑式清单（2026-08 当代东方）——方位字做行首锚点（朱砂宋体），
       // 成本分级小号右对齐，行间与列表上下各一条 1px 细线；诚实标注（传统象征 vs
       // 传统+现代）与传统/现代两行说明照旧保留——它们是产品可信度的核心，不能丢。
@@ -705,17 +647,7 @@ export default function FengshuiPage() {
   // 基调 → 本命八方」这条相对顺序（评审后续 #4/#6）：房屋盘在左节点、基调与本命盘
   // 在右节点时，左节点恒先于右节点，基调又在本命盘之前——这条顺序天然成立，
   // 所以本结构不违反那两条断言（第一版「盘 tab 整体居左」正是把这条读过头了）。
-  const tabRow = inTg ? (
-    <div className="mt-5">
-      <Segmented
-        options={TABS.map((tb) => ({ value: tb, label: t(`fengshui.tabs.${tb}`) }))}
-        value={tab}
-        onChange={setTab}
-        idBase="fs"
-        ariaLabel={t("fengshui.title")}
-      />
-    </div>
-  ) : (
+  const tabRow = (
     <div className="mt-5 flex gap-1 border-b" style={{ borderColor: "var(--color-line)" }}>
       {TABS.map((tb) => (
         <button
@@ -761,7 +693,7 @@ export default function FengshuiPage() {
   const left = (
     <>
       {tab === "chart" && (
-        <div {...panelProps("chart")}>
+        <div>
           {/* 主视觉顺序（评审后续 #4）：登记了朝向已知的居所时，居所盘先出现、
               本命盘降为第二段；没有居所时维持原有顺序，本命盘仍是第一屏。
               两套判语各自的取用规则完全不变——只是改了「谁先出现」，不改
@@ -868,10 +800,6 @@ export default function FengshuiPage() {
 
   const right = (
     <>
-      {/* 盘 tab 的右列部分（生气方/基调/叙述/本命盘）**不挂 panelProps**：TG 的
-          tabpanel 契约（评审 M4）要求每个 tab 恰一个 panel，由左列 div 担任
-          （fs-panel-chart）；右列这个 div 只是同一 tab 内容在桌面两栏下的另一半，
-          不再是独立 landmark。 */}
       {tab === "chart" && (
         <div>
           {/* 一句话基调（评审后续 #6）：确定性、始终可见，不依赖 LLM 是否已返回。
@@ -972,7 +900,7 @@ export default function FengshuiPage() {
       )}
 
       {tab === "remedy" && (
-        <section className="mt-6" {...panelProps("remedy")}>
+        <section className="mt-6">
           <h2 className="text-[18px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.remedyTitle")}</h2>
           <NarrativeStatus
             t={t}
@@ -1016,7 +944,7 @@ export default function FengshuiPage() {
       )}
 
       {tab === "object" && (
-        <section className="mt-6" {...panelProps("object")}>
+        <section className="mt-6">
           <Card className="p-5">
             <h2 className="text-[16px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.object.title")}</h2>
             <p className="mt-1 text-[13px] text-ink-2">{t("fengshui.object.subtitle")}</p>

@@ -9,7 +9,6 @@ import {
 import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { listDwellings } from "@/lib/dwellings";
 import { supabase } from "@/lib/supabase";
-import { hasTgSession, tgGetProfile } from "@/lib/tg/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -19,7 +18,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
 
 /**
  * 物件顾问页（EP-fs-08 弱版 / EP-fs-18 强版）。与「境」主页面（../page.tsx）同一套
- * 骨架约定：flag 门控、档案读取（Telegram 会话优先，否则匿名档案）、加载/无档案态处理。
+ * 骨架约定：flag 门控、档案读取、加载/无档案态处理。
  * 落位建议本身（推荐方位/不宜方位/品类规则/与命主关系）由 ObjectAdvisorForm 内部调用
  * core 的 `adviseObject` 纯函数确定性算出，本页只负责准备入参并把它交下去。
  *
@@ -71,7 +70,7 @@ export default function FengshuiObjectPage() {
 
   useEffect(() => {
     if (!ENABLED) return;
-    (hasTgSession() ? tgGetProfile() : getActiveProfile())
+    getActiveProfile()
       .then((p: Profile | null) => setProfile(p))
       .catch(() => setProfile(null));
   }, []);
@@ -103,8 +102,8 @@ export default function FengshuiObjectPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Authorization：TG 会话走 cookie（同源请求自动带上），本地匿名/邮箱登录靠
-        // 这个头，服务端才能识别出「其实是会员」，不会被误挡成非会员。
+        // Authorization：本地匿名/邮箱登录靠这个头，服务端才能识别出「其实是会员」，
+        // 不会被误挡成非会员。
         const { data } = await supabase().auth.getSession();
         const token = data.session?.access_token;
         const r = await fetch("/api/fengshui/reading", {

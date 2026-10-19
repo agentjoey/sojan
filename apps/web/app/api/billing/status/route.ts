@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveUid } from "@/lib/account/uid";
-import { supabaseAdmin } from "@/lib/tg/admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEntitlement, isMember } from "@/lib/entitlements";
 
 export const runtime = "nodejs";

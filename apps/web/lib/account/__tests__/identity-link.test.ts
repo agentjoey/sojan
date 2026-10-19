@@ -6,9 +6,6 @@ const getUserByIdMock = vi.fn();
 const updateUserByIdMock = vi.fn();
 const deleteUserMock = vi.fn();
 const getUserMock = vi.fn();
-const tgByTgIdMock = vi.fn(); // select(...).eq("tg_user_id", ...).maybeSingle()
-const tgByUidMock = vi.fn(); // select(...).eq("supabase_user_id", ...).maybeSingle()
-const tgInsertMock = vi.fn();
 
 /** email_bind_pending 表的可控状态。 */
 const pending = {
@@ -23,7 +20,7 @@ const pending = {
 /** profiles / spirit_messages 的计数（孤儿是否「有数据」）。 */
 const counts = { profiles: 0, spirit_messages: 0 };
 
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({
     auth: {
       getUser: (...a: unknown[]) => getUserMock(...a),
@@ -65,15 +62,7 @@ vi.mock("@/lib/tg/admin", () => ({
           select: () => ({ eq: async () => ({ count: counts[table], error: null }) }),
         };
       }
-      // tg_users
-      return {
-        select: () => ({
-          eq: (field: string) => ({
-            maybeSingle: () => (field === "tg_user_id" ? tgByTgIdMock() : tgByUidMock()),
-          }),
-        }),
-        insert: (...a: unknown[]) => tgInsertMock(...a),
-      };
+      throw new Error(`unexpected table: ${table}`);
     },
   }),
 }));
@@ -116,9 +105,6 @@ beforeEach(() => {
   updateUserByIdMock.mockResolvedValue({ error: null });
   deleteUserMock.mockResolvedValue({ error: null });
   getUserMock.mockResolvedValue({ data: { user: proofUser() } });
-  tgByTgIdMock.mockResolvedValue({ data: null, error: null });
-  tgByUidMock.mockResolvedValue({ data: null, error: null });
-  tgInsertMock.mockResolvedValue({ error: null });
   pending.row = pendingRow();
   pending.insert.mockClear();
   pending.deleted = [];
@@ -317,43 +303,6 @@ describe("peekEmailBind（确认屏只读预览，不消费）", () => {
   it("过期意向 → no_pending", async () => {
     pending.row = pendingRow({ created_at: new Date(Date.now() - 16 * 60 * 1000).toISOString() });
     expect(await peekEmailBind("n1", "orphan")).toEqual({ ok: false, error: "no_pending" });
-  });
-});
-
-describe("attachIdentity · telegram 分支", () => {
-  it("未被占用 → 建映射", async () => {
-    const r = await attachIdentity("u1", { kind: "telegram", tgId: 999, username: "bob" });
-    expect(r).toEqual({ ok: true });
-    expect(tgInsertMock).toHaveBeenCalledWith({ tg_user_id: 999, supabase_user_id: "u1", username: "bob" });
-  });
-
-  it("本账号已绑别的 TG → already_attached（409），不撞唯一索引（S3）", async () => {
-    tgByUidMock.mockResolvedValue({ data: { tg_user_id: 111 }, error: null });
-    const r = await attachIdentity("u1", { kind: "telegram", tgId: 999 });
-    expect(r).toEqual({ ok: false, error: "already_attached" });
-    expect(tgInsertMock).not.toHaveBeenCalled();
-  });
-
-  it("同一个 TG 重绑自己 → 幂等 ok", async () => {
-    tgByUidMock.mockResolvedValue({ data: { tg_user_id: 999 }, error: null });
-    tgByTgIdMock.mockResolvedValue({ data: { supabase_user_id: "u1" }, error: null });
-    const r = await attachIdentity("u1", { kind: "telegram", tgId: 999 });
-    expect(r).toEqual({ ok: true });
-    expect(tgInsertMock).not.toHaveBeenCalled();
-  });
-
-  it("该 TG 已绑给别人 → already_attached", async () => {
-    tgByTgIdMock.mockResolvedValue({ data: { supabase_user_id: "other" }, error: null });
-    const r = await attachIdentity("u1", { kind: "telegram", tgId: 999 });
-    expect(r).toEqual({ ok: false, error: "already_attached" });
-    expect(tgInsertMock).not.toHaveBeenCalled();
-  });
-
-  it("前置反查报错 → send_failed，不当作「没绑过」放行（NEW-6：静默吞错等于绕过校验）", async () => {
-    tgByUidMock.mockResolvedValue({ data: null, error: { message: "db down" } });
-    const r = await attachIdentity("u1", { kind: "telegram", tgId: 999 });
-    expect(r).toEqual({ ok: false, error: "send_failed" });
-    expect(tgInsertMock).not.toHaveBeenCalled();
   });
 });
 

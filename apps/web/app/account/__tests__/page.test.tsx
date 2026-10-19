@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent, cleanup } from "@testing-library/react";
 
 const getWebUserMock = vi.fn(async (): Promise<{ id: string; email: string | null; isAnonymous: boolean } | null> => null);
 const signInWithEmailMock = vi.fn(async (..._a: unknown[]): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true }));
@@ -17,23 +17,16 @@ vi.mock("@/lib/supabase", async () => {
     supabase: () => ({ auth: { getSession: getSessionMock } }),
   };
 });
-const hasTgSessionMock = vi.fn(() => true);
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => hasTgSessionMock(),
-  tgLoginWithWidget: vi.fn(),
-  tgLogout: vi.fn(),
-}));
-vi.mock("@/lib/tg/ui", () => ({ useIsTelegram: () => false }));
 vi.mock("@/components/Paywall", () => ({ Paywall: () => null }));
 
 const { ANON_MERGE_TOKEN_KEY } = await import("@/lib/supabase");
 
-const fetchMock = vi.fn(async (url: string) => {
-  if (url === "/api/tg/session") return new Response(JSON.stringify({ active: true, refreshed: false }), { status: 200 });
-  if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: null, telegram: { username: "u1" } }), { status: 200 });
+const defaultFetch = async (url: string) => {
+  if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: "me@example.com" }), { status: 200 });
   if (url.startsWith("/api/billing/status")) return new Response(JSON.stringify({ tier: "free", memberUntil: null, used: 0, free: 30 }), { status: 200 });
   return new Response("{}", { status: 200 });
-});
+};
+const fetchMock = vi.fn(defaultFetch);
 
 async function renderAccountPage() {
   const { default: Page } = await import("../page");
@@ -47,7 +40,7 @@ async function renderAccountPage() {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
-  hasTgSessionMock.mockReturnValue(true);
+  fetchMock.mockImplementation(defaultFetch);
   getWebUserMock.mockReset().mockResolvedValue(null);
   signInWithEmailMock.mockReset().mockResolvedValue({ ok: true });
   upgradeAnonymousToEmailMock.mockReset().mockResolvedValue({ ok: true });
@@ -59,29 +52,32 @@ afterEach(() => {
   fetchMock.mockClear();
 });
 
-describe("EP-account2-03：/account 真正消费 /api/tg/session 的确认结果", () => {
-  it("active=true → 保持已登录态（TG 视图渲染出来，不回退到匿名态）", async () => {
+describe("已登录（邮箱）与未登录视图", () => {
+  it("邮箱用户：渲染登出按钮与危险区", async () => {
+    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
     await renderAccountPage();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tg/session", expect.anything()));
-    // TG 视图特征：账户危险区/登出按钮出现（既有 view.kind==="telegram" 分支才会渲染）
     expect(await screen.findByText("登出")).toBeInTheDocument();
+    expect(await screen.findByTestId("danger-zone")).toBeInTheDocument();
   });
 
-  it("active=false → 落到未登录态（不是继续假装已登录），且不再渲染登出按钮", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/tg/session") return new Response(JSON.stringify({ active: false, refreshed: false }), { status: 200 });
-      return new Response("{}", { status: 200 });
-    });
+  it("未登录：落匿名态，没有登出按钮", async () => {
+    getWebUserMock.mockResolvedValue(null);
     await renderAccountPage();
-    await waitFor(() => expect(screen.queryByText("登出")).toBeNull());
+    expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
+    expect(screen.queryByText("登出")).toBeNull();
+  });
+
+  it("不再有任何 Telegram 元素：没有 Telegram 登录 widget、没有 Telegram 绑定行", async () => {
+    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
+    const { container } = await renderAccountPage();
+    await screen.findByTestId("identity-email");
+    expect(container.textContent).not.toContain("Telegram");
+    expect(screen.queryByTestId("identity-telegram")).toBeNull();
+    expect(container.querySelector("script[data-telegram-login]")).toBeNull();
   });
 });
 
 describe("EP-account-login：换设备用已注册邮箱登录", () => {
-  beforeEach(() => {
-    hasTgSessionMock.mockReturnValue(false);
-  });
-
   async function fillAndSubmit(email = "existing@example.com") {
     const input = await screen.findByLabelText("邮箱地址");
     fireEvent.change(input, { target: { value: email } });
@@ -146,10 +142,6 @@ describe("EP-account-login：换设备用已注册邮箱登录", () => {
 });
 
 describe("EP-auth-return：?next= 回跳参数透传", () => {
-  beforeEach(() => {
-    hasTgSessionMock.mockReturnValue(false);
-  });
-
   function stubSearch(search: string) {
     Object.defineProperty(window, "location", { value: { ...window.location, search }, writable: true });
   }
@@ -217,15 +209,7 @@ describe("EP-auth-return：?next= 回跳参数透传", () => {
  */
 describe("UI v3 C4-1：6c 版式", () => {
   beforeEach(() => {
-    // 测试间污染：文件首个 describe 的「active=false」用例用 mockImplementation 覆盖过
-    // fetchMock，外层 afterEach 只 mockClear（清调用记录）不还原实现——不重置的话
-    // /api/tg/session 在本组仍回 active:false，页面落匿名态，identity/danger-zone 全不渲染。
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/tg/session") return new Response(JSON.stringify({ active: true, refreshed: false }), { status: 200 });
-      if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: null, telegram: { username: "u1" } }), { status: 200 });
-      if (url.startsWith("/api/billing/status")) return new Response(JSON.stringify({ tier: "free", memberUntil: null, used: 0, free: 30 }), { status: 200 });
-      return new Response("{}", { status: 200 });
-    });
+    getWebUserMock.mockResolvedValue({ id: "u1", email: "me@example.com", isAnonymous: false });
   });
 
   it("订阅等级用 serif 19px 呈现（6c：等级 serif 19px + 用量）", async () => {
@@ -235,12 +219,19 @@ describe("UI v3 C4-1：6c 版式", () => {
     expect(tier.className).toContain("text-[19px]");
   });
 
-  it("绑定与登录：未绑定项朱砂、已绑定项墨色（两侧都钉，不是只钉一侧）", async () => {
+  it("绑定与登录：已绑定项墨色、未绑定项朱砂（两侧都钉，不是只钉一侧）", async () => {
     await renderAccountPage();
-    // fetchMock 的 identities：email=null（未绑定）/ telegram.username="u1"（已绑定）
-    await waitFor(() => expect(screen.getByTestId("identity-telegram").textContent).toBe("u1"));
+    await waitFor(() => expect(screen.getByTestId("identity-email").textContent).toBe("me@example.com"));
+    expect((screen.getByTestId("identity-email") as HTMLElement).style.color).toBe("var(--color-ink)");
+    cleanup();
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/account/identities")) return new Response(JSON.stringify({ email: null }), { status: 200 });
+      return defaultFetch(url);
+    });
+    await renderAccountPage();
+    await waitFor(() => expect(screen.getByTestId("identity-email").textContent).toBe("未绑定"));
     expect((screen.getByTestId("identity-email") as HTMLElement).style.color).toBe("var(--color-cinnabar)");
-    expect((screen.getByTestId("identity-telegram") as HTMLElement).style.color).toBe("var(--color-ink)");
   });
 
   it("危险区走强调手法（Emphasis 2px 朱砂左线 + 浅朱砂淡出底），不再是朱砂边框盒", async () => {

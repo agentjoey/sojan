@@ -1,4 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * service-role Supabase 客户端（服务端专用）。
+ *
+ * 过渡文件：Supabase → Neon 迁移（Task 10）完成后整体删除。
+ */
 let _c: SupabaseClient | null = null;
 export function supabaseAdmin(): SupabaseClient {
   if (_c) return _c;

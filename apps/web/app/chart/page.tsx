@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getActiveProfile, getQuestionnaire, saveReading, type Profile } from "@/lib/profiles";
-import { hasTgSession, isTelegram, tgGetProfile, tgGetQuestionnaire } from "@/lib/tg/client";
-import type { QuestionnaireAnswers } from "@sojan/core";
-import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { timelineAction } from "@/app/actions";
 import { Card, BellLogo, cn } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
@@ -49,19 +46,10 @@ export default function ChartPage() {
   const [timeline, setTimeline] = useState<string | null>(null);
   const [qAnswers, setQAnswers] = useState<Awaited<ReturnType<typeof getQuestionnaire>>>(null);
 
-  const inTg = useIsTelegram();
-
-  useTgMainButton({
-    text: streaming ? t("chart.generating") : t("chart.castForMe"),
-    onClick: () => generate(),
-    enabled: !streaming,
-    visible: inTg && !reading,
-  });
-
   useEffect(() => {
     (async () => {
       try {
-        const p = hasTgSession() ? await tgGetProfile() : await getActiveProfile();
+        const p = await getActiveProfile();
         setProfile(p);
         if (p?.reading) setReading(p.reading); // 已生成则直接展示，不再调用 LLM
         if (p) {
@@ -73,17 +61,13 @@ export default function ChartPage() {
     })();
   }, []);
 
-  // 自我画像（EP-jiao Task 8：从已删除的 /spirit/portrait 独立页挪入命盘页）——
-  // TG Mini App 走独立的 cookie 会话 + /api/tg/* 中介，没有浏览器侧 Supabase auth
-  // 会话，getQuestionnaire 的 RLS 查询在 TG 内必然拿不到数据；必须像被删的
-  // /spirit/portrait 原页那样按 hasTgSession() 分支到 tgGetQuestionnaire()，
-  // 否则所有从 TG 进 /chart 的用户自我画像会静默永久缺问卷增强。
+  // 自我画像（EP-jiao Task 8：从已删除的 /spirit/portrait 独立页挪入命盘页）。
   // questionnaire 是问卷自陈，读不到时静默回落 null，SelfPortrait 仅凭命盘也能
   // 渲染，不阻塞主流程。
   useEffect(() => {
     if (!profile) return;
-    (hasTgSession() ? tgGetQuestionnaire() : getQuestionnaire(profile.id))
-      .then((q) => setQAnswers((q as QuestionnaireAnswers | null) ?? null))
+    getQuestionnaire(profile.id)
+      .then((q) => setQAnswers(q ?? null))
       .catch(() => setQAnswers(null));
   }, [profile]);
 
@@ -120,7 +104,6 @@ export default function ChartPage() {
         setProfile({ ...profile, reading: target });
       }
       setStreaming(false);
-      haptics.success();
     };
     const tick = () => {
       if (pause > 0) {
@@ -191,22 +174,6 @@ export default function ChartPage() {
       annotation={chart.normalizedSolarTime}
       action={
         <>
-          {isTelegram() && (
-            <button
-              onClick={() => {
-                const username = process.env.NEXT_PUBLIC_TG_BOT_USERNAME || "analyst_helen_bot";
-                window.Telegram?.WebApp?.openTelegramLink?.(
-                  "https://t.me/share/url?url=" +
-                    encodeURIComponent(`https://t.me/${username}?startapp=sojan`) +
-                    "&text=" +
-                    encodeURIComponent(t("chart.shareText"))
-                );
-              }}
-              className="text-[13px] text-cinnabar underline underline-offset-4"
-            >
-              {t("chart.share")}
-            </button>
-          )}
           <Link href="/calendar" className="text-[13px] text-gold underline underline-offset-4">{t("chart.todayFortune")}</Link>
         </>
       }
@@ -259,7 +226,7 @@ export default function ChartPage() {
         // 那条分隔线仍是有意义的分隔，必须断点门控，不能无条件去掉。
         className="xl:mt-6 xl:border-t-0 xl:pt-0"
       >
-        {!inTg && !reading && !streaming && (
+        {!reading && !streaming && (
           <button
             onClick={generate}
             className="group flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-all duration-200 hover:bg-cinnabar-press"

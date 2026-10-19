@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { ReadingForm } from "../ReadingForm";
@@ -12,10 +12,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 function render_() {
   return render(<ReadingForm />, { wrapper: Wrapper });
 }
-
-beforeEach(() => {
-  delete window.Telegram;
-});
 
 /**
  * 对照设计稿（frontend-harness 审查，2026-08-18）：ReadingForm 是全站唯一

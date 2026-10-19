@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const insertMock = vi.fn();
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({ from: () => ({ insert: (...a: unknown[]) => insertMock(...a) }) }),
 }));
 

@@ -1,6 +1,6 @@
 import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
 import type { UnifiedChart } from "@sojan/core";
-import { supabaseAdmin } from "@/lib/tg/admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
 import { localeFromRequest } from "@/lib/i18n/server";

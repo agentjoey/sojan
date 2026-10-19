@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { resolveUid } from "@/lib/account/uid";
-import { supabaseAdmin } from "@/lib/tg/admin";
-import { TG_COOKIE } from "@/lib/tg/session";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TG_HINT_COOKIE = "zj_tg_hint";
 
 export async function POST(req: Request): Promise<Response> {
   const body = await req.json().catch(() => ({}));
@@ -27,8 +24,5 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(TG_COOKIE, "", { maxAge: 0, path: "/" });
-  res.cookies.set(TG_HINT_COOKIE, "", { maxAge: 0, path: "/" });
-  return res;
+  return NextResponse.json({ ok: true });
 }

@@ -5,7 +5,6 @@ const resolveUidMock = vi.fn();
 const resolveAccessMock = vi.fn();
 const recordConsentOnceMock = vi.fn();
 const getUserByIdMock = vi.fn();
-const tgMaybeSingleMock = vi.fn();
 
 vi.mock("@/lib/account/uid", () => ({ resolveUid: (...a: unknown[]) => resolveUidMock(...a) }));
 vi.mock("@/lib/access", () => ({
@@ -16,10 +15,9 @@ vi.mock("@/lib/consent", () => ({
   recordConsentOnce: (...a: unknown[]) => recordConsentOnceMock(...a),
   TERMS_VERSION: "2026-08-20",
 }));
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({
     auth: { admin: { getUserById: (...a: unknown[]) => getUserByIdMock(...a) } },
-    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => tgMaybeSingleMock() }) }) }),
   }),
 }));
 
@@ -27,10 +25,9 @@ const { GET } = await import("../route");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveUidMock.mockResolvedValue({ uid: "u1", via: "tg" });
-  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: false, hasTelegram: true });
+  resolveUidMock.mockResolvedValue({ uid: "u1", via: "web" });
+  resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
   getUserByIdMock.mockResolvedValue({ data: { user: { email: null } } });
-  tgMaybeSingleMock.mockResolvedValue({ data: { username: "bob" } });
 });
 
 describe("GET /api/account/identities", () => {
@@ -48,7 +45,7 @@ describe("GET /api/account/identities", () => {
   });
 
   it("resolveAccess 判定 anonymous（理论上不该走到这——resolveUid 已经拿到 uid，但防御性覆盖）→ 不记录 consent", async () => {
-    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false, hasTelegram: false });
+    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
     await GET(new Request("http://x"));
     expect(recordConsentOnceMock).not.toHaveBeenCalled();
   });
@@ -58,5 +55,11 @@ describe("GET /api/account/identities", () => {
     const res = await GET(new Request("http://x"));
     const json = await res.json();
     expect(json.email).toBeNull();
+  });
+
+  it("只返回 email，不再有 telegram 字段（TG 已下线）", async () => {
+    getUserByIdMock.mockResolvedValue({ data: { user: { email: "a@x.com" } } });
+    const res = await GET(new Request("http://x"));
+    expect(await res.json()).toEqual({ email: "a@x.com" });
   });
 });

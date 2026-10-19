@@ -2,19 +2,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getUserByIdMock = vi.fn();
-const tgUsersMaybeSingleMock = vi.fn();
 const getEntitlementMock = vi.fn();
 
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({
     auth: { admin: { getUserById: (...a: unknown[]) => getUserByIdMock(...a) } },
     from: (table: string) => {
-      if (table !== "tg_users") throw new Error(`unexpected table ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({ maybeSingle: () => tgUsersMaybeSingleMock() }),
-        }),
-      };
+      throw new Error(`unexpected table ${table}`);
     },
   }),
 }));
@@ -32,15 +26,14 @@ function user(email: string | null, confirmed: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  tgUsersMaybeSingleMock.mockResolvedValue({ data: null });
   getEntitlementMock.mockResolvedValue({ tier: "free", memberUntil: null });
 });
 
 describe("resolveAccess", () => {
-  it("无 TG 映射、无邮箱 → anonymous", async () => {
+  it("无邮箱 → anonymous", async () => {
     getUserByIdMock.mockResolvedValue(user(null, false));
     const r = await resolveAccess("u1");
-    expect(r).toEqual({ level: "anonymous", hasVerifiedEmail: false, hasTelegram: false });
+    expect(r).toEqual({ level: "anonymous", hasVerifiedEmail: false });
   });
 
   it(`影子邮箱（@${SYNTHETIC_EMAIL_DOMAIN}）即使 email_confirmed_at 有值也不算 hasVerifiedEmail`, async () => {
@@ -59,22 +52,21 @@ describe("resolveAccess", () => {
   it("真实已验证邮箱 → identified，hasVerifiedEmail=true", async () => {
     getUserByIdMock.mockResolvedValue(user("a@x.com", true));
     const r = await resolveAccess("u1");
-    expect(r).toEqual({ level: "identified", hasVerifiedEmail: true, hasTelegram: false });
+    expect(r).toEqual({ level: "identified", hasVerifiedEmail: true });
   });
 
-  it("有 TG 映射、无邮箱 → identified，hasTelegram=true", async () => {
+  it("残留的 tg_users 映射不再抬升层级：无邮箱即 anonymous（TG 已下线，identified 只认真实已验证邮箱）", async () => {
     getUserByIdMock.mockResolvedValue(user(null, false));
-    tgUsersMaybeSingleMock.mockResolvedValue({ data: { supabase_user_id: "u1" } });
     const r = await resolveAccess("u1");
-    expect(r).toEqual({ level: "identified", hasVerifiedEmail: false, hasTelegram: true });
+    expect(r.level).toBe("anonymous");
+    expect(r).not.toHaveProperty("hasTelegram");
   });
 
-  it("有 TG 映射但邮箱未验证 → identified 但不是 member（即使 entitlements 表里 tier=member）", async () => {
-    getUserByIdMock.mockResolvedValue(user(null, false));
-    tgUsersMaybeSingleMock.mockResolvedValue({ data: { supabase_user_id: "u1" } });
+  it("影子邮箱用户 + entitlements 里有效订阅 → 仍是 anonymous（member 要求真实已验证邮箱）", async () => {
+    getUserByIdMock.mockResolvedValue(user(`tg_123@${SYNTHETIC_EMAIL_DOMAIN}`, true));
     getEntitlementMock.mockResolvedValue({ tier: "member", memberUntil: "2099-01-01T00:00:00Z" });
     const r = await resolveAccess("u1");
-    expect(r.level).toBe("identified"); // 不是 member——member 要求 hasVerifiedEmail
+    expect(r.level).toBe("anonymous");
   });
 
   it("已验证邮箱 + entitlements 里有效订阅 → member", async () => {

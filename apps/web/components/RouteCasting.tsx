@@ -7,8 +7,7 @@ import { useT } from "@/lib/i18n/I18nProvider";
 
 /**
  * 路由切换过场（owner 打磨批指令 7）：每次客户端路由切换播一次 1.2s 短版
- * 风铃过场（`CastingOverlay` mode="route"）。挂在 `AppShell` 的 `{!tg && …}`
- * 内——TG 冻结，Mini App 里不播。
+ * 风铃过场（`CastingOverlay` mode="route"）。挂在 `AppShell` 内。
  *
  * - 首次挂载不播：首屏的等待由各地页面的 pending 过场（或静态内容）承担，
  *   再叠一层路由过场是双播。

@@ -11,11 +11,6 @@
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_BASE_URL` / `LLM_WIRE` | 可插拔 LLM，未设时用 MiniMax-M3 默认值（见 CLAUDE.md）|
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 浏览器侧 Supabase（匿名会话 + RLS）|
 | `SUPABASE_SERVICE_ROLE_KEY` | 服务端 Supabase。**仅限 route handler，绕过 RLS**，绝不可进客户端包 |
-| `TELEGRAM_BOT_TOKEN` | Bot API。**未配置时 `next build` 会在 `/api/tg/webhook` 的 page-data 收集阶段失败**——本地裸构建报 `TELEGRAM_BOT_TOKEN 未配置` 属此原因，带占位值即可通过 |
-| `TELEGRAM_WEBHOOK_SECRET` | webhook 校验 + TG session cookie 的 HMAC 签名密钥 |
-| `NEXT_PUBLIC_TG_BOT_USERNAME` / `NEXT_PUBLIC_MINIAPP_URL` | TG 登录 widget 与 Mini App 地址 |
-| `TG_QUOTA_DISABLED` | 关闭 TG 侧配额（灰度用）|
-| `CRON_SECRET` | `/api/tg/cron` 的调用凭据 |
 | `NEXT_PUBLIC_SPIRIT_ENABLED` | 本命之灵 flag，`=1` 开启 |
 | `NEXT_PUBLIC_FENGSHUI_ENABLED` | 风水「境」flag，`=1` 开启。**2026-08-16 起 Production + Preview 均已设为 1** |
 | `BILLING_ENABLED` | 会员闸门总开关。**不为 `"1"`（默认）时不做任何限制**——注意它**没有** `NEXT_PUBLIC_` 前缀，客户端读不到，故页面须向服务端探测权益 |

@@ -49,7 +49,6 @@ vi.mock("@/lib/profiles", () => ({
   getSpiritMemory: (...a: unknown[]) => getSpiritMemoryMock(...a),
   getQuestionnaire: (...a: unknown[]) => getQuestionnaireMock(...a),
 }));
-vi.mock("@/lib/tg/client", () => ({ hasTgSession: () => false, tgGetProfile: vi.fn() }));
 
 const throwJiaoMock = vi.fn();
 vi.mock("@/lib/jiao", () => ({ throwJiao: (...a: unknown[]) => throwJiaoMock(...a) }));

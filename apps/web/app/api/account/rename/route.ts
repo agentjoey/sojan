@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveUid } from "@/lib/account/uid";
-import { supabaseAdmin } from "@/lib/tg/admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

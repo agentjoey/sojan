@@ -33,7 +33,7 @@ export const en: Messages = {
     calendar: "Fortune",
     chart: "Chart",
     // UI v3 polish batch (owner directive 6): /spirit nav label is now 问事; the seal
-    // char 灵 stays (lib/nav.ts), TG_ENTRIES untouched (TG frozen).
+    // char 灵 stays (lib/nav.ts).
     spirit: "问事 (Jiao)",
     fengshui: "Feng Shui",
     dream: "Dream",
@@ -56,7 +56,6 @@ export const en: Messages = {
     signOut: "Sign out",
     email: "Email",
     emailAddress: "Email address",
-    loginWithTelegram: "Log in with Telegram",
     sendMagicLink: "Send magic link",
     linked: "Linked",
     notLinked: "Not linked",
@@ -65,12 +64,7 @@ export const en: Messages = {
     tierFree: "Free",
     expiresOn: "Expires {date}",
     usageThisMonth: "Used {used}/{free} this month",
-    loggedInViaTelegram: "Logged in via Telegram",
-    linkEmailLabel: "Link email",
-    linkEmailSent:
-      "Confirmation email sent. Check your inbox and click the link to finish linking.",
     linkEmailInUse: "This email is already linked to another account",
-    linkEmailConflict: "This account already has a different verified email. Contact support to change it.",
     bindConfirmTitle: "Confirm email binding",
     bindConfirmBody:
       "You're about to bind {email} to this Sojan account. If you didn't start this, tap Cancel — once bound, this address becomes the account's sign-in and recovery method.",
@@ -78,16 +72,13 @@ export const en: Messages = {
     bindCancel: "Cancel",
     bindExpired: "This binding link has expired or was already used. Start again from the account page.",
     bindFailed: "Binding failed. Please try again.",
-    linkFailed: "Link failed, please try again",
-    tgAlreadyLinked:
-      "This Telegram is linked to another account. Please log in and merge instead",
     invalidEmail: "Please enter a valid email address",
     anonymousDescription:
       "You're in local anonymous mode. Sign in to sync your profiles and readings across devices.",
     magicLinkSent: "Sent. Check your email for the sign-in link.",
     dangerZone: "Danger Zone · Delete Account",
     deleteWarning:
-      "This action is irreversible. Your account, all profiles, chat history, membership and Telegram link will be permanently deleted and cannot be recovered.",
+      "This action is irreversible. Your account, all profiles, chat history, membership will be permanently deleted and cannot be recovered.",
     deleteAccount: "Delete account",
     confirmDelete: "Confirm deletion",
     deleting: "Deleting…",
@@ -102,7 +93,6 @@ export const en: Messages = {
     monthly: "$9/month",
     yearly: "$99/year",
     comingSoon: "Payments coming soon",
-    telegramIAP: "Telegram in-app purchases coming soon",
     // subtitleLimit ("Free plan limit reached…") is gone: its only call site was the
     // add-dwelling slot on /fengshui/dwellings, and that gate was removed in final
     // review I2 (nothing ever reads dwelling #2). See components/Paywall.tsx.
@@ -111,10 +101,6 @@ export const en: Messages = {
   },
   home: {
     heroTitle1: "Your chart,",
-    // kickerHero is no longer used by the web hero (polish batch directive 5) but
-    // the TG homepage PageHeader still consumes it — TG is frozen, key stays.
-    // kickerToc is fully dead, removed.
-    kickerHero: "Prologue",
     footerBrand: "Sojan · Eastern Mingli",
     ctaSecondary: "See today’s reading →",
     heroTitle2: "is a mirror",
@@ -145,18 +131,6 @@ export const en: Messages = {
     },
     disclaimer:
       "This product is a self-exploration tool for traditional culture and psychology. All readings are for self-reflection only and do not constitute medical, legal, financial, or psychological advice.",
-    tg: {
-      tagline: "Your chart is a mirror",
-      entries: {
-        calendar: { title: "Daily fortune", subtitle: "Daily flow · one push a day" },
-        chart: { title: "My chart", subtitle: "命理 (Mingli) + psychological reading" },
-        spirit: { title: "Spirit", subtitle: "Guardian spirit & yearly guidance" },
-        fengshui: { title: "Home Feng Shui", subtitle: "Your directions · dwelling chart" },
-        dream: { title: "Dreams", subtitle: "Dream mirror · psychological reflection" },
-        reading: { title: "Cast chart", subtitle: "Birth info instant chart" },
-        profiles: { title: "My profiles", subtitle: "Saved chart profiles" },
-      },
-    },
   },
   reading: {
     heroTitle1: "Tell me,",
@@ -190,10 +164,8 @@ export const en: Messages = {
     genderLabel: "Gender",
     male: "乾 · Male",
     female: "坤 · Female",
-    castMyChart: "Cast my chart",
     submit: "Cast My Chart",
     submitting: "Casting your chart…",
-    saveProfileError: "Failed to create profile: {message}",
     saveChartError: "Failed to save chart: {message}",
   },
   chart: {
@@ -204,8 +176,6 @@ export const en: Messages = {
     loadingProfile: "Loading profile…",
     noProfile: "No chart profile yet.",
     goCast: "去起盘 (Cast chart) →",
-    share: "分享 (Share) →",
-    shareText: "Sojan · Eastern astrology × Western psychology for self-reflection",
     todayFortune: "今日运势 (Today's fortune) →",
 
     baziTitle: "八字四柱 (BaZi Four Pillars)",
@@ -214,7 +184,6 @@ export const en: Messages = {
     westernMissing: "Missing birth time or place; the Western chart and psychological layer are omitted. Complete them to unlock.",
     readingTitle: "三段式解读 (Three-Part Reading)",
 
-    castForMe: "为我照见 (Sojan for me)",
     generating: "正在为你照见 (Reflecting for you)…",
     generateReading: "为我照见 (Sojan for me) · 生成完整解读 (Generate full reading)",
     generateReadingSub: "Your chart is ready — read your core self, growth themes, and a word for this moment through 命理结构 (Mingli structure) + 深层心理 (depth psychology).",

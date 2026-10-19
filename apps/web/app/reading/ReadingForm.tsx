@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { computeChartAction, geocodeAction, type GeoResult } from "@/app/actions";
 import { createProfile } from "@/lib/profiles";
-import { hasTgSession, isTelegram, ensureTgSession, tgReadyExpand } from "@/lib/tg/client";
-import { useIsTelegram, useTgMainButton, haptics } from "@/lib/tg/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { BirthInput } from "@sojan/core";
 import { shichenOf } from "@/lib/shichen";
@@ -20,22 +18,14 @@ export function ReadingForm() {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null);
 
-  // 受控字段（用于派生 canSubmit 与 TG MainButton）
+  // 受控字段
   const [date, setDate] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
 
   // 出生时辰
   const [time, setTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
-
-  // 避免 SSR/ hydration 因 isTelegram() 不一致而错位
-  const inTg = useIsTelegram();
-
-  useEffect(() => {
-    if (isTelegram()) tgReadyExpand();
-  }, []);
 
   // 出生地（地名 → 经纬度/时区）
   const [placeQuery, setPlaceQuery] = useState("");
@@ -44,28 +34,18 @@ export function ReadingForm() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geocoding, startGeocode] = useTransition();
 
-  const canSubmit = Boolean(date && gender && geo);
-
-  useTgMainButton({
-    text: t("reading.castMyChart"),
-    onClick: () => formRef.current?.requestSubmit(),
-    enabled: canSubmit,
-    visible: inTg,
-  });
-
   function doGeocode() {
     setGeoError(null);
     setCandidates([]);
     startGeocode(async () => {
       const r = await geocodeAction(placeQuery);
-      if (!r.ok) { setGeoError(r.error); haptics.error(); return; }
+      if (!r.ok) { setGeoError(r.error); return; }
       if (r.results.length === 1) setGeo(r.results[0]!);
       else setCandidates(r.results);
     });
   }
 
   function onSubmit(formData: FormData) {
-    haptics.light();
     setError(null);
     const nickname = formData.get("nickname") ? String(formData.get("nickname")) : undefined;
     const input: Partial<BirthInput> = {
@@ -79,31 +59,13 @@ export function ReadingForm() {
       nickname,
     };
     startTransition(async () => {
-      if (hasTgSession()) {
-        try {
-          await ensureTgSession();
-          const r = await fetch("/api/tg/profile", {
-            method: "POST",
-            credentials: "include",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ nickname, birthInput: input }),
-          });
-          if (!r.ok) { setError(await r.text()); haptics.error(); return; }
-          router.push("/chart");
-        } catch (e) {
-          setError(t("reading.saveProfileError", { message: e instanceof Error ? e.message : String(e) }));
-          haptics.error();
-        }
-        return;
-      }
       const res = await computeChartAction(input);
-      if (!res.ok) { setError(res.error); haptics.error(); return; }
+      if (!res.ok) { setError(res.error); return; }
       try {
         await createProfile({ nickname, birthInput: input as BirthInput, chart: res.chart });
         router.push("/chart");
       } catch (e) {
         setError(t("reading.saveChartError", { message: e instanceof Error ? e.message : String(e) }));
-        haptics.error();
       }
     });
   }
@@ -111,7 +73,7 @@ export function ReadingForm() {
   const join = t("common.listSeparator");
 
   return (
-    <form ref={formRef} action={onSubmit} className="space-y-5">
+    <form action={onSubmit} className="space-y-5">
       <Field label={t("reading.nicknameLabel")}>
         <input name="nickname" className={`${field} placeholder:text-muted`} style={fieldStyle} placeholder={t("reading.nicknamePlaceholder")} />
       </Field>
@@ -223,11 +185,9 @@ export function ReadingForm() {
         <input type="hidden" name="gender" value={gender} />
       </Field>
 
-      {!inTg && (
-        <button type="submit" disabled={pending} className="w-full px-6 py-[15px] text-[16px] font-medium transition-colors duration-200 bg-[var(--color-cinnabar)] hover:bg-[var(--color-cinnabar-press)] disabled:opacity-50" style={{ color: "var(--color-paper)", borderRadius: "var(--radius-button)" }}>
-          {pending ? t("reading.submitting") : t("reading.submit")}
-        </button>
-      )}
+      <button type="submit" disabled={pending} className="w-full px-6 py-[15px] text-[16px] font-medium transition-colors duration-200 bg-[var(--color-cinnabar)] hover:bg-[var(--color-cinnabar-press)] disabled:opacity-50" style={{ color: "var(--color-paper)", borderRadius: "var(--radius-button)" }}>
+        {pending ? t("reading.submitting") : t("reading.submit")}
+      </button>
 
       {error && (
         <div className="px-4 py-3 text-[13px]" style={{ borderRadius: "var(--radius-card)", background: "var(--color-error-bg)", color: "var(--color-seal)", border: "1px solid var(--color-error-line)" }}>{error}</div>

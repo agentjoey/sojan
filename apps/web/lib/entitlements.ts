@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/tg/admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 export type Entitlement = { tier: string; memberUntil: string | null };
 export async function getEntitlement(userId: string): Promise<Entitlement> {
   const { data } = await supabaseAdmin().from("entitlements").select("tier,member_until").eq("user_id", userId).maybeSingle();

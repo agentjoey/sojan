@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "./admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * 匿名用户排的盘迁到已识别账号名下（EP-account2-06）。改为单事务 RPC

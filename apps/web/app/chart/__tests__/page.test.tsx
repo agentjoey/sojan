@@ -8,10 +8,8 @@ import { BirthInputSchema, computeUnifiedChart } from "@sojan/core";
  * 左列按 5b 组装（`ChartIdentity` / `WuxingWheel` / `BaziPillars` / `LuckPillars` /
  * `ChartToc`），右列本波只重排（`ChartBlock` 版式不变）。
  *
- * 本文件不存在，以 `app/calendar/__tests__/page.test.tsx`（同形状页面，mock
- * 同样三个模块：`@/lib/profiles`、`@/lib/tg/client`、`@/app/actions`）为先例
- * 照搬结构；`/chart` 额外用了 `useIsTelegram`/`useTgMainButton`/`haptics`
- * （`@/lib/tg/ui`），多 mock 这一个模块。
+ * 结构照搬 `app/calendar/__tests__/page.test.tsx`（同形状页面，mock
+ * `@/lib/profiles`、`@/app/actions`）。
  */
 
 const birth = BirthInputSchema.parse({
@@ -34,19 +32,6 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfile: vi.fn(async () => profile),
   getQuestionnaire: vi.fn(async () => null),
   saveReading: vi.fn(async () => {}),
-}));
-
-vi.mock("@/lib/tg/client", () => ({
-  hasTgSession: () => false,
-  isTelegram: () => false,
-  tgGetProfile: vi.fn(),
-  tgGetQuestionnaire: vi.fn(async () => null),
-}));
-
-vi.mock("@/lib/tg/ui", () => ({
-  useIsTelegram: () => false,
-  useTgMainButton: () => {},
-  haptics: { light: vi.fn(), medium: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 
 const timelineActionMock = vi.fn(async (..._a: unknown[]): Promise<string | null> => null);

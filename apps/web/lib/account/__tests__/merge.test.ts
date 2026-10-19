@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getUserMock = vi.fn();
 const rpcMock = vi.fn();
-vi.mock("@/lib/tg/admin", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: () => ({
     auth: { getUser: (...a: unknown[]) => getUserMock(...a) },
     rpc: (...a: unknown[]) => rpcMock(...a),

@@ -7,7 +7,6 @@ import { getActiveProfile, getSpiritMemory, saveSpiritMemory, getQuestionnaire, 
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDreamHistory, appendDreamHistory, type DreamHistoryEntry } from "@/lib/dream-history";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -40,8 +39,7 @@ export default function DreamPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // EP-account2 阻断 3：web 臂 fetch 补 Authorization Bearer 后，匿名/会话失效
-  // 用户会拿到 401——不能按通用错误把服务端裸字符串（"未登录"）扔给用户，
+  // EP-account2 阻断 3：匿名/会话失效用户会拿到 401——不能按通用错误把服务端裸字符串（"未登录"）扔给用户，
   // 给一个引导态（参考 dream.noProfile 的既有处理）。
   const [needLogin, setNeedLogin] = useState(false);
   // 关系记忆/问卷由客户端取（同 SpiritPanel 模式）。
@@ -104,13 +102,10 @@ export default function DreamPage() {
         // 续接历史：没有梦原文可单独重建，priorTurns 直接是完整 turns（[0] 是历史解读）。
         payload.priorTurns = resumedFromHistory ? turns : turns.slice(1);
       }
-      // EP-account2 阻断 3：/api/spirit/dream 硬要求 Bearer（路由已改，客户端必须跟上），
-      // 取法与 SpiritPanel/fengshui 一致——supabase 会话的 access_token，与 x-zj-locale 共存。
-      const { data: sessionData } = await supabase().auth.getSession();
-      const token = sessionData.session?.access_token;
+      // 身份由会话 cookie 带（同源 fetch 自动附上），不再手拼 Authorization。
       const res = await fetch("/api/spirit/dream", {
         method: "POST",
-        headers: { "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "x-zj-locale": locale },
         body: JSON.stringify({ ...payload, chart: profile.chart, memory: memory ?? undefined, questionnaire }),
       });
       if (!res.ok) {
@@ -139,7 +134,11 @@ export default function DreamPage() {
       if (!isFollowUp) {
         dreamSummaryAction(dreamText as string, replyText, locale).then((summary) => {
           if (!summary) return;
-          void appendDreamHistory(profile.id, summary, replyText).then(() => listDreamHistory(profile.id).then(setHistory));
+          appendDreamHistory(profile.id, summary, replyText)
+            .then(() => listDreamHistory(profile.id).then(setHistory))
+            .catch((e) => {
+              if (!gate.handleAuthError(e)) console.error("appendDreamHistory failed:", e);
+            });
         });
       }
     } catch (e) {

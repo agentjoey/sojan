@@ -6,7 +6,6 @@ import { phaseAfter, formatQuestionnaire, MAX_THROWS, type Omen, type BlockFace 
 import { getActiveProfile, getSpiritMemory, getQuestionnaire, type Profile } from "@/lib/profiles";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
-import { supabase } from "@/lib/supabase";
 import { throwJiao } from "@/lib/jiao";
 import { detectJiaoCrisis } from "@/lib/jiao-crisis";
 import { listJiaoHistory, appendJiaoHistory, type JiaoHistoryEntry } from "@/lib/jiao-history";
@@ -159,11 +158,10 @@ export default function SpiritPage() {
     if (!profile) return;
     const q = question.trim();
     try {
-      const { data: sessionData } = await supabase().auth.getSession();
-      const token = sessionData.session?.access_token;
+      // 身份由会话 cookie 带（同源 fetch 自动附上），不再手拼 Authorization。
       const res = await fetch("/api/spirit/jiao", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "content-type": "application/json", "x-zj-locale": locale },
         body: JSON.stringify({ chart: profile.chart, question: q, omen, exhausted, memory: memory ?? undefined, questionnaire }),
       });
       if (!res.ok) {
@@ -195,7 +193,11 @@ export default function SpiritPage() {
       // 历史摘要 fire-and-forget（同 /dream 的处理）：失败不影响已经拿到的回应
       jiaoSummaryAction(q, reply, locale).then((summary) => {
         if (!summary) return;
-        void appendJiaoHistory(profile.id, omen, summary, reply).then(() => listJiaoHistory(profile.id).then(setHistory));
+        appendJiaoHistory(profile.id, omen, summary, reply)
+          .then(() => listJiaoHistory(profile.id).then(setHistory))
+          .catch((e) => {
+            if (!gate.handleAuthError(e)) console.error("appendJiaoHistory failed:", e);
+          });
       });
     } catch (e) {
       // 撤回刚才 proceedAfterReveal 追加进 throws 的这一次筊象：否则第三次笑筊那一轮遇到

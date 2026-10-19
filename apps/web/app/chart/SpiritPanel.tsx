@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { Omen } from "@sojan/core";
 import { deriveSpirit } from "@sojan/core";
 import type { Profile } from "@/lib/profiles";
-import { supabase } from "@/lib/supabase";
 import { Markdown } from "@/components/Markdown";
 import { Paywall } from "@/components/Paywall";
 import { QuickPrompts } from "@/components/spirit/QuickPrompts";
@@ -132,11 +131,10 @@ export function SpiritPanel({
 
       setStreaming(true);
       try {
-        const { data: sessionData } = await supabase().auth.getSession();
-        const token = sessionData.session?.access_token;
+        // 身份由会话 cookie 带（同源 fetch 自动附上），不再手拼 Authorization。
         const res = await fetch("/api/spirit/jiao", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-zj-locale": locale, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          headers: { "Content-Type": "application/json", "x-zj-locale": locale },
           body: JSON.stringify({
             chart: profile.chart,
             followUp: trimmed,

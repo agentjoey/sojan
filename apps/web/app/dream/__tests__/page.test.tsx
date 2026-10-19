@@ -51,22 +51,6 @@ vi.mock("@/lib/dream-history", () => ({
 }));
 
 /**
- * EP-account2 阻断 3：page.tsx web 臂直接 import `@/lib/supabase`（读会话
- * access_token 附到 /api/spirit/dream 请求头，路由已硬要求 Bearer）。真实实现
- * 在缺 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时抛错，必须 mock。会话内容做成可按
- * 测试改写的共享可变量（vi.hoisted）——renderDreamPage() 每次 resetModules +
- * 动态 import，mock 工厂可能重新执行，直接摆弄 mock 实例会打到旧实例
- * （fengshui/__tests__/page.test.tsx 记过同一个坑，理由同 supabaseSession）。
- * 默认带 token 的会话，让「页面发出的请求形态」有真实对象可断言。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `render()` 包一层 `await act(async () => {...})`：page.tsx 挂载时
  * `getActiveProfile().then(setProfile)` 落在真实微任务里，同步 render 返回后
  * setState 可能落在 act 作用域之外（fengshui/__tests__/page.test.tsx 顶部注释
@@ -87,7 +71,6 @@ async function renderDreamPage() {
 
 beforeEach(() => {
   vi.resetModules();
-  supabaseSession.current = { access_token: "test-access-token" };
   vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "1");
   getSpiritMemoryMock.mockClear();
   saveSpiritMemoryMock.mockClear();
@@ -160,11 +143,10 @@ describe("验收补做：web 臂记忆读取/写回 + 提交路径", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("/api/spirit/dream");
-    // EP-account2 阻断 3：路由硬要求 Bearer——页面发出的请求必须带 Authorization
-    // （与本分支已有的 x-zj-locale 头共存）。这正是「路由改了客户端没改」的洞，
-    // 守的是请求形态而不是服务端行为（服务端行为由 route.test.ts 独立覆盖）。
+    // Neon 迁移（Task 8）：身份由会话 cookie 带（同源 fetch 自动附上），页面不再手拼
+    // Authorization；x-zj-locale 头照旧。服务端行为由 route.test.ts 独立覆盖。
     const headers = init!.headers as Record<string, string>;
-    expect(headers.Authorization).toBe("Bearer test-access-token");
+    expect(headers.Authorization).toBeUndefined();
     expect(headers["x-zj-locale"]).toBe("zh");
     const body = JSON.parse(init!.body as string);
     expect(body.dream).toBe("我梦见自己在坠落，怎么都落不到底。");
@@ -199,8 +181,7 @@ describe("验收补做：web 臂记忆读取/写回 + 提交路径", () => {
 });
 
 describe("EP-account2 阻断 3：web 臂 401 友好态（不扔服务端裸字符串）", () => {
-  it("无会话（拿不到 token）+ 服务端 401 → 渲染引导登录文案与链接，不出现裸「未登录」", async () => {
-    supabaseSession.current = null;
+  it("无会话 + 服务端 401 → 渲染引导登录文案与链接，不出现裸「未登录」", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("未登录", { status: 401 })));
 
     await renderDreamPage();
@@ -219,7 +200,7 @@ describe("EP-account2 阻断 3：web 臂 401 友好态（不扔服务端裸字�
     expect(spiritMemoryActionMock).not.toHaveBeenCalled();
   });
 
-  it("有会话但服务端仍 401（token 失效）→ 同样落引导态", async () => {
+  it("有会话但服务端仍 401（会话失效）→ 同样落引导态", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("未登录", { status: 401 })));
 
     await renderDreamPage();
@@ -262,7 +243,7 @@ describe("EP-dream-history：历史列表 + 追问", () => {
     listDreamHistoryMock.mockResolvedValueOnce([
       { id: "h1", summary: "一个关于坠落的梦", fullText: "这个梦在处理坠落感，可能对应最近的失控体验。", createdAt: "2026-08-19T00:00:00Z" },
     ]);
-    const fetchMock = vi.fn(async () => new Response("坠落常和失控感有关。", { status: 200 }));
+    const fetchMock = vi.fn(async (..._a: unknown[]) => new Response("坠落常和失控感有关。", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await renderDreamPage();
@@ -475,6 +456,19 @@ describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
 });
 
 describe("Task 6：会话中途失效（Review Focus 3）", () => {
+  it("写历史时抛 UnauthenticatedError（appendDreamHistory）→ 转为登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("解读文本。", { status: 200 })));
+    dreamSummaryActionMock.mockResolvedValueOnce("一个关于考试的梦");
+    appendDreamHistoryMock.mockRejectedValueOnce(new UnauthenticatedError());
+    await renderDreamPage();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "梦见考试没带准考证。" } });
+    fireEvent.click(screen.getByText("解这个梦"));
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fdream");
+  });
+
+
   it("解梦后写回关系记忆抛 UnauthenticatedError → 转为登录引导", async () => {
     const { UnauthenticatedError } = await import("@/lib/errors");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("解读文本。", { status: 200 })));

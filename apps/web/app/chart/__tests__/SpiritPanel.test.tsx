@@ -17,7 +17,7 @@ import { I18nProvider } from "@/lib/i18n/I18nProvider";
  * 现在的 SpiritPanel 已经不读写 `spirit_messages`（该文件与 `lib/spirit.ts` 一并
  * 删除），追问改走 `/api/spirit/jiao` 的 `followUp` 分支——下面钉住这几件事：
  *   1. 有 seed 时不生成欢迎语、不产生 seed 之外的任何消息；
- *   2. 从不触碰任何 Supabase 表（`supabase().from` 全程不被调用）——
+ *   2. 从不触碰任何数据层（档案/历史门面的函数全程不被调用）——
  *      这是「不读写 spirit_messages」最直接的回归网；
  *   3. 追问 historyForApi/priorTurns 正确包含 seed；
  *   4. 追问打 `/api/spirit/jiao`（不是 `/api/spirit/chat`）并带上 omen/exhausted/
@@ -29,14 +29,16 @@ const birth = BirthInputSchema.parse({ date: "1991-03-15", time: "14:30", gender
 const chart = computeUnifiedChart(birth);
 const profile = { id: "p1", nickname: "阿甲", birthInput: birth, chart, createdAt: "", reading: null };
 
-const fromSpy = vi.fn();
-const getSessionMock = vi.fn(async () => ({ data: { session: { access_token: "test-token" } as { access_token: string } | null } }));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({
-    auth: { getSession: (...a: unknown[]) => getSessionMock(...(a as [])) },
-    // 回归网：SpiritPanel 不该再触碰任何表（历史上的 bug 是无条件读 spirit_messages）。
-    from: (...a: unknown[]) => fromSpy(...(a as [])),
-  }),
+// 回归网：SpiritPanel 不该触碰任何数据层（历史上的 bug 是无条件读 spirit_messages）。
+// 数据层现在是 server action 门面，这里把它们换成 spy，挂载与追问全程都不该被调用。
+const dataSpy = vi.fn();
+vi.mock("@/lib/profiles", () => ({
+  getSpiritMemory: (...a: unknown[]) => dataSpy("getSpiritMemory", ...a),
+  saveSpiritMemory: (...a: unknown[]) => dataSpy("saveSpiritMemory", ...a),
+}));
+vi.mock("@/lib/jiao-history", () => ({
+  listJiaoHistory: (...a: unknown[]) => dataSpy("listJiaoHistory", ...a),
+  appendJiaoHistory: (...a: unknown[]) => dataSpy("appendJiaoHistory", ...a),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -63,9 +65,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof SpiritPanel>> = 
 }
 
 beforeEach(() => {
-  fromSpy.mockClear();
-  getSessionMock.mockClear();
-  getSessionMock.mockResolvedValue({ data: { session: { access_token: "test-token" } } });
+  dataSpy.mockClear();
 });
 
 afterEach(() => {
@@ -73,7 +73,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("SpiritPanel：只渲染 seed，不生成欢迎语，不触碰任何 Supabase 表", () => {
+describe("SpiritPanel：只渲染 seed，不生成欢迎语，不触碰任何 数据层", () => {
   it("渲染出的正是 seedTurns 的两条内容，没有多出一条通用欢迎语", () => {
     const { container } = renderPanel();
     // 消息列表本身有一个稳定的容器 class（overflow-y-auto），QuickPrompts 的
@@ -89,9 +89,9 @@ describe("SpiritPanel：只渲染 seed，不生成欢迎语，不触碰任何 Su
     expect(within("这一掷是圣筊。留意你看到它时的第一反应。").filter((n) => n.tagName === "SPAN")).toHaveLength(1);
   });
 
-  it("挂载阶段不触碰任何 Supabase 表——回归 C2（此前无条件读 spirit_messages）", () => {
+  it("挂载阶段不触碰任何数据层——回归 C2（此前无条件读 spirit_messages）", () => {
     renderPanel();
-    expect(fromSpy).not.toHaveBeenCalled();
+    expect(dataSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -121,11 +121,12 @@ describe("SpiritPanel：追问打 /api/spirit/jiao（I4），不再是通用 /ap
     // priorTurns 不含 seed 里的用户提问（它会被服务端用 question+omen 重建），
     // 只含灵的第一条回应——与 continueJiaoReply 的「同一次问卦内追问」契约一致。
     expect(body.priorTurns).toEqual([{ role: "spirit", content: "这一掷是圣筊。留意你看到它时的第一反应。" }]);
-    expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBe("Bearer test-token");
+    // 身份由会话 cookie 带（同源 fetch 自动附上），面板不再手拼 Authorization。
+    expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBeUndefined();
 
     await waitFor(() => expect(screen.getByText("那份犹豫本身也是答案的一部分。")).toBeInTheDocument());
     // 追问全程也没有碰任何表——同上一组的回归点，这里换一个更贴近真实交互的路径再验一次。
-    expect(fromSpy).not.toHaveBeenCalled();
+    expect(dataSpy).not.toHaveBeenCalled();
   });
 
   it("续接历史（question=undefined）：priorTurns 就是 seed 原样，不带 question 字段", async () => {

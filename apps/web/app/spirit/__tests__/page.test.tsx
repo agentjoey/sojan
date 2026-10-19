@@ -75,19 +75,6 @@ vi.mock("@/app/actions", () => ({
 }));
 
 /**
- * EP-jiao：page.tsx 直接 import `@/lib/supabase`（掷筊落定后调 /api/spirit/jiao 时
- * 读会话 access_token 附到请求头）。会话内容做成可按测试改写的共享可变量
- * （vi.hoisted）——renderSpiritPage() 每次 resetModules + 动态 import，mock 工厂
- * 可能重新执行，直接摆弄 mock 实例会打到旧实例（dream/fengshui 测试记过同一个坑）。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: { access_token: "test-access-token" } as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `render()` 包一层 `await act(async () => {...})`：page.tsx 挂载时
  * `getActiveProfile().then(setProfile)` 落在真实微任务里，同步 render 返回后
  * setState 可能落在 act 作用域之外（dream/fengshui 测试记过同一时序竞争，这里沿用
@@ -139,7 +126,6 @@ beforeEach(() => {
   listJiaoHistoryMock.mockResolvedValue([]);
   appendJiaoHistoryMock.mockClear();
   jiaoSummaryActionMock.mockClear();
-  supabaseSession.current = { access_token: "test-access-token" };
 });
 
 describe("owner 打磨批指令 7：档案读取期挂持续版过场", () => {
@@ -292,7 +278,8 @@ describe("EP-jiao 掷筊闸门", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.omen).toBe("圣筊");
     expect(body.question).toBe("该不该换工作");
-    expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBe("Bearer test-access-token");
+    // 身份由会话 cookie 带（同源 fetch 自动附上），页面不再手拼 Authorization。
+    expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBeUndefined();
 
     // 落定之后转入对话态：SpiritPanel（桩组件）拿到 seedTurns，问题与灵解都在里面，
     // 而不是只拼进请求体、渲染时又丢了。
@@ -599,6 +586,32 @@ describe("UI v3 C3：掷筊三态版式", () => {
     fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
 
     await waitFor(() => expect(screen.getByTestId("shell-label").textContent).toBe("胶囊:圣筊"));
+  });
+});
+
+describe("Task 8：写历史时会话失效", () => {
+  const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>();
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("appendJiaoHistory 抛 UnauthenticatedError → 转为登录引导", async () => {
+    const { UnauthenticatedError } = await import("@/lib/errors");
+    throwJiaoMock.mockReturnValue({ blocks: ["仰", "俯"], omen: "圣筊" });
+    fetchSpy.mockResolvedValue(new Response("这一掷是圣筊。"));
+    jiaoSummaryActionMock.mockResolvedValueOnce("一件关于换工作的事");
+    appendJiaoHistoryMock.mockRejectedValueOnce(new UnauthenticatedError());
+    await renderSpiritPage();
+    fireEvent.change(screen.getByPlaceholderText(/该不该/), { target: { value: "该不该换工作" } });
+    fireEvent.click(screen.getByRole("button", { name: "掷筊" }));
+    fireEvent.animationEnd(screen.getAllByTestId("jiao-block")[1]!);
+    fireEvent.click(await screen.findByRole("button", { name: "继续" }));
+    const prompt = await screen.findByTestId("sign-in-prompt");
+    expect(prompt.querySelector("a")!.getAttribute("href")).toBe("/account?next=%2Fspirit");
   });
 });
 

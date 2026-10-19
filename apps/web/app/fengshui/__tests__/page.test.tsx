@@ -133,7 +133,7 @@ const { dwellingsFixture, profilesById } = vi.hoisted(() => ({
  * 让「被挡时它从没收到过 dwelling/cohabitants」成为一条可断言的事实。
  * 记录器用 `vi.hoisted`：`renderPage()` 每次 `resetModules()` + 动态 `import("../page")`，
  * mock 工厂会重新执行，闭包到同一份可变对象才能读到页面真正调用的那些入参
- * （与 `dwellingsFixture` / `supabaseSession` 同一理由）。
+ * （与 `dwellingsFixture` 同一理由）。
  * 本文件顶层为算 `fs`/`l1` 也会调用它，那两次发生在收集阶段，`beforeEach` 里清空即可。
  */
 const { computeFengshuiCalls } = vi.hoisted(() => ({
@@ -163,31 +163,8 @@ vi.mock("@/lib/dwellings", () => ({
 vi.mock("next/navigation", () => ({ usePathname: () => "/fengshui" }));
 
 /**
- * Task 10（EP-fs-17 会员闸门）：page.tsx 新增直接 import `@/lib/supabase`（读会话
- * access_token，附到 /api/fengshui/reading 的请求头上，供服务端识别会员）。
- * `@/lib/supabase` 的真实实现会在没配置 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时抛错
- * （见 lib/__tests__/dwellings.test.ts 顶部注释，同一个坑），测试环境没配这两个
- * env，必须 mock 掉。默认 `session: null`（等价于「未登录/本地匿名」）——绝大多数
- * 测试不关心「服务端具体怎么识别身份」（那由 route.test.ts 独立覆盖）。
- *
- * 修复单 Important 4：会话内容改成可按测试改写的共享可变量（`vi.hoisted`，理由同
- * `dwellingsFixture`：renderPage() 每次 resetModules + 动态 import，mock 工厂可能
- * 重新执行，直接摆弄 mock 实例会打到一个 page.tsx 根本不会调用到的旧实例）。
- * 原来写死 `session: null` 意味着 `fengshuiAuthHeader()` 在**每一条**测试里都返回
- * `{}`，于是「客户端到底发不发 Authorization」全程零断言——把 POST 与两个探测请求
- * 的 Authorization 头整个删掉，全套测试照样绿，而 BILLING_ENABLED=1 时每个
- * 邮箱/匿名 Supabase 会员都会被静默 402 并挡在付费墙外。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `@/lib/fengshui-report` 的服务端读写（`readFengshuiReport`/`saveFengshuiReport`）本
- * 该打 Supabase，测试里用一个模块级 Map 顶替「服务端存储」。`reportStore` 用
+ * 该打服务端，测试里用一个模块级 Map 顶替「服务端存储」。`reportStore` 用
  * `vi.hoisted` 声明，是为了让下面 `vi.mock` 工厂（会被提升到本文件所有 import 之前
  * 执行）能安全闭包到它——工厂内部只在 `vi.fn` 的回调里读写 `reportStore`，真正调用
  * 发生在测试运行时（模块早已加载完毕），不是工厂函数体自身执行的那一刻，所以不存在
@@ -263,7 +240,6 @@ beforeEach(() => {
   reportStore.clear();
   dwellingsFixture.current = [];
   dwellingsFixture.error = null;
-  supabaseSession.current = null;
   computeFengshuiCalls.args.length = 0;
   profilesById.clear();
   profilesById.set("p2", cohabProfile);
@@ -595,13 +571,13 @@ describe("EP-fs-15 Layer 1 指纹与缓存（复审必修1：指纹须真正随�
 
 describe("EP-fs-15 居所读取失败（复审必修2）", () => {
   it("listDwellings 失败时显示「居所读取失败」+ 重试入口，而不是「还没登记居所」；且留痕（console.warn）", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await renderPage();
 
     await waitFor(() => expect(screen.getByText(/居所读取失败/)).toBeInTheDocument());
-    // 两者对用户是完全不同的意思：读取失败 ≠ 确认为空。绝不能把一次 Supabase 抖动
+    // 两者对用户是完全不同的意思：读取失败 ≠ 确认为空。绝不能把一次数据库抖动
     // 误判成「还没登记」，那会诱导用户重复登记已存在的居所。
     expect(screen.queryByText(/还没登记居所/)).toBeNull();
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
@@ -611,7 +587,7 @@ describe("EP-fs-15 居所读取失败（复审必修2）", () => {
   });
 
   it("点击重试后重新调用 listDwellings，成功后恢复正常渲染、错误提示消失", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await renderPage();
@@ -1280,29 +1256,22 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Critical 1）：未知 ≠ �
 });
 
 /**
- * 修复单 Important 4：客户端到底发不发 `Authorization` 头，此前零断言——
- * 两个页面测试文件都把 supabase 会话写死成 `session: null`，于是
- * `fengshuiAuthHeader()` 在每一条测试里都返回 `{}`。把 POST 与探测请求的
- * Authorization 头整个删掉，全套测试照样绿，而 `BILLING_ENABLED=1` 时每个
- * 邮箱 / 匿名 Supabase 会员都会被静默 402 并挡在付费墙外。
- * route.test.ts 证明了**服务端**会读 Bearer，但没有任何东西证明**客户端**会发。
+ * 身份只靠同源请求自带的会话 cookie：客户端不再手工拼 `Authorization`。
+ * 此前的实现读 Supabase 会话 token 附到探测 GET 与叙述 POST 上，两处漏掉任何一处都会让
+ * 会员被静默 402；迁到 Neon Auth cookie 之后，这条断言守的是反方向——别把 Bearer 拼回来
+ * （服务端也已不读 `Authorization`，拼了只会制造「看似带了身份」的假象）。
  */
-describe("EP-fs-17 会员闸门（Task 10 修复单 Important 4）：客户端必须把会话 token 发出去", () => {
-  function recordingFetch(calls: { method: string; headers: Record<string, string> }[]) {
-    return vi.fn(async (_url: string, init?: RequestInit) => {
+describe("EP-fs-17 会员闸门：客户端不手工带 Authorization（身份走 cookie）", () => {
+  it("闸门探测 GET 与叙述 POST 都不带 Authorization，POST 原有的头保持不变", async () => {
+    dwellingsFixture.current = [dwellingL1()];
+    const calls: { method: string; headers: Record<string, string> }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ method, headers: (init?.headers ?? {}) as Record<string, string> });
       return method === "POST"
         ? jsonResponse({ sections: SECTIONS, degraded: false })
         : jsonResponse({ entitled: true });
-    });
-  }
-
-  it("有 Supabase 会话时：闸门探测 GET 与叙述 POST 都带上 Authorization: Bearer <access_token>", async () => {
-    supabaseSession.current = { access_token: "tok-abc" };
-    dwellingsFixture.current = [dwellingL1()];
-    const calls: { method: string; headers: Record<string, string> }[] = [];
-    vi.stubGlobal("fetch", recordingFetch(calls));
+    }));
 
     await renderPage();
     await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
@@ -1311,24 +1280,10 @@ describe("EP-fs-17 会员闸门（Task 10 修复单 Important 4）：客户端�
     const post = calls.find((c) => c.method === "POST");
     expect(get).toBeDefined();
     expect(post).toBeDefined();
-    expect(get!.headers.Authorization).toBe("Bearer tok-abc");
-    expect(post!.headers.Authorization).toBe("Bearer tok-abc");
-    // POST 原有的头不能被 authHeader 覆盖掉
+    expect(get!.headers.Authorization).toBeUndefined();
+    expect(post!.headers.Authorization).toBeUndefined();
     expect(post!.headers["content-type"]).toBe("application/json");
     expect(post!.headers["x-zj-locale"]).toBe("zh");
-  });
-
-  it("没有 Supabase 会话时不伪造 Authorization 头（对照组：证明上面那条断言真由会话驱动）", async () => {
-    supabaseSession.current = null;
-    dwellingsFixture.current = [dwellingL1()];
-    const calls: { method: string; headers: Record<string, string> }[] = [];
-    vi.stubGlobal("fetch", recordingFetch(calls));
-
-    await renderPage();
-    await waitFor(() => expect(screen.getByText("展开完整解读 →")).toBeInTheDocument());
-
-    expect(calls.find((c) => c.method === "GET")!.headers.Authorization).toBeUndefined();
-    expect(calls.find((c) => c.method === "POST")!.headers.Authorization).toBeUndefined();
   });
 });
 

@@ -10,7 +10,6 @@ import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { listDwellings } from "@/lib/dwellings";
-import { supabase } from "@/lib/supabase";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -105,14 +104,8 @@ export default function FengshuiObjectPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Authorization：本地匿名/邮箱登录靠这个头，服务端才能识别出「其实是会员」，
-        // 不会被误挡成非会员。
-        const { data } = await supabase().auth.getSession();
-        const token = data.session?.access_token;
-        const r = await fetch("/api/fengshui/reading", {
-          method: "GET",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        // 同源请求自带会话 cookie，服务端据此识别会员，无需手工拼 Authorization。
+        const r = await fetch("/api/fengshui/reading", { method: "GET" });
         if (cancelled) return;
         // 非 2xx / body 读不出布尔值 = 基础设施失败（冷启动、代理插手、离线占位页），
         // **不是**「服务端判定你不是会员」——本路由的正常回答永远是 200 + { entitled }。

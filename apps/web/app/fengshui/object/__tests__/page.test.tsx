@@ -68,18 +68,6 @@ vi.mock("@/lib/dwellings", () => ({
 vi.mock("next/navigation", () => ({ usePathname: () => "/fengshui/object" }));
 
 /**
- * EP-fs-18：本页新增会员闸门探测，要读 supabase 会话的 access_token 附到探测请求上
- * （邮箱/匿名登录靠这个头）。`@/lib/supabase` 的真实实现在没配置
- * NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时会抛错，测试环境没配，必须 mock。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * 本页对同一个 URL 发两种请求：`GET /api/fengshui/reading`（会员闸门探测）与
  * `POST /api/fengshui/object`（把已算好的建议润色成句）。全局 fetch 桩必须按
  * method 分流，否则「只认 URL」的裸桩会把探测也答成润色文本，`r.json()` 解析失败
@@ -173,7 +161,6 @@ beforeEach(() => {
   dwellingsFixture.current = [];
   dwellingsFixture.calls = 0;
   dwellingsFixture.error = null;
-  supabaseSession.current = null;
   vi.stubGlobal(
     "fetch",
     methodRouter({
@@ -413,9 +400,8 @@ describe("EP-fs-18 /fengshui/object 强版接线（会员 + 居所）", () => {
     expect(screen.queryByText("重新确认")).toBeNull();
   });
 
-  it("探测请求带上 Authorization（邮箱/匿名登录靠它被识别为会员）", async () => {
+  it("探测请求不手工带 Authorization（同源 cookie 识别会员）", async () => {
     dwellingsFixture.current = [CLASH_DWELLING];
-    supabaseSession.current = { access_token: "tok-abc" };
     const spy = methodRouter({ GET: () => jsonResponse({ entitled: true }), POST: () => new Response("好的。") });
     vi.stubGlobal("fetch", spy);
 
@@ -423,11 +409,11 @@ describe("EP-fs-18 /fengshui/object 强版接线（会员 + 居所）", () => {
     await waitFor(() => expect(probeCalls(spy)).toBe(1));
     const [url, init] = spy.mock.calls.find(([, i]) => (i?.method ?? "GET") === "GET")!;
     expect(url).toBe("/api/fengshui/reading");
-    expect(init!.headers).toMatchObject({ Authorization: "Bearer tok-abc" });
+    expect((init?.headers ?? {}) as Record<string, string>).not.toHaveProperty("Authorization");
   });
 
   it("居所读取失败 → 弱版（不崩、不发探测）", async () => {
-    dwellingsFixture.error = new Error("supabase 抖动");
+    dwellingsFixture.error = new Error("db 抖动");
     const spy = methodRouter({ POST: () => new Response("好的。") });
     vi.stubGlobal("fetch", spy);
 

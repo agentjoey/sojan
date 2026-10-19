@@ -12,8 +12,8 @@ vi.mock("@/lib/account/uid", () => ({
 }));
 
 /**
- * 权益查询仍走 Supabase（Task 7 才改 Neon）；db 测试不能连外部 Supabase，
- * 这里只替换 `getEntitlement`，`isMember` 用真实实现。
+ * 会员状态在本文件里直接由 `entitlement` 控制（不为每条用例往 entitlements 表写行），
+ * 这里只替换 `getEntitlement`，`isMember` 用真实实现；真实权益 SQL 见 entitlements.db.test.ts。
  */
 const { entitlement } = vi.hoisted(() => ({
   entitlement: { tier: "free", memberUntil: null as string | null },

@@ -32,7 +32,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  * `../object/page.tsx` 以及服务端 `api/fengshui/reading` 的 402 上。
  *
  * 日后若真的实现居所切换器，多居所才重新成为一项会员权益、闸门才值得加回来——
- * 但那时还需要一条服务端写入路径：`createDwelling` 目前是浏览器直写 supabase，
+ * 但那时还需要一条服务端写入路径：`createDwelling` 目前只校验会话（Neon + uid 隔离），不校验会员，
  * 客户端闸门可以被直接绕过。别只把付费墙贴回来就当数。
  *
  * 删除确认是**页内两步确认**（与 profiles/page.tsx 同一模式：点删除 → 原地出现
@@ -89,7 +89,8 @@ export default function DwellingsPage() {
     try {
       await deleteDwelling(id);
       setDwellings((prev) => (prev ? prev.filter((d) => d.id !== id) : prev));
-    } catch {
+    } catch (e) {
+      if (gate.handleAuthError(e)) return;
       // 失败不能静默：既不让 rejection 逃逸成未捕获异常，也不能把这一项从列表里摘掉——
       // 没删成功，列表就不该表现得像删成功了一样。给用户看得见的反馈，让 ta 可以重试。
       setDeleteError(t("fengshui.dwelling.deleteFailed"));
@@ -235,7 +236,7 @@ export default function DwellingsPage() {
             <h2 className="text-[16px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.dwelling.editTitle")}</h2>
             <div className="mt-3">
               {/* key 强制重挂载：切到另一套居所时表单 state 整个重置，不回串 */}
-              <DwellingForm key={editingDwelling.id} initial={editingDwelling} onSaved={handleSaved} />
+              <DwellingForm key={editingDwelling.id} initial={editingDwelling} onSaved={handleSaved} onAuthError={gate.handleAuthError} />
             </div>
             <button
               type="button"
@@ -249,7 +250,7 @@ export default function DwellingsPage() {
           <>
             <h2 className="text-[16px]" style={{ fontFamily: "var(--font-serif)" }}>{t("fengshui.dwelling.add")}</h2>
             <div className="mt-3">
-              <DwellingForm onSaved={handleSaved} />
+              <DwellingForm onSaved={handleSaved} onAuthError={gate.handleAuthError} />
             </div>
           </>
         )}

@@ -1,8 +1,9 @@
-import { supabase, ensureSession } from "@/lib/supabase";
+import * as data from "@/lib/data/fengshui-report";
+import { unwrap } from "@/lib/errors";
 
 export type FengshuiSections = { situation: string; youAndSpace: string; actions: string };
 
-/** 报告读写与生成（EP-fs-16）。走 Supabase 客户端 + RLS / web 解读路由。 */
+/** 报告读写与生成（EP-fs-16）。读写在服务端（`lib/data/fengshui-report.ts`，Neon），生成走 web 解读路由。 */
 
 export type FingerprintInput = {
   profileId: string;
@@ -33,27 +34,14 @@ export function fengshuiFingerprint(i: FingerprintInput): string {
   return `fs${(h >>> 0).toString(36)}`;
 }
 
-export async function readFengshuiReport(fingerprint: string): Promise<FengshuiSections | null> {
-  await ensureSession();
-  const { data, error } = await supabase()
-    .from("fengshui_reports").select("sections")
-    .eq("input_fingerprint", fingerprint).maybeSingle();
-  if (error) throw error;
-  return (data?.sections as FengshuiSections) ?? null;
-}
+export { readFengshuiReport } from "@/lib/data/fengshui-report";
 
 export async function saveFengshuiReport(args: {
   fingerprint: string; profileId: string; dwellingId: string | null;
   layer: 0 | 1; locale: string; sections: FengshuiSections;
 }): Promise<void> {
-  const uid = await ensureSession();
-  const { error } = await supabase().from("fengshui_reports").upsert({
-    uid, input_fingerprint: args.fingerprint, profile_id: args.profileId,
-    dwelling_id: args.dwellingId, layer: args.layer, locale: args.locale, sections: args.sections,
-  }, { onConflict: "uid,input_fingerprint" });
-  if (error) throw error;
+  unwrap(await data.saveFengshuiReport(args));
 }
-
 
 /**
  * 报告生成请求。`body` 与 /api/fengshui/reading 的请求体同一形态：
@@ -64,19 +52,9 @@ export async function requestFengshuiReading(
   body: Record<string, unknown>,
   locale: string,
 ): Promise<{ sections: FengshuiSections; degraded: boolean }> {
-  // Authorization：本地匿名/邮箱登录靠这个头让服务端识别会员。
-  // 与 page.tsx 的 fengshuiAuthHeader、DwellingForm 的探测同一手法。
-  let authHeader: Record<string, string> = {};
-  try {
-    const { data } = await supabase().auth.getSession();
-    const token = data.session?.access_token;
-    if (token) authHeader = { Authorization: `Bearer ${token}` };
-  } catch {
-    // 取不到会话 = 真正匿名，服务端按「未登录」处理，等价非会员——本就是正确结果。
-  }
   const r = await fetch("/api/fengshui/reading", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-zj-locale": locale, ...authHeader },
+    headers: { "content-type": "application/json", "x-zj-locale": locale },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(await r.text());

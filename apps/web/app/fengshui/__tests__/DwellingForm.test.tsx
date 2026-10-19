@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n/I18nProvider";
 // 上限的单一事实源，与 api/fengshui/reading/route.ts 的 `z.array(...).max()` 同源。
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
 import { zh } from "@/lib/i18n/messages/zh";
+import { UnauthenticatedError } from "@/lib/errors";
 import { DwellingForm } from "../DwellingForm";
 
 const createDwelling = vi.fn(async (d: unknown) => ({ id: "d1", ...(d as object) }));
@@ -33,19 +34,6 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfileId: () => "p1",
 }));
 
-/**
- * 最终评审 I3：本表单现在会为「合看是不是会员功能」向服务端探测一次
- * （GET /api/fengshui/reading，与 /fengshui、/fengshui/object 同一个端点、同一份
- * 服务端判断）。`@/lib/supabase` 的真实实现在没配 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY
- * 时会抛错（与 fengshui/__tests__/page.test.tsx、dwellings/__tests__/page.test.tsx
- * 踩过的是同一个坑），必须 mock。会话内容做成共享可变量，好让「探测请求到底带不带
- * Authorization」这条链路可断言——写死 null 就等于零断言。
- */
-const supabaseSession = { current: null as { access_token: string } | null };
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
 /** 闸门探测响应；route 返回 JSON `{ entitled }`。 */
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" }, ...init });
@@ -61,7 +49,6 @@ beforeEach(() => {
   // 不清空调用记录的话，后续测试里「listProfiles 确实被调用过」这类断言会被前一条
   // 测试的调用记录污染成假阳性——即便本测试的组件压根没发起过请求也会通过。
   listProfiles.mockReset().mockResolvedValue([PROFILE_MAIN, PROFILE_B, PROFILE_C]);
-  supabaseSession.current = null;
   // 默认 entitled:true（对应「未开闸」= 默认配置，或「已是会员」）——保证 Task 9b
   // 既有的同住人用例无需逐条改动。非会员分支由本文件末尾的 I3 describe 专门覆盖。
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ entitled: true })));
@@ -107,6 +94,20 @@ describe("EP-fs-14 居所录入", () => {
     fireEvent.click(screen.getByText("保存"));
     await waitFor(() => expect(createDwelling).toHaveBeenCalled());
     expect(createDwelling.mock.calls[0]![0]).toMatchObject({ tenancy: "rent" });
+  });
+});
+
+describe("会话中途失效", () => {
+  it("保存抛 UnauthenticatedError → 交给 onAuthError 处理，不向外抛未捕获异常，onSaved 不触发", async () => {
+    createDwelling.mockRejectedValueOnce(new UnauthenticatedError());
+    const onAuthError = vi.fn((_e: unknown) => true);
+    const onSaved = vi.fn();
+    render(<DwellingForm onSaved={onSaved} onAuthError={onAuthError} />, { wrapper: Wrapper });
+    fireEvent.click(screen.getByRole("button", { name: /不确定/ }));
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(onAuthError).toHaveBeenCalledTimes(1));
+    expect(onAuthError.mock.calls[0]![0]).toBeInstanceOf(UnauthenticatedError);
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });
 
@@ -409,8 +410,7 @@ describe("最终评审 I3：非会员必须在选择器处就知道合看是会�
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("探测请求带上 Supabase 会话 token——否则 BILLING_ENABLED=1 时每个邮箱/匿名会员都会被误判成非会员", async () => {
-    supabaseSession.current = { access_token: "tok-xyz" };
+  it("探测请求是同源 GET，不手工带 Authorization（会话 cookie 随请求发出）", async () => {
     const fetchSpy = vi.fn(async () => jsonResponse({ entitled: true }));
     vi.stubGlobal("fetch", fetchSpy);
     render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
@@ -419,18 +419,7 @@ describe("最终评审 I3：非会员必须在选择器处就知道合看是会�
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/fengshui/reading");
     expect(init.method).toBe("GET");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-xyz");
-  });
-
-  it("没有会话时不伪造 Authorization 头（对照组）", async () => {
-    supabaseSession.current = null;
-    const fetchSpy = vi.fn(async () => jsonResponse({ entitled: true }));
-    vi.stubGlobal("fetch", fetchSpy);
-    render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
-
-    const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(init.headers).toBeUndefined();
   });
 });
 

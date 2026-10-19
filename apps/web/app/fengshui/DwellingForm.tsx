@@ -5,7 +5,6 @@ import { DIRECTIONS, DIRECTION_LABEL, type Direction } from "@sojan/core";
 import { createDwelling, updateDwelling, type Dwelling } from "@/lib/dwellings";
 import { listProfiles, getActiveProfileId, type Profile } from "@/lib/profiles";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
-import { supabase } from "@/lib/supabase";
 import { Segmented } from "@/components/Segmented";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { Button } from "@/components/ui";
@@ -25,7 +24,12 @@ import { Button } from "@/components/ui";
  *    cohabitantInputs : undefined`），选择器这头却完全开放——非会员勾完存下，
  *    没有付费墙、没有提示、什么都不出现。
  */
-export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved: (d: Dwelling) => void }) {
+export function DwellingForm({ initial, onSaved, onAuthError }: {
+  initial?: Dwelling;
+  onSaved: (d: Dwelling) => void;
+  /** 保存时会话已失效（`UnauthenticatedError`）：页面传 `gate.handleAuthError` 切到登录引导。返回 true = 已处理。 */
+  onAuthError?: (e: unknown) => boolean;
+}) {
   const t = useT();
   const [name, setName] = useState(initial?.name ?? "");
   const [kind, setKind] = useState<"home" | "office">(initial?.kind ?? "home");
@@ -88,14 +92,8 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
     let cancelled = false;
     (async () => {
       try {
-        // Authorization：本地匿名/邮箱登录靠这个头，服务端才能识别出「其实是会员」，
-        // 不会被误挡成非会员。
-        const { data } = await supabase().auth.getSession();
-        const token = data.session?.access_token;
-        const r = await fetch("/api/fengshui/reading", {
-          method: "GET",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        // 同源请求自带会话 cookie，服务端据此识别会员，无需手工拼 Authorization。
+        const r = await fetch("/api/fengshui/reading", { method: "GET" });
         if (cancelled || !r.ok) return; // 非 2xx = 基础设施失败，不是「判定你不是会员」
         const body = (await r.json().catch(() => null)) as { entitled?: boolean } | null;
         if (cancelled || typeof body?.entitled !== "boolean") return; // 同理：读不出布尔值 = 未知
@@ -127,6 +125,8 @@ export function DwellingForm({ initial, onSaved }: { initial?: Dwelling; onSaved
         ? (await updateDwelling(initial.id, payload), { ...initial, ...payload })
         : await createDwelling(payload);
       onSaved(saved);
+    } catch (e) {
+      if (!onAuthError?.(e)) throw e;
     } finally {
       setSaving(false);
     }

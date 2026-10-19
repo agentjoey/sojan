@@ -1,7 +1,12 @@
-import { supabase, ensureSession } from "@/lib/supabase";
 import type { Direction } from "@sojan/core";
+import * as data from "@/lib/data/dwellings";
+import { unwrap } from "@/lib/errors";
 
-/** 居所 CRUD（EP-fs-14）。走 Supabase 客户端 + RLS。 */
+/**
+ * 居所客户端门面：本体在服务端（`lib/data/dwellings.ts`，Neon + 会话 uid 隔离），
+ * 这里把写操作的 `ActionResult` 解包回迁移前的签名（未登录 → `UnauthenticatedError`）。
+ * 无指令：客户端组件直接 import；服务端只取 `Dwelling` 类型。
+ */
 
 export type Dwelling = {
   id: string; name: string;
@@ -12,51 +17,16 @@ export type Dwelling = {
   memberProfileIds: string[];
 };
 
-type Row = {
-  id: string; name: string; kind: string; tenancy: string;
-  facing: string | null; member_profile_ids: string[] | null;
-};
-const toDwelling = (r: Row): Dwelling => ({
-  id: r.id, name: r.name,
-  kind: r.kind === "office" ? "office" : "home",
-  tenancy: r.tenancy === "own" ? "own" : "rent",
-  facing: (r.facing as Direction | null) ?? null,
-  memberProfileIds: r.member_profile_ids ?? [],
-});
-
-export async function listDwellings(): Promise<Dwelling[]> {
-  await ensureSession();
-  const { data, error } = await supabase()
-    .from("dwellings").select("*").order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data as Row[]).map(toDwelling);
-}
+export { listDwellings } from "@/lib/data/dwellings";
 
 export async function createDwelling(d: Omit<Dwelling, "id">): Promise<Dwelling> {
-  const uid = await ensureSession();
-  const { data, error } = await supabase().from("dwellings").insert({
-    uid, name: d.name, kind: d.kind, tenancy: d.tenancy,
-    facing: d.facing, member_profile_ids: d.memberProfileIds,
-  }).select("*").single();
-  if (error) throw error;
-  return toDwelling(data as Row);
+  return unwrap(await data.createDwelling(d));
 }
 
 export async function updateDwelling(id: string, patch: Partial<Omit<Dwelling, "id">>): Promise<void> {
-  await ensureSession();
-  const { error } = await supabase().from("dwellings").update({
-    ...(patch.name !== undefined && { name: patch.name }),
-    ...(patch.kind !== undefined && { kind: patch.kind }),
-    ...(patch.tenancy !== undefined && { tenancy: patch.tenancy }),
-    ...(patch.facing !== undefined && { facing: patch.facing }),
-    ...(patch.memberProfileIds !== undefined && { member_profile_ids: patch.memberProfileIds }),
-    updated_at: new Date().toISOString(),
-  }).eq("id", id);
-  if (error) throw error;
+  unwrap(await data.updateDwelling(id, patch));
 }
 
 export async function deleteDwelling(id: string): Promise<void> {
-  await ensureSession();
-  const { error } = await supabase().from("dwellings").delete().eq("id", id);
-  if (error) throw error;
+  unwrap(await data.deleteDwelling(id));
 }

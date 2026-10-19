@@ -19,7 +19,6 @@ import { Card, Emphasis } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { TwoColumn } from "@/components/TwoColumn";
 import { Paywall } from "@/components/Paywall";
-import { supabase } from "@/lib/supabase";
 import {
   fengshuiFingerprint, readFengshuiReport, requestFengshuiReading, saveFengshuiReport,
   type FengshuiSections,
@@ -98,25 +97,6 @@ async function loadProfilesByIds(ids: string[]): Promise<Profile[]> {
 }
 
 /**
- * 会员闸门探测（Task 10，EP-fs-17，GET /api/fengshui/reading）要能让服务端识别当前
- * 用户：本地匿名 / 邮箱登录走
- * Authorization Bearer——与 account/page.tsx、SpiritPanel.tsx 同一手法（读 supabase
- * 会话的 access_token）。取不到会话（真正匿名、从未 ensureSession() 过）时返回空
- * header，服务端据此按「未登录」处理，等价于非会员——这本身就是正确结果，不需要
- * 特殊分支。生成叙述的 POST 请求的身份头在 `requestFengshuiReading`
- * （lib/fengshui-report.ts）内部处理，不经过这里。
- */
-async function fengshuiAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { data } = await supabase().auth.getSession();
-    const token = data.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch {
-    return {};
-  }
-}
-
-/**
  * 叙述分节的标题键。**不要借用 directionsTitle / affinityTitle** ——
  * 那两个描述的是下方确定性区块（八方吉凶、宜用色与材），与叙述分节语义不同。
  * situation/youAndSpace 渲染在「盘」tab（与盘图同属「这是什么情况」）；
@@ -173,6 +153,7 @@ type EntitlementState = "idle" | "probing" | "entitled" | "blocked" | "unknown";
 export default function FengshuiPage() {
   const t = useT();
   const gate = useSignInGate();
+  const { handleAuthError } = gate;
   const { locale } = useLocale();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [dwellings, setDwellings] = useState<Dwelling[] | undefined>(undefined);
@@ -247,7 +228,7 @@ export default function FengshuiPage() {
   // 因此「多套居所」不构成会员权益：最终评审 I2 已撤除 dwellings/page.tsx 上那道
   // 挡住保存第 2 套的付费墙——升级换来的只是管理列表里多一行，别无他物。
   // 切换器是真功能、值得做，但需要连带补一条服务端写入路径（createDwelling 目前是
-  // 浏览器直写 supabase），不在任何已交付 brief 的范围内，需要时另开任务。
+  // 服务端只校验会话、不校验会员），不在任何已交付 brief 的范围内，需要时另开任务。
   // 依赖 profile 而非并行加载，
   // 避免「profile 就绪但 dwellings 未就绪」这个中间态被误当成 Layer 0 触发一次多余的
   // LLM 请求（narrative-fetch effect 专门等两者都落定后才发起，见下）。
@@ -289,10 +270,11 @@ export default function FengshuiPage() {
         setDwellings(list);
         setCohabitantProfiles(members);
       } catch (e) {
-        // ⚠️ 不能静默：把一次 Supabase 抖动（或纯粹的网络挂起）当成「用户还没登记
+        // ⚠️ 不能静默：把一次数据库抖动（或纯粹的网络挂起）当成「用户还没登记
         // 居所」会把已有居所说成不存在，诱导重复登记。留痕 + 显式失败态 + 重试入口
         // （而不是复用 noDwelling 文案）；仍落定 dwellings/cohabitantProfiles 为
         // 空数组，让页面按 Layer 0 继续可用（不因为居所读取失败连累整个「境」页）。
+        if (handleAuthError(e)) return;
         console.warn("[fengshui] 居所读取失败，按未登记处理并提示重试", e);
         if (cancelled) return;
         setDwellingsError(true);
@@ -303,7 +285,7 @@ export default function FengshuiPage() {
     return () => {
       cancelled = true;
     };
-  }, [profile, dwellingsRetryNonce]);
+  }, [profile, dwellingsRetryNonce, handleAuthError]);
 
   const dwelling = dwellings?.[0] ?? null;
 
@@ -338,8 +320,8 @@ export default function FengshuiPage() {
     setEntitlement("probing");
     (async () => {
       try {
-        const headers = await fengshuiAuthHeader();
-        const r = await fetch("/api/fengshui/reading", { method: "GET", headers });
+        // 同源请求自带会话 cookie，服务端据此识别会员，无需手工拼 Authorization。
+        const r = await fetch("/api/fengshui/reading", { method: "GET" });
         if (cancelled) return;
         // ⚠️ 非 2xx（冷启动 / 502 / 代理插手）是**基础设施失败**，不是"服务端判定
         // 你不是会员"——本路由的正常回答永远是 200 + { entitled }。把它当成
@@ -451,7 +433,7 @@ export default function FengshuiPage() {
     (async () => {
       // 服务端读取失败（未登录/网络）按 cache miss 处理，不阻断下面的重新生成。
       // ⚠️ 但**不能静默**：这已不是波1 那个客户端缓存，而是服务端持久化路径。
-      // Supabase 若持续故障，表现是「每次加载都重新调一次 LLM」——花着钱、用户无感、
+      // 数据库若持续故障，表现是「每次加载都重新调一次 LLM」——花着钱、用户无感、
       // 我们也无从察觉。降级照旧，但必须留下可排查的痕迹。
       const cached = await readFengshuiReport(fp).catch((e) => {
         console.warn("[fengshui] 报告读取失败，按未命中处理（将重新生成）", e);
@@ -464,8 +446,7 @@ export default function FengshuiPage() {
         // Task 10（EP-fs-17）：dwelling/cohabitants 只在 entitled 时携带——服务端
         // 收到这两个字段会独立校验会员资格（客户端闸门可绕过，这不是唯一防线，
         // 只是不希望非会员平白把这次本该成功的 Layer 0 叙述请求打成 402）。
-        // 请求经 `requestFengshuiReading` 发往 /api/fengshui/reading 并附带 Authorization
-        // （本地匿名/邮箱登录靠它让服务端识别会员）。
+        // 请求经 `requestFengshuiReading` 发往 /api/fengshui/reading（会话 cookie 随同源请求带上）。
         const data = await requestFengshuiReading(
           {
             ...profile.birthInput,
@@ -488,7 +469,10 @@ export default function FengshuiPage() {
           await saveFengshuiReport({
             fingerprint: fp, profileId: profile.id, dwellingId: effectiveDwellingInput?.id ?? null,
             layer: effectiveDwellingInput ? 1 : 0, locale, sections: data.sections,
-          }).catch((e) => console.warn("[fengshui] 报告持久化失败，下次加载会重新生成", e));
+          }).catch((e) => {
+            if (handleAuthError(e)) return;
+            console.warn("[fengshui] 报告持久化失败，下次加载会重新生成", e);
+          });
         }
       } catch {
         if (!cancelled) setFailed(true);
@@ -499,7 +483,7 @@ export default function FengshuiPage() {
     // entitlementPending 入依赖数组：探测落定/发生变化都要重新评估要不要重新生成
     // 叙述（effectiveDwellingInput/effectiveCohabitantInputs 由 entitled 派生，
     // 而 fs 又由它们派生——fs 已在数组里，这里显式带上守卫本身用到的那个量）。
-  }, [profile, fs, dwelling, dwellingInput, cohabitantProfiles, dwellings, locale, retryNonce, entitlementPending]);
+  }, [profile, fs, dwelling, dwellingInput, cohabitantProfiles, dwellings, locale, retryNonce, entitlementPending, handleAuthError]);
 
   function regenerate() {
     setRetryNonce((n) => n + 1);

@@ -11,7 +11,7 @@ import type { FengshuiSections } from "@/lib/fengshui-report";
  * 风水报告生成的**服务端共享逻辑**（校验 / 闸门 / 生成）。
  * 曾为 web 路由与 TG 中介端点共用（TG 已下线），保留为独立模块供路由调用。
  *
- * 本模块只被服务端路由 import，不进浏览器模块图（依赖 entitlements → service-role）。
+ * 本模块只被服务端路由 import，不进浏览器模块图（依赖 entitlements → 服务端 SQL）。
  */
 
 /**
@@ -55,7 +55,7 @@ export type ReadingRequest = z.infer<typeof ReadingRequestSchema>;
  * `lib/entitlements.ts` 的 `consumeLlm()` 同一手法，避免闸门判断在两处各写一份、
  * 其中一处忘了同步。未能解析出 uid（未登录/身份不明）与非会员同等对待：都视为不满足。
  *
- * 入参是**已解析出的 uid** 而不是 Request：uid 由路由从 Bearer 解出，闸门规则只有一条。
+ * 入参是**已解析出的 uid** 而不是 Request：uid 由路由从会话 cookie 解出，闸门规则只有一条。
  */
 export async function isFengshuiEntitledForUid(uid: string | undefined): Promise<boolean> {
   if (process.env.BILLING_ENABLED !== "1") return true;

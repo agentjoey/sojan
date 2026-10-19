@@ -24,26 +24,8 @@ vi.mock("@/lib/profiles", () => ({
   getActiveProfileId: () => "p1",
 }));
 /**
- * `@/lib/supabase` 的真实实现在没配 NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY 时会抛错
- * （同 lib/__tests__/dwellings.test.ts、fengshui/__tests__/page.test.tsx 踩过的同一个
- * 坑），必须 mock 掉。
- *
- * 最终评审 I2 之后**本页自己不再 import 它**（多居所闸门连同探测一并撤除），但
- * `DwellingForm`（本页下半部分永远渲染）会 import——它要为同住人选择器的合看闸门
- * （最终评审 I3）读会话 token。所以这个 mock 仍然是必需的，只是服务对象换了。
- * 会话内容保持可按测试改写的共享可变量（`vi.hoisted`，理由同
- * fengshui/__tests__/page.test.tsx 里的同名夹具）。
- */
-const { supabaseSession } = vi.hoisted(() => ({
-  supabaseSession: { current: null as { access_token: string } | null },
-}));
-vi.mock("@/lib/supabase", () => ({
-  supabase: () => ({ auth: { getSession: vi.fn(async () => ({ data: { session: supabaseSession.current } })) } }),
-}));
-
-/**
  * `DwellingForm`（本页下半部分永远渲染）也从 `@/lib/dwellings` 取
- * `createDwelling`/`updateDwelling`，一并在这里 mock，避免真的打 supabase——但本文件
+ * `createDwelling`/`updateDwelling`，一并在这里 mock，避免真的打服务端——但本文件
  * 不断言这两个函数的调用，所以直接内联桩实现即可（与 DwellingForm.test.tsx 里
  * `updateDwelling: vi.fn(async () => {})` 同一种写法）。只有 `listDwellings`/
  * `deleteDwelling` 需要外层 const + 间接包装：本文件要在各条测试里用
@@ -105,7 +87,6 @@ beforeEach(() => {
   listDwellings.mockReset().mockResolvedValue([]);
   deleteDwelling.mockReset().mockResolvedValue(undefined);
   updateDwelling.mockReset().mockResolvedValue(undefined);
-  supabaseSession.current = null;
   // 默认 entitled:true。本页自己已不发请求（I2），这个桩留着是给 `DwellingForm`
   // 内部那条合看闸门探测兜底——本文件的 listProfiles 只返回主档案自己，选择器不
   // 渲染、探测也不会发起，但桩在这里意味着即使将来夹具变了也不会打到真 fetch。

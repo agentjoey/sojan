@@ -39,7 +39,7 @@ Neon 项目 `sojan`（`lucky-lake-64982745`，AWS ap-southeast-1，PG 18）。**
 
 ### 上线前必做（Neon Console，MCP 无对应开关）
 1. **关闭 `allow_localhost`**：Console → Settings → Better Auth，把 **production 与 staging** 两个分支的 `allow_localhost` 关掉（三个分支目前都还是 `true`，对应 Task 11 Step 1b）。dev 分支保持开启。
-2. **配 Custom SMTP**（staging / production 上线前必须，共享 SMTP 仅限 dev）：推荐 Resend，发信地址 `noreply@sojan.app`；先在 DNS 配好 SPF/DKIM；Neon 里应用名设为「照见 Sojan」。品牌化双语邮件模板（`send.otp` webhook 自行发信）不在本次范围。
+2. **配 Custom SMTP**（staging / production 上线前必须，共享 SMTP 仅限 dev）：用 Resend，**暂用已验证的 `agentjoey.ai` 发信域名**（owner 2026-10-19 决定；以后可换 `sojan.app`，届时先在 DNS 配 SPF/DKIM）。Neon Console → 对应分支 → Settings → Better Auth → Email provider 选 Custom SMTP：Host `smtp.resend.com`、Port `465`（SSL）、Username `resend`、Password 填 Resend API key、Sender `noreply@agentjoey.ai`、Sender name「照见 Sojan」；配好后用 Neon 的 send test email 验证。staging/production 两个分支各配一次。
 
 ## 部署
 - **平台：** Vercel（Next.js App Router 原生，Fluid Compute）。**函数区域固定 `sin1`**（`apps/web/vercel.json` 的 `regions`），必须与 Neon 同在新加坡，否则默认 `iad1` 每条 SQL 都要跨太平洋走一个来回。

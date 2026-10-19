@@ -19,7 +19,7 @@
 | LLM 返回 refusal | 触发安全边界（健康/生死/财务预测）| 优雅降级，提示用户换问法；强化非决定论措辞 |
 | `next dev` 退出 1 / `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` / "Another next dev server is already running" | 端口被占（本机 **Hermes WhatsApp bridge 常驻 :3000**），Next 退到 3001 后 abort | Web 已固定端口 **3030**（`apps/web` dev/start 脚本 `-p 3030`）。查占用：`lsof -nP -iTCP:3030 -sTCP:LISTEN`；清掉：`lsof -nP -iTCP:3030 -sTCP:LISTEN -t \| xargs kill -9` |
 | 所有用户都显示未登录 / 登录后刷新又掉线 | `NEON_AUTH_BASE_URL` 缺失或指错分支；`NEON_AUTH_COOKIE_SECRET` 缺失或短于 32 字符；当前域名不在该 Neon 分支的 trusted domains（随机 Vercel 预览域名本就不在白名单，预期不可登录） | 对照 `docs/deployment.md` 的分支映射核对 env；Neon Console → Auth 看 trusted origins；浏览器 DevTools 看 `__Secure-neon-auth.*` cookie 是否被设置 |
-| 验证码邮件收不到 | dev 用 Neon 共享 SMTP 有限流；staging/production 未配 Custom SMTP 或 SPF/DKIM 未通过 | 配 Resend（`noreply@sojan.app`）并核对 DNS；垃圾箱也查一下 |
+| 验证码邮件收不到 | dev 用 Neon 共享 SMTP 有限流；staging/production 未配 Custom SMTP 或 SPF/DKIM 未通过 | 配 Resend（当前发信域名 `agentjoey.ai`，见 deployment.md）并核对 DNS；垃圾箱也查一下 |
 | 数据层报「`DATABASE_URL` 未配置」 | 该环境没设 `DATABASE_URL`（`lib/db.ts` 抛出） | 在对应 Vercel 环境补上目标 Neon 分支的连接串，重新部署；本地检查 `apps/web/.env.local` |
 | 查询明显变慢（每个页面多出几百 ms） | Vercel 函数区域不是 `sin1`（默认 `iad1`，每条 SQL 跨太平洋） | 确认 `apps/web/vercel.json` 的 `regions: ["sin1"]` 已部署；响应头 `x-vercel-id` 形如 `<edge>::<function>::<id>`，**第二段（function 区域）必须是 `sin1`**；第一段是边缘节点，不看它 |
 | 注销后短时间内仍显示已登录 / 写入产生孤儿数据 | 没清 `__Secure-neon-auth.*` cookie，SDK 缓存会话 TTL 300s | 检查 `/api/account/delete` 响应的 Set-Cookie（有测试覆盖）；托管 `delete-user` 端点 404，注销走 SQL 事务 |

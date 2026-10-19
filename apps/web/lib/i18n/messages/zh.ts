@@ -156,7 +156,7 @@ export const zh = {
     disclaimerStart: "出生信息属敏感个人信息。命盘",
     disclaimerHighlight: "存于你的私人档案",
     disclaimerEnd:
-      "（匿名、按设备隔离，仅你可见），可随时在「档案」中删除。仅供自我观照。",
+      "（存于你的账号下，仅你可见），可随时在「档案」中删除，注销账号时一并删除。仅供自我观照。",
     nicknameLabel: "称 呼",
     nicknamePlaceholder: "希望我如何称呼你？",
     birthDateLabel: "出生日期",

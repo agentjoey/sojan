@@ -144,7 +144,7 @@ export const en: Messages = {
     disclaimerStart: "Birth information is sensitive personal data. Your chart is stored ",
     disclaimerHighlight: "in your private profile",
     disclaimerEnd:
-      " (anonymous, device-isolated, visible only to you) and can be deleted anytime in Profiles. For self-reflection only.",
+      " (stored under your account, visible only to you) and can be deleted anytime in Profiles, or together with your account. For self-reflection only.",
     nicknameLabel: "Name",
     nicknamePlaceholder: "How should I address you?",
     birthDateLabel: "Birth date",

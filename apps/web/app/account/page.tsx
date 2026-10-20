@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { getAccountSummary, acceptTermsOnce } from "@/lib/data/account";
 import { DEFAULT_NEXT, safeNext } from "@/lib/auth/next";
+import { OTP_LENGTH, OTP_RESEND_COOLDOWN_S, OTP_SEND_TIMEOUT_MS } from "@/lib/auth/otp";
 import { Paywall } from "@/components/Paywall";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -27,8 +28,11 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 
 type ViewState = { kind: "loading" } | { kind: "in"; email: string } | { kind: "out" };
 
-/** 邮箱验证码位数（Neon Auth / Better Auth 默认 6 位）。 */
-const OTP_LENGTH = 6;
+/**
+ * 发码结果：`uncertain` = 客户端超时或网关 504——服务端可能已经生成并发出了新码
+ * （此时旧邮件里的码已失效），所以按「可能已发出」处理，而不是报失败。
+ */
+type SendOutcome = "sent" | "uncertain" | "failed";
 
 type BillingStatus = {
   tier: string;
@@ -47,6 +51,12 @@ export default function AccountPage() {
   const [busy, setBusy] = useState<"send" | "verify" | null>(null);
   // 验证码错误时保留输入框原值、只显示错误文案，方便改一位重试或点「重新发送」。
   const [error, setError] = useState<string | null>(null);
+  // 非错误的提示（如「以最新一封为准」），与 error 分开展示。
+  const [notice, setNotice] = useState<string | null>(null);
+  // 「重新发送」冷却截止时刻（按时间戳算剩余秒数，后台标签页节流也不会拖慢倒计时）。
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const cooldown = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -89,33 +99,78 @@ export default function AccountPage() {
     };
   }, [view.kind]);
 
-  /** 发送（或重新发送）验证码。返回是否发送成功。 */
-  async function sendCode(): Promise<boolean> {
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const id = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (n >= cooldownUntil) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
+
+  /** 发送（或重新发送）验证码；最多等 OTP_SEND_TIMEOUT_MS，超时即中止请求并解锁界面。 */
+  async function sendCode(): Promise<SendOutcome> {
     const addr = email.trim();
     if (!addr.includes("@")) {
       setError(t("account.invalidEmail"));
-      return false;
+      return "failed";
     }
     setBusy("send");
     setError(null);
+    setNotice(null);
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve("timeout");
+      }, OTP_SEND_TIMEOUT_MS);
+    });
+    let outcome: SendOutcome;
     try {
-      const { error: err } = await authClient.emailOtp.sendVerificationOtp({ email: addr, type: "sign-in" });
-      if (err) {
-        setError(err.status === 429 ? t("account.otp.rateLimited") : t("account.otp.sendFailed"));
-        return false;
+      const res = await Promise.race([
+        authClient.emailOtp.sendVerificationOtp({
+          email: addr,
+          type: "sign-in",
+          fetchOptions: { signal: controller.signal },
+        }),
+        timedOut,
+      ]);
+      if (res === "timeout") outcome = "uncertain";
+      else if (!res.error) outcome = "sent";
+      else if (res.error.status === 504) outcome = "uncertain";
+      else {
+        setError(res.error.status === 429 ? t("account.otp.rateLimited") : t("account.otp.sendFailed"));
+        outcome = "failed";
       }
-      setEmail(addr);
-      return true;
     } catch {
-      setError(t("account.otp.sendFailed"));
-      return false;
+      if (controller.signal.aborted) outcome = "uncertain";
+      else {
+        setError(t("account.otp.sendFailed"));
+        outcome = "failed";
+      }
     } finally {
+      clearTimeout(timer);
       setBusy(null);
     }
+    if (outcome !== "failed") {
+      setEmail(addr);
+      const n = Date.now();
+      setNow(n);
+      setCooldownUntil(n + OTP_RESEND_COOLDOWN_S * 1000);
+      if (outcome === "uncertain") setNotice(t("account.otp.sendUncertain"));
+    }
+    return outcome;
   }
 
   async function handleSendEmail() {
-    if (await sendCode()) setStep("code");
+    if ((await sendCode()) !== "failed") setStep("code");
+  }
+
+  async function handleResend() {
+    // 每次重发都会让上一封邮件里的码失效——明确告诉用户以最新一封为准。
+    if ((await sendCode()) === "sent") setNotice(t("account.otp.resent"));
   }
 
   async function handleVerify() {
@@ -182,6 +237,7 @@ export default function AccountPage() {
     setStep("email");
     setCode("");
     setError(null);
+    setNotice(null);
     setBilling(null);
     router.refresh();
   }
@@ -326,12 +382,12 @@ export default function AccountPage() {
               <div className="mt-3 flex items-center justify-between text-[13px]">
                 <button
                   type="button"
-                  onClick={sendCode}
-                  disabled={busy === "send"}
+                  onClick={handleResend}
+                  disabled={busy === "send" || cooldown > 0}
                   className="underline underline-offset-4 disabled:opacity-60"
                   style={{ color: "var(--color-ink-2)" }}
                 >
-                  {t("account.otp.resend")}
+                  {cooldown > 0 ? t("account.otp.resendIn", { s: cooldown }) : t("account.otp.resend")}
                 </button>
                 <button
                   type="button"
@@ -339,6 +395,7 @@ export default function AccountPage() {
                     setStep("email");
                     setCode("");
                     setError(null);
+                    setNotice(null);
                   }}
                   className="underline underline-offset-4"
                   style={{ color: "var(--color-ink-2)" }}
@@ -347,6 +404,12 @@ export default function AccountPage() {
                 </button>
               </div>
             </>
+          )}
+
+          {notice && (
+            <p role="status" className="mt-3 text-[13px] leading-relaxed" style={{ color: "var(--color-ink-2)" }}>
+              {notice}
+            </p>
           )}
 
           {error && (

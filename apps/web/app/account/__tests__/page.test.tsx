@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
+import { OTP_RESEND_COOLDOWN_S, OTP_SEND_TIMEOUT_MS } from "@/lib/auth/otp";
 
 type AuthErr = { status?: number; message?: string } | null;
 const sendOtpMock = vi.fn(async (..._a: unknown[]): Promise<{ data: unknown; error: AuthErr }> => ({ data: { success: true }, error: null }));
@@ -36,6 +37,11 @@ const defaultFetch = async (url: string) => {
   return new Response("{}", { status: 200 });
 };
 const fetchMock = vi.fn(defaultFetch);
+
+/** Neon 客户端遇非 2xx 直接 throw 带 HTTP status 的错误（AuthApiError/AuthError），不返回 { error }。 */
+function thrownAuthError(status: number) {
+  return Object.assign(new Error(`HTTP ${status}`), { status });
+}
 
 function stubSearch(search: string) {
   Object.defineProperty(window, "location", { value: { ...window.location, search }, writable: true });
@@ -73,6 +79,7 @@ beforeEach(() => {
   stubSearch("");
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   fetchMock.mockClear();
 });
@@ -107,7 +114,7 @@ describe("未登录：邮箱 → 验证码", () => {
   it("提交邮箱 → sendVerificationOtp({ email, type: 'sign-in' })，并切到验证码输入", async () => {
     await renderAccountPage();
     await submitEmail();
-    expect(sendOtpMock).toHaveBeenCalledWith({ email: "me@example.com", type: "sign-in" });
+    expect(sendOtpMock).toHaveBeenCalledWith(expect.objectContaining({ email: "me@example.com", type: "sign-in" }));
     expect(await screen.findByLabelText("验证码")).toBeInTheDocument();
     expect(screen.getByText(/me@example\.com/)).toBeInTheDocument();
   });
@@ -125,6 +132,23 @@ describe("未登录：邮箱 → 验证码", () => {
     await submitEmail();
     expect(await screen.findByText("发送过于频繁，请稍后再试")).toBeInTheDocument();
     expect(screen.queryByLabelText("验证码")).toBeNull();
+  });
+
+  it("sendVerificationOtp 抛出 429（Neon 客户端的真实形态）→ 显示「发送过于频繁」", async () => {
+    sendOtpMock.mockRejectedValue(thrownAuthError(429));
+    await renderAccountPage();
+    await submitEmail();
+    expect(await screen.findByText("发送过于频繁，请稍后再试")).toBeInTheDocument();
+    expect(screen.queryByLabelText("验证码")).toBeNull();
+  });
+
+  it("signIn.emailOtp 抛出 400（码错/过期，Neon 客户端的真实形态）→ 显示 invalidCode 而不是笼统的登录失败", async () => {
+    signInOtpMock.mockRejectedValue(thrownAuthError(400));
+    await renderAccountPage();
+    await submitEmail();
+    await enterCodeAndVerify("654321");
+    expect(await screen.findByText("验证码不正确或已过期，请重试")).toBeInTheDocument();
+    expect(screen.queryByText("登录失败，请稍后重试")).toBeNull();
   });
 
   it("sendVerificationOtp 其他错误 → 通用发送失败文案", async () => {
@@ -169,12 +193,15 @@ describe("未登录：邮箱 → 验证码", () => {
   });
 
   it("验证码错误 → 显示错误文案，输入框保留原值，「重新发送」可点，且不 acceptTermsOnce / 不跳转", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     signInOtpMock.mockResolvedValue({ data: null, error: { status: 400, message: "Invalid OTP" } });
     await renderAccountPage();
     await submitEmail();
     await enterCodeAndVerify("654321");
     expect(await screen.findByText("验证码不正确或已过期，请重试")).toBeInTheDocument();
     expect((screen.getByLabelText("验证码") as HTMLInputElement).value).toBe("654321");
+    // 发码后有冷却；冷却结束「重新发送」可点
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_RESEND_COOLDOWN_S * 1000); });
     const resend = screen.getByRole("button", { name: "重新发送" });
     expect(resend).toBeEnabled();
     expect(acceptTermsOnceMock).not.toHaveBeenCalled();
@@ -185,7 +212,7 @@ describe("未登录：邮箱 → 验证码", () => {
     await act(async () => {
       fireEvent.click(resend);
     });
-    expect(sendOtpMock).toHaveBeenCalledWith({ email: "me@example.com", type: "sign-in" });
+    expect(sendOtpMock).toHaveBeenCalledWith(expect.objectContaining({ email: "me@example.com", type: "sign-in" }));
   });
 
   it("验证码通过但读不到会话（cookie 没落地）→ 显示 sessionMissing 错误，保留输入，不跳转", async () => {
@@ -230,6 +257,97 @@ describe("未登录：邮箱 → 验证码", () => {
     await submitEmail();
     fireEvent.click(await screen.findByRole("button", { name: "更换邮箱" }));
     expect(await screen.findByLabelText("邮箱地址")).toBeInTheDocument();
+  });
+});
+
+describe("发码超时与重发（EP-otp-send-timeout）", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  /** 一个永不返回的发码请求，记录它收到的 abort signal。 */
+  function hangingSend() {
+    const signals: AbortSignal[] = [];
+    sendOtpMock.mockImplementation((...a: unknown[]) => {
+      const opts = a[0] as { fetchOptions?: { signal?: AbortSignal } };
+      if (opts.fetchOptions?.signal) signals.push(opts.fetchOptions.signal);
+      return new Promise(() => {});
+    });
+    return signals;
+  }
+
+  it("首次发码一直不返回 → 超时后解锁、进入验证码步骤、提示邮件可能已发出，并中止请求", async () => {
+    const signals = hangingSend();
+    await renderAccountPage();
+    await submitEmail();
+    expect(screen.getByRole("button", { name: "发送中…" })).toBeDisabled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_SEND_TIMEOUT_MS); });
+
+    expect(await screen.findByLabelText("验证码")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("以最新一封为准");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(signals).toHaveLength(1);
+    expect(signals[0].aborted).toBe(true);
+  });
+
+  it("发码抛出 504（15 s 内网关先超时）→ 同样按「可能已发出」处理，进入验证码步骤", async () => {
+    sendOtpMock.mockRejectedValue(thrownAuthError(504));
+    await renderAccountPage();
+    await submitEmail();
+    expect(await screen.findByLabelText("验证码")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("以最新一封为准");
+  });
+
+  it("重发一直不返回 → 超时后「验证并登录」恢复可用，不再卡住", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_RESEND_COOLDOWN_S * 1000); });
+    fireEvent.change(screen.getByLabelText("验证码"), { target: { value: "123456" } });
+
+    hangingSend();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "重新发送" })); });
+    expect(screen.getByRole("button", { name: "验证并登录" })).toBeDisabled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_SEND_TIMEOUT_MS); });
+    expect(screen.getByRole("button", { name: "验证并登录" })).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("以最新一封为准");
+  });
+
+  it("发码成功后「重新发送」进入冷却（显示倒计时、禁用），冷却结束恢复", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    const cooling = screen.getByRole("button", { name: `重新发送（${OTP_RESEND_COOLDOWN_S} 秒）` });
+    expect(cooling).toBeDisabled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.getByRole("button", { name: /^重新发送（2[89] 秒）$/ })).toBeDisabled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync((OTP_RESEND_COOLDOWN_S - 1) * 1000); });
+    expect(screen.getByRole("button", { name: "重新发送" })).toBeEnabled();
+  });
+
+  it("重发成功 → 提示旧邮件里的码已失效、以最新一封为准，并重新进入冷却", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    expect(screen.queryByRole("status")).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_RESEND_COOLDOWN_S * 1000); });
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "重新发送" })); });
+    expect(sendOtpMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status")).toHaveTextContent("之前邮件里的验证码已失效");
+    expect(screen.getByRole("button", { name: `重新发送（${OTP_RESEND_COOLDOWN_S} 秒）` })).toBeDisabled();
+  });
+
+  it("重发失败（非超时）→ 显示发送失败，不进入冷却", async () => {
+    await renderAccountPage();
+    await submitEmail();
+    await act(async () => { await vi.advanceTimersByTimeAsync(OTP_RESEND_COOLDOWN_S * 1000); });
+
+    sendOtpMock.mockRejectedValue(thrownAuthError(500));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "重新发送" })); });
+    expect(await screen.findByText("发送失败，请稍后重试")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重新发送" })).toBeEnabled();
   });
 });
 

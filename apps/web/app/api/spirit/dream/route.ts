@@ -1,9 +1,10 @@
-import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
+import { resolveLlmConfig, isLlmConfigured, interpretDream, continueDreamReply, DREAM_MAX_CHARS } from "@sojan/llm";
 import type { UnifiedChart } from "@sojan/core";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
 import { getUid, getViewer } from "@/lib/account/uid";
 import { localeFromRequest } from "@/lib/i18n/server";
+import { parseSpiritCommon } from "@/lib/spirit-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +23,11 @@ export async function POST(req: Request): Promise<Response> {
   // 历史里存的解读全文，continueDreamReply 据此跳过首轮「对方讲述了一个梦」的重建。
   const dreamRaw = typeof body?.dream === "string" ? body.dream.trim() : undefined;
   const followUp = typeof body?.followUp === "string" ? body.followUp.trim() : "";
-  const priorTurns = (Array.isArray(body?.priorTurns) ? body.priorTurns : []).slice(-12) as SpiritTurn[];
   if (!chart) return new Response("缺少命盘 chart", { status: 400 });
+  // priorTurns / memory / questionnaire 限长与 role 校验：先于鉴权与计量，非法入参不扣额度。
+  const common = parseSpiritCommon(body);
+  if (!common.ok) return new Response(common.message, { status: 400 });
+  const { priorTurns, memory, questionnaire } = common.data;
   if (!followUp) {
     // 首次解读：必须有梦原文。追问（含续接历史）时 dream 可选。
     if (!dreamRaw) return new Response("缺少梦境 dream", { status: 400 });
@@ -48,8 +52,8 @@ export async function POST(req: Request): Promise<Response> {
   const language = localeFromRequest(req);
   const opts = {
     language,
-    memory: typeof body?.memory === "string" ? body.memory : undefined,
-    questionnaire: typeof body?.questionnaire === "string" ? body.questionnaire : undefined,
+    memory,
+    questionnaire,
   };
   try {
     let out: string;

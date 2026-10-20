@@ -9,6 +9,7 @@ import { Markdown } from "@/components/Markdown";
 import { Paywall } from "@/components/Paywall";
 import { QuickPrompts } from "@/components/spirit/QuickPrompts";
 import { useLocale, useT } from "@/lib/i18n/I18nProvider";
+import { SPIRIT_MAX_TURNS } from "@/lib/spirit-limits";
 
 type Turn = { id: string; role: "user" | "spirit"; content: string };
 
@@ -116,7 +117,8 @@ export function SpiritPanel({
       // （跳过 turns[0] 那条用户原始提问，它会被重建，不能重复喂给模型）。
       // question 为 undefined = 续接历史：turns[0] 本身就是历史里存的回复全文，
       // priorTurns 就是 turns 原样。两种场景与 continueJiaoReply 的两个重载一一对应。
-      const priorTurns = (question !== undefined ? turns.slice(1) : turns).map((m) => ({
+      // 服务端对 >SPIRIT_MAX_TURNS 条显式 400，故只发最近的若干条（与原先服务端静默取尾部等效）。
+      const priorTurns = (question !== undefined ? turns.slice(1) : turns).slice(-SPIRIT_MAX_TURNS).map((m) => ({
         role: m.role,
         content: m.content,
       }));

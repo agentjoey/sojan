@@ -25,6 +25,8 @@ vi.mock("@sojan/llm", () => ({
   JIAO_MAX_CHARS: 500,
 }));
 
+import { SPIRIT_MAX_TURNS, SPIRIT_TURN_MAX_CHARS, SPIRIT_MEMORY_MAX_CHARS, SPIRIT_QUESTIONNAIRE_MAX_CHARS } from "@/lib/spirit-request";
+
 const { POST } = await import("../route");
 const CHART = { fake: true };
 
@@ -106,8 +108,8 @@ describe("POST /api/spirit/jiao 主流程", () => {
 });
 
 describe("追问分支", () => {
-  it("followUp + priorTurns → 走 continueJiaoReply，priorTurns 裁到最近 12 条", async () => {
-    const many = Array.from({ length: 20 }, (_, i) => ({ role: "user" as const, content: `t${i}` }));
+  it("followUp + priorTurns → 走 continueJiaoReply，priorTurns 原样透传（最多 12 条）", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ role: "user" as const, content: `t${i}` }));
     const res = await POST(req({ chart: CHART, question: "原问题", omen: "圣筊", followUp: "再问", priorTurns: many }));
     expect(res.status).toBe(200);
     expect(generateJiaoReplySpy).not.toHaveBeenCalled();
@@ -155,5 +157,54 @@ describe("鉴权闸门（与 /api/spirit/dream 同一套）", () => {
     const res = await POST(req({ chart: CHART, question: "问题", omen: "圣筊" }));
     expect(res.status).toBe(401);
     expect(consumeLlmMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("入参限长与 role 校验（review #6）：先于鉴权/计量，非法 → 400 且不扣额度", () => {
+  const base = { chart: CHART, question: "原问题", omen: "圣筊", followUp: "再问" };
+  const turn = (i: number) => ({ role: i % 2 === 0 ? "spirit" : "user", content: `t${i}` });
+
+  async function expect400(body: unknown) {
+    const res = await POST(req(body));
+    expect(res.status).toBe(400);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(getUidMock).not.toHaveBeenCalled();
+    expect(generateJiaoReplySpy).not.toHaveBeenCalled();
+    expect(continueJiaoReplySpy).not.toHaveBeenCalled();
+  }
+
+  it("单条 turn 超 4000 字符 → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "spirit", content: "x".repeat(SPIRIT_TURN_MAX_CHARS + 1) }] });
+  });
+  it("非法 role → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "assistant", content: "hi" }] });
+  });
+  it("turn 缺 content / content 非字符串 → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "user" }] });
+    await expect400({ ...base, priorTurns: [{ role: "user", content: 1 }] });
+  });
+  it("超过 12 条 → 400（显式拒绝，不再静默截断）", async () => {
+    await expect400({ ...base, priorTurns: Array.from({ length: SPIRIT_MAX_TURNS + 1 }, (_, i) => turn(i)) });
+  });
+  it("memory 超 2000 → 400", async () => {
+    await expect400({ ...base, memory: "m".repeat(SPIRIT_MEMORY_MAX_CHARS + 1) });
+  });
+  it("questionnaire 超 2000 → 400（首次问卦同样校验）", async () => {
+    await expect400({ chart: CHART, question: "原问题", omen: "圣筊", questionnaire: "q".repeat(SPIRIT_QUESTIONNAIRE_MAX_CHARS + 1) });
+  });
+  it("priorTurns 不是数组 → 400", async () => {
+    await expect400({ ...base, priorTurns: "oops" });
+  });
+
+  it("恰好在边界：12 条、content 4000、memory 2000、questionnaire 2000 → 200 并原样透传", async () => {
+    const priorTurns = Array.from({ length: SPIRIT_MAX_TURNS }, (_, i) => ({ ...turn(i), content: "x".repeat(SPIRIT_TURN_MAX_CHARS) }));
+    const memory = "m".repeat(SPIRIT_MEMORY_MAX_CHARS);
+    const questionnaire = "q".repeat(SPIRIT_QUESTIONNAIRE_MAX_CHARS);
+    const res = await POST(req({ ...base, priorTurns, memory, questionnaire }));
+    expect(res.status).toBe(200);
+    const args = continueJiaoReplySpy.mock.calls.at(-1)!;
+    expect(args[2]).toEqual(priorTurns);
+    expect(args[4]).toEqual(expect.objectContaining({ memory, questionnaire }));
+    expect(consumeLlmMock).toHaveBeenCalledWith("u1");
   });
 });

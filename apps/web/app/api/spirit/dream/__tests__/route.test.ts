@@ -33,6 +33,8 @@ vi.mock("@sojan/llm", () => ({
   DREAM_MAX_CHARS: 2000,
 }));
 
+import { SPIRIT_MAX_TURNS, SPIRIT_TURN_MAX_CHARS, SPIRIT_MEMORY_MAX_CHARS, SPIRIT_QUESTIONNAIRE_MAX_CHARS } from "@/lib/spirit-request";
+
 const { POST } = await import("../route");
 
 const CHART = { fake: true };
@@ -126,8 +128,8 @@ describe("EP-dream-history 追问：followUp/priorTurns", () => {
     vi.unstubAllEnvs();
   });
 
-  it("带 followUp → 走 continueDreamReply（不走 interpretDream），priorTurns 原样透传且裁到最近 12 条", async () => {
-    const priorTurns = Array.from({ length: 15 }, (_, i) => ({ role: i % 2 === 0 ? "spirit" : "user", content: `t${i}` }));
+  it("带 followUp → 走 continueDreamReply（不走 interpretDream），priorTurns 原样透传（最多 12 条）", async () => {
+    const priorTurns = Array.from({ length: 12 }, (_, i) => ({ role: i % 2 === 0 ? "spirit" : "user", content: `t${i}` }));
     const res = await POST(
       req({ chart: CHART, dream: "我梦见坠落", followUp: "还有别的解读吗？", priorTurns }),
     );
@@ -137,7 +139,7 @@ describe("EP-dream-history 追问：followUp/priorTurns", () => {
     expect(continueDreamReplySpy).toHaveBeenCalledWith(
       CHART,
       "我梦见坠落",
-      priorTurns.slice(-12),
+      priorTurns,
       "还有别的解读吗？",
       expect.objectContaining({ language: "zh" }),
     );
@@ -207,5 +209,68 @@ describe("EP-account2-05：/api/spirit/dream 同一处闸门漏洞", () => {
     const res = await POST(req({ chart: { fake: true }, dream: "我梦见坠落" }));
     expect(res.status).toBe(401);
     expect(interpretDreamSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("入参限长与 role 校验（review #6）：先于鉴权/计量，非法 → 400 且不扣额度", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getUidMock.mockResolvedValue("u1");
+    vi.stubEnv("NEXT_PUBLIC_DREAM_ENABLED", "1");
+    resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const base = { chart: CHART, dream: "我梦见坠落", followUp: "还有别的解读吗？" };
+  const turn = (i: number) => ({ role: i % 2 === 0 ? "spirit" : "user", content: `t${i}` });
+
+  async function expect400(body: unknown) {
+    const res = await POST(req(body));
+    expect(res.status).toBe(400);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(getUidMock).not.toHaveBeenCalled();
+    expect(interpretDreamSpy).not.toHaveBeenCalled();
+    expect(continueDreamReplySpy).not.toHaveBeenCalled();
+  }
+
+  it("单条 turn 超 4000 字符 → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "spirit", content: "x".repeat(SPIRIT_TURN_MAX_CHARS + 1) }] });
+  });
+  it("非法 role → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "assistant", content: "hi" }] });
+  });
+  it("turn 缺 content / content 非字符串 → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "user" }] });
+    await expect400({ ...base, priorTurns: [{ role: "user", content: 1 }] });
+  });
+  it("超过 12 条 → 400（显式拒绝，不再静默截断）", async () => {
+    await expect400({ ...base, priorTurns: Array.from({ length: SPIRIT_MAX_TURNS + 1 }, (_, i) => turn(i)) });
+  });
+  it("memory 超 2000 → 400", async () => {
+    await expect400({ ...base, memory: "m".repeat(SPIRIT_MEMORY_MAX_CHARS + 1) });
+  });
+  it("questionnaire 超 2000 → 400（首次解读同样校验）", async () => {
+    await expect400({ chart: CHART, dream: "我梦见坠落", questionnaire: "q".repeat(SPIRIT_QUESTIONNAIRE_MAX_CHARS + 1) });
+  });
+  it("priorTurns 不是数组 → 400", async () => {
+    await expect400({ ...base, priorTurns: "oops" });
+  });
+
+  it("恰好在边界：12 条、content 4000、memory 2000、questionnaire 2000 → 200 并原样透传", async () => {
+    const priorTurns = Array.from({ length: SPIRIT_MAX_TURNS }, (_, i) => ({ ...turn(i), content: "x".repeat(SPIRIT_TURN_MAX_CHARS) }));
+    const memory = "m".repeat(SPIRIT_MEMORY_MAX_CHARS);
+    const questionnaire = "q".repeat(SPIRIT_QUESTIONNAIRE_MAX_CHARS);
+    const res = await POST(req({ ...base, priorTurns, memory, questionnaire }));
+    expect(res.status).toBe(200);
+    expect(continueDreamReplySpy).toHaveBeenCalledWith(
+      CHART,
+      "我梦见坠落",
+      priorTurns,
+      "还有别的解读吗？",
+      expect.objectContaining({ memory, questionnaire }),
+    );
+    expect(consumeLlmMock).toHaveBeenCalledWith("u1");
   });
 });

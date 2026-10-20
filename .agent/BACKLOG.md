@@ -10,6 +10,14 @@
 - [ ] **[EP-reading-field-leak] 解读正文出现 facts 字段名**（2026-10-19 staging 实测）：命理段标题写出了「命宫（未支）为空宫（soulTriad.isEmpty）」——模型把承重事实的字段名原样写进正文。需在 `@sojan/llm` prompt 硬规则里禁止引用字段名，并在 sanitize 层去掉 `xxx.yyy` 形式的标识符；补 eval 用例。
 - [x] ~~**[EP-supabase-sunset] Supabase 下线**~~ —— **2026-10-20 完成**：production 切到 Neon 后先暂停、复核生产正常，随后 owner 在 Supabase 控制台删除项目 `sxjcpoxhphlnwhpzachi`（已确认不在项目列表中）。owner 数据此前已导入 Neon 并 md5 核对。剩余收尾：Vercel Production/Preview 上若还有 `SUPABASE*`/`NEXT_PUBLIC_SUPABASE_*`/`TELEGRAM_*`/`TG_*`/`CRON_SECRET` 等旧变量，删除即可（新代码不读取）。
 
+## 🟡 最终评审遗留（2026-10-20，分支 `fix/review-findings`，计划 `docs/superpowers/plans/2026-10-20-review-fixes.md`）
+- [ ] **[EP-tz-edge] [优先级上调] 新疆等边缘时区：出生时间的「记录时区」与地理时区不一致**：tz-lookup 对新疆坐标返回 `Asia/Urumqi`（UTC+6），而当地出生时间普遍按北京时间（UTC+8）记录 → 八字/紫微（真太阳时）与西方盘（钟表时）**两边都可能偏约 2 小时**，足以换时辰乃至换日。方案：起盘表单对这类时区显式让用户确认「出生时间按哪个时区记录」（新疆默认北京时间），并把选择写进 BirthInput.timezone；补 core 用例。
+- [ ] **[EP-western-recompute] 存量冻结档案的西方层是按真太阳时算的**：2026-10-20 之前建档的命盘，西方盘把真太阳时当钟表时喂给了库（已修：现用 `NormalizedBirth.civil`），但冻结档案**没有重算**，目前唯一的修法是用户删档重建。考虑一次「重算西方层」迁移（只重写 `chart.western`，需临时放开 `profiles_freeze` 触发器或走专门的迁移路径），并评估已存解读里西方段是否随之失真。
+- [ ] **[EP-aux-llm-unmetered] 辅助 LLM action 不计量、入参无上限**：`app/actions.ts` 的辅助 action 只要求登录、不走 `consumeLlm`；`spiritMemoryAction` 的 history、`timelineAction` 的 chart 都不限长。方案：history 用 `SPIRIT_MAX_TURNS` / `SPIRIT_TURN_MAX_CHARS`（`lib/spirit-limits.ts`）裁剪/拒绝，chart 做结构校验或改为按 profileId 从库里取；再评估是否需要计量。
+- [ ] **[EP-llm-refund] LLM 失败/重试不退额度**：解读/解梦/掷筊/风水在 `consumeLlm` 扣费后，LLM 失败或输出不完整都不退款；风水叙事的重试/降级路径还会再扣一次。方案：失败时补偿退回一次额度，或改成「成功落库后才扣」。
+- [ ] **[EP-fs-paywall-402] 风水页面收到 402 不显示 Paywall**：`/api/fengshui/*` 额度不足返回 402，但风水页面没有像命盘页那样切到 `<Paywall>`，用户只看到失败。方案：按命盘页的 402 处理接上 Paywall，补页面测试。
+- [ ] **[EP-spirit-prior-cap] priorTurns 总长度没有聚合上限（可选）**：单条 turn ≤ `SPIRIT_TURN_MAX_CHARS`(8000)、条数 ≤ `SPIRIT_MAX_TURNS`(12)，单次请求最坏仍可达 12×8000 字符。可加一个总长上限（超出从最早的 turn 开始丢）。
+
 ## 🔴 HIGH
 ### 账号登录（EP-account-login，owner 实测发现 2026-08-21，**同日修复**）
 换设备登录不了自己的账号——直接违背 `EP-account` 当初「跨设备同步档案」的初衷。两个独立根因均已修复：

@@ -49,10 +49,12 @@ flowchart TB
 
 **A. 建档解读（一次性，持久化）**
 ```
-BirthInput → Zod 校验 → normalizeBirth(真太阳时+EoT / 农历 / 子时索引)
-  → 三引擎共用归一时刻并行 → UnifiedChart(Zod) → createProfile(lib/data → Neon, 需登录, 冻结)
-  → /api/reading: extractFacts → 三声部 prompt → MiniMax-M3 流式
-     → sanitize(西方降级兜底) → correctMutagens(四化纠正) → 四分节卡片 → 存档(不重算)
+BirthInput → Zod 校验 → normalizeBirth(真太阳时+EoT / 民用钟表时 civil / 农历 / 子时索引)
+  → 八字·紫微用真太阳时、西方盘用 civil 钟表时 → UnifiedChart(Zod) → createProfile(lib/data → Neon, 需登录, 冻结)
+  → /api/reading {profileId}（需登录 + consumeLlm 计量；命盘取库里冻结档案）: extractFacts → 三声部 prompt → MiniMax-M3 流式
+     → sanitize(西方降级兜底) → correctMutagens(四化纠正)
+     → 流正常结束且四分节齐全 → 服务端 storeReading 落库，以 READING_SAVED_MARKER 收尾（否则 READING_ERROR_MARKER，不存）
+     → 页面只认成功标记 → 四分节卡片（回访读存档，不重算）
 ```
 
 **B. 每日运势（确定性 + 轻 LLM）**
@@ -85,7 +87,7 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
 
 - **iztro v2.5.8**：`astro.config({ algorithm: 'default'|'zhongzhou' })`（**非**旧版 `configure({mutagen})`），默认中州派。
 - **iztro `timeIndex` 0–12**：是时辰索引非小时；晚子时(23:xx)=12，用 `hourToTimeIndex`。
-- **真太阳时**：normalize 层统一 = 经度平太阳时校正 + 均时差 EoT（±~16min）；三引擎共用，保证四柱/星盘时刻一致。
+- **真太阳时 vs 钟表时**：normalize 层同时产出两种时刻——八字/紫微用真太阳时（经度平太阳时校正 + 均时差 EoT，±~16min）；西方盘用民用钟表时 `NormalizedBirth.civil`（circular-natal-horoscope-js 自己按经纬度推时区，喂真太阳时会被二次校正）。UTC 偏移按**真实时刻**两步取值（先按钟表时估、再按换算出的真实时刻重取），DST 切换边界才正确。
 - **晚子时归日**：`ziHourConvention` → lunar `EightChar.setSect`（`current`=算当天 sect2 默认 / `next`=算次日 sect1）。
 - **日主旺衰**：当前为启发式（得令/坐下/印比加权占比 → strong/weak/balanced），非用神级精算（见 §7 优化项）。
 - **西方盘可降级**：缺纬度/时辰未知 → `western=null`，仅出东方双盘 + 心理段降级提示。

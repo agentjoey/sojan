@@ -4,7 +4,7 @@
 // 流正常结束且四分节齐全才落库，出错/缺节一律不存，并以约定标记收尾供客户端识别。
 // 测法同 spirit/dream：直接 import 路由处理函数，拿 Node 原生 Request 调用。
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { READING_ERROR_MARKER } from "@/lib/reading-sections";
+import { READING_ERROR_MARKER, READING_SAVED_MARKER } from "@/lib/reading-sections";
 
 const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
 const getUidMock = vi.fn(async (): Promise<string | null> => "u1");
@@ -129,7 +129,8 @@ describe("POST /api/reading", () => {
     const res = await POST(r);
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(text).toBe(FULL);
+    // final review M1：落库成功以显式的成功标记收尾——客户端只认这个，不再把「没有错误标记」当成功
+    expect(text).toBe(FULL + READING_SAVED_MARKER);
     expect(text).not.toContain(READING_ERROR_MARKER);
     // 命盘取自库里的档案，而不是客户端传来的；客户端断开时经 signal 中止上游
     expect(streamReadingSpy).toHaveBeenCalledWith(CHART, expect.objectContaining({ nickname: "阿甲", language: "zh", signal: r.signal }));
@@ -164,5 +165,15 @@ describe("POST /api/reading", () => {
     const text = await res.text();
     expect(text.endsWith(READING_ERROR_MARKER)).toBe(true);
     expect(text).not.toContain("db down");
+    expect(text).not.toContain(READING_SAVED_MARKER);
+  });
+
+  it("全文齐全但 storeReading 返回 false（并发请求先写入 / 档案已删）→ 以错误标记收尾，不带成功标记", async () => {
+    storeMock.mockResolvedValueOnce(false);
+    const res = await POST(req());
+    const text = await res.text();
+    expect(storeMock).toHaveBeenCalledTimes(1);
+    expect(text.endsWith(READING_ERROR_MARKER)).toBe(true);
+    expect(text).not.toContain(READING_SAVED_MARKER);
   });
 });

@@ -23,7 +23,7 @@ import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
 import { Paywall } from "@/components/Paywall";
 import { UnauthenticatedError } from "@/lib/errors";
-import { READING_ERROR_MARKER, splitSections } from "@/lib/reading-sections";
+import { READING_MARKER_HOLDBACK, READING_SAVED_MARKER, splitSections } from "@/lib/reading-sections";
 
 const YEAR = new Date().getFullYear();
 const todayYmd = `${YEAR}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
@@ -106,8 +106,8 @@ export default function ChartPage() {
       setStreaming(false);
     };
     const tick = () => {
-      // 流未结束时扣住末尾一段不铺：失败标记只会出现在结尾，别让它半截闪现在正文里
-      const limit = streamDone ? target.length : Math.max(0, target.length - READING_ERROR_MARKER.length);
+      // 流未结束时扣住末尾一段不铺：成功/失败标记只会出现在结尾，别让它半截闪现在正文里
+      const limit = streamDone ? target.length : Math.max(0, target.length - READING_MARKER_HOLDBACK);
       if (pause > 0) {
         pause--;
       } else if (shown < limit) {
@@ -163,11 +163,13 @@ export default function ChartPage() {
         if (done) break;
         target += dec.decode(value, { stream: true });
       }
-      // 服务端没落库（流中出错/缺分节/写库失败）时以标记收尾：丢弃已收到的正文
-      if (target.endsWith(READING_ERROR_MARKER)) {
+      // 只认显式成功标记（服务端已落库）。错误标记（流中出错/缺分节/写库失败）或两个都没有
+      // （函数被中途杀掉）一律按失败：丢弃已收到的正文，提示重新生成（final review M1）
+      if (!target.endsWith(READING_SAVED_MARKER)) {
         fail(t("chart.readingFailed"));
         return;
       }
+      target = target.slice(0, -READING_SAVED_MARKER.length);
       streamDone = true; // tick 追平后自行 finalize（仅展示收尾，库里已由服务端写好）
     } catch (e) {
       fail(e instanceof Error ? e.message : String(e));

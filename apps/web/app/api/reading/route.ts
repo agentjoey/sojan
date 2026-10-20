@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/account/uid";
 import { resolveAccess } from "@/lib/access";
 import { consumeLlm } from "@/lib/entitlements";
 import { loadReadingTarget, storeReading } from "@/lib/data/reading";
-import { READING_ERROR_MARKER, isCompleteReading } from "@/lib/reading-sections";
+import { READING_ERROR_MARKER, READING_SAVED_MARKER, isCompleteReading } from "@/lib/reading-sections";
 import { localeFromRequest } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
@@ -16,8 +16,9 @@ export const dynamic = "force-dynamic";
  * 顺序：LLM 未配置 503 → 无会话 401 → anonymous 401 → 入参 400 → 非本人档案 404 →
  * 已有解读 409（不重复生成、不扣额度）→ 额度 402 → 流式。
  * 命盘取自库里冻结的档案，不信任客户端传来的出生信息/命盘。
- * 流正常结束且四分节齐全才写库；流中出错、缺分节、写库失败都不存，响应以
- * `READING_ERROR_MARKER` 收尾，错误细节只进服务端日志、不拼进正文。
+ * 流正常结束且四分节齐全才写库；写库成功以 `READING_SAVED_MARKER` 收尾（客户端只认它为成功）。
+ * 流中出错、缺分节、写库失败/落空都不存，响应以 `READING_ERROR_MARKER` 收尾，错误细节只进服务端日志、
+ * 不拼进正文。两个标记都没有 = 函数被中途杀掉，客户端同样按失败处理。
  */
 export async function POST(req: Request): Promise<Response> {
   const cfg = resolveLlmConfig();
@@ -72,7 +73,7 @@ export async function POST(req: Request): Promise<Response> {
       } catch (e) {
         console.error("[reading] stream/save failed, not saved:", e);
       } finally {
-        if (!saved) send(READING_ERROR_MARKER);
+        send(saved ? READING_SAVED_MARKER : READING_ERROR_MARKER);
         try {
           controller.close();
         } catch {

@@ -15,6 +15,15 @@ export const READING_SECTION_COUNT = 4;
  */
 export const READING_ERROR_MARKER = "\n\n[[SOJAN_READING_ERROR]]";
 
+/**
+ * 流式响应的成功结尾标记：服务端落库成功后才发。客户端**只认它**为成功——
+ * 两个标记都没有（函数被中途杀掉、连接断开）同样按失败处理（final review M1）。
+ */
+export const READING_SAVED_MARKER = "\n\n[[SOJAN_READING_SAVED]]";
+
+/** 流未结束时客户端要扣住不展示的尾部长度：任一标记都可能正在半截到达。 */
+export const READING_MARKER_HOLDBACK = Math.max(READING_ERROR_MARKER.length, READING_SAVED_MARKER.length);
+
 const H2 = /^##\s+/m;
 
 function toSection(p: string, i: number): ReadingSection {

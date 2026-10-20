@@ -6,7 +6,11 @@ import type { BirthInput, DailyFortune, UnifiedChart } from "@sojan/core";
 
 const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
 vi.mock("@/lib/account/uid", () => ({ getViewer: () => getViewerMock() }));
-const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
+// final review M3：守卫直接看会话（!viewer || !viewer.emailVerified），不再经 resolveAccess 多查一次权益表。
+// 这里让 resolveAccess 一被调用就失败——守卫的真实判定路径必须完全不碰它。
+const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => {
+  throw new Error("llmAllowed must not query entitlements via resolveAccess");
+});
 vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
 
 const llm = {
@@ -49,25 +53,29 @@ describe.each(cases)("%s：登录守卫", (_name, call, llmFn, okValue) => {
   beforeEach(() => {
     vi.clearAllMocks();
     getViewerMock.mockResolvedValue({ uid: "u1", email: "a@x.com", emailVerified: true });
-    resolveAccessMock.mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
   });
 
-  it("无会话 → null，不调 LLM", async () => {
+  it("无会话（getViewer → null）→ null，不调 LLM", async () => {
     getViewerMock.mockResolvedValue(null);
-    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
     expect(await call()).toBeNull();
     expect(llm[llmFn]).not.toHaveBeenCalled();
   });
 
-  it("有会话但 anonymous（邮箱未验证）→ null，不调 LLM", async () => {
+  it("有会话但邮箱未验证（anonymous）→ null，不调 LLM", async () => {
     getViewerMock.mockResolvedValue({ uid: "u1", email: "a@x.com", emailVerified: false });
-    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
     expect(await call()).toBeNull();
     expect(llm[llmFn]).not.toHaveBeenCalled();
   });
 
-  it("已验证登录用户 → 照常调 LLM 并返回结果", async () => {
+  it("会话查询抛错 → null（容错约定），不调 LLM", async () => {
+    getViewerMock.mockRejectedValue(new Error("auth down"));
+    expect(await call()).toBeNull();
+    expect(llm[llmFn]).not.toHaveBeenCalled();
+  });
+
+  it("已验证登录用户 → 照常调 LLM 并返回结果，且不额外查权益（不调 resolveAccess）", async () => {
     expect(await call()).toEqual(okValue);
     expect(llm[llmFn]).toHaveBeenCalledTimes(1);
+    expect(resolveAccessMock).not.toHaveBeenCalled();
   });
 });

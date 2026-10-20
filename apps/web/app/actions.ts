@@ -13,18 +13,20 @@ import {
   type ZiweiHoroscope,
 } from "@sojan/core";
 import { getViewer } from "@/lib/account/uid";
-import { resolveAccess } from "@/lib/access";
 import { polishDailyFortune, dailyBehaviorAdvice, generateTimeline, summarizeSpiritMemory, summarizeDreamEntry, summarizeJiaoEntry, generateDailySpiritGreeting, resolveLlmConfig, isLlmConfigured, type ReadingLanguage } from "@sojan/llm";
 
 /**
  * 辅助 LLM action 的统一前置（review #4）：LLM 已配置且会话已登录（邮箱已验证）才放行。
  * 不满足一律让调用方返回 null——这些 action 的调用方都把 null 当作"无 LLM、静默降级"。
+ * 直接看会话：anonymous ⇔ `!viewer || !viewer.emailVerified`（与 resolveAccess 同一口径），
+ * 不经 resolveAccess，省掉每次辅助调用都多查一次权益表（final review M3）。
  * 私有 helper：`"use server"` 文件只能导出 async 函数，故不 export。
  */
 async function llmAllowed(): Promise<boolean> {
   if (!isLlmConfigured(resolveLlmConfig())) return false;
   try {
-    return (await resolveAccess(await getViewer())).level !== "anonymous";
+    const viewer = await getViewer();
+    return !!viewer && viewer.emailVerified;
   } catch {
     return false; // 会话/库异常按未登录处理，保持"辅助 action 失败即 null"的容错约定
   }

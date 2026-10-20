@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { getAccountSummary, acceptTermsOnce } from "@/lib/data/account";
 import { DEFAULT_NEXT, safeNext } from "@/lib/auth/next";
-import { OTP_LENGTH, OTP_RESEND_COOLDOWN_S, OTP_SEND_TIMEOUT_MS } from "@/lib/auth/otp";
+import { OTP_LENGTH, OTP_RESEND_COOLDOWN_S, OTP_SEND_TIMEOUT_MS, settleAuthCall } from "@/lib/auth/otp";
 import { Paywall } from "@/components/Paywall";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -130,11 +130,13 @@ export default function AccountPage() {
     let outcome: SendOutcome;
     try {
       const res = await Promise.race([
-        authClient.emailOtp.sendVerificationOtp({
-          email: addr,
-          type: "sign-in",
-          fetchOptions: { signal: controller.signal },
-        }),
+        settleAuthCall(
+          authClient.emailOtp.sendVerificationOtp({
+            email: addr,
+            type: "sign-in",
+            fetchOptions: { signal: controller.signal },
+          }),
+        ),
         timedOut,
       ]);
       if (res === "timeout") outcome = "uncertain";
@@ -178,7 +180,7 @@ export default function AccountPage() {
     setBusy("verify");
     setError(null);
     try {
-      const { error: err } = await authClient.signIn.emailOtp({ email, otp: code });
+      const { error: err } = await settleAuthCall(authClient.signIn.emailOtp({ email, otp: code }));
       if (err) {
         setError(err.status === 429 ? t("account.otp.rateLimited") : t("account.otp.invalidCode"));
         return;

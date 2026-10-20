@@ -25,7 +25,7 @@ vi.mock("@sojan/llm", () => ({
   JIAO_MAX_CHARS: 500,
 }));
 
-import { SPIRIT_MAX_TURNS, SPIRIT_TURN_MAX_CHARS, SPIRIT_MEMORY_MAX_CHARS, SPIRIT_QUESTIONNAIRE_MAX_CHARS } from "@/lib/spirit-request";
+import { SPIRIT_MAX_TURNS, SPIRIT_MEMORY_MAX_CHARS, SPIRIT_QUESTIONNAIRE_MAX_CHARS } from "@/lib/spirit-request";
 
 const { POST } = await import("../route");
 const CHART = { fake: true };
@@ -173,8 +173,8 @@ describe("入参限长与 role 校验（review #6）：先于鉴权/计量，非
     expect(continueJiaoReplySpy).not.toHaveBeenCalled();
   }
 
-  it("单条 turn 超 4000 字符 → 400", async () => {
-    await expect400({ ...base, priorTurns: [{ role: "spirit", content: "x".repeat(SPIRIT_TURN_MAX_CHARS + 1) }] });
+  it("单条 turn 8001 字符 → 400", async () => {
+    await expect400({ ...base, priorTurns: [{ role: "spirit", content: "x".repeat(8001) }] });
   });
   it("非法 role → 400", async () => {
     await expect400({ ...base, priorTurns: [{ role: "assistant", content: "hi" }] });
@@ -196,8 +196,8 @@ describe("入参限长与 role 校验（review #6）：先于鉴权/计量，非
     await expect400({ ...base, priorTurns: "oops" });
   });
 
-  it("恰好在边界：12 条、content 4000、memory 2000、questionnaire 2000 → 200 并原样透传", async () => {
-    const priorTurns = Array.from({ length: SPIRIT_MAX_TURNS }, (_, i) => ({ ...turn(i), content: "x".repeat(SPIRIT_TURN_MAX_CHARS) }));
+  it("恰好在边界：12 条、content 8000、memory 2000、questionnaire 2000 → 200 并原样透传", async () => {
+    const priorTurns = Array.from({ length: SPIRIT_MAX_TURNS }, (_, i) => ({ ...turn(i), content: "x".repeat(8000) }));
     const memory = "m".repeat(SPIRIT_MEMORY_MAX_CHARS);
     const questionnaire = "q".repeat(SPIRIT_QUESTIONNAIRE_MAX_CHARS);
     const res = await POST(req({ ...base, priorTurns, memory, questionnaire }));

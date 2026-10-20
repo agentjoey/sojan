@@ -2,7 +2,16 @@ import type { LlmConfig } from "./provider";
 import { withRetry, isRetryableError } from "./retry";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
-export type ChatOptions = { temperature?: number; maxTokens?: number; signal?: AbortSignal };
+export type ChatOptions = {
+  temperature?: number;
+  maxTokens?: number;
+  signal?: AbortSignal;
+  /**
+   * 流式专用：上游以 max_tokens(anthropic) / length(openai) 停止时抛错。
+   * 只给整篇解读（streamReading）开——解梦/掷筊/灵聊天的小上限是刻意的，撞上属预期。
+   */
+  failOnTruncation?: boolean;
+};
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -84,37 +93,80 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
 }
 
 // ── 流式 ─────────────────────────────────────────────────
+/**
+ * 上游失败一律抛错，不吞成「正常结束」（最终评审 I1）：
+ * - error 事件（anthropic `type:"error"`，如 529 overloaded；openai `{error}` 块）→ 抛
+ * - 流结束却没见到终止符（message_stop / [DONE] / 非空 finish_reason）→ 抛
+ * - failOnTruncation 且 stop_reason=max_tokens / finish_reason=length → 抛
+ * 重试（withRetry）只包初次 fetch+状态码；流一旦开始产出，中途失败不重试（否则会重复已吐出的文本）。
+ */
 export async function* chatStream(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}): AsyncGenerator<string, void, unknown> {
   const res = await post(cfg, messages, opts, true);
   if (!res.body) throw new Error(`LLM ${cfg.provider}: no response body`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  const tag = `LLM ${cfg.provider}/${cfg.wire}`;
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue; // 忽略 anthropic 的 `event:` 行
-      const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") return; // openai 终止
-      try {
-        const json = JSON.parse(payload) as Record<string, any>;
+  let terminated = false; // 见到终止符（message_stop / [DONE] / 非空 finish_reason）
+  let stopped = false; // 见到硬终止（message_stop / [DONE]），不再读
+  let stopReason: string | null = null;
+
+  try {
+    while (!stopped) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (!buffer.trim()) break;
+        buffer += "\n"; // 末行没换行（如结尾 `data: [DONE]`）也要处理
+      } else {
+        buffer += decoder.decode(value, { stream: true });
+      }
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue; // 忽略 anthropic 的 `event:` 行
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") {
+          // openai 终止
+          terminated = stopped = true;
+          break;
+        }
+        let json: Record<string, any>;
+        try {
+          json = JSON.parse(payload) as Record<string, any>;
+        } catch {
+          continue; // 跨块截断的 JSON 留待下轮
+        }
+        // ⚠️ 以下 throw 必须在 JSON.parse 的 try/catch 之外，否则会被当作坏块吞掉
         if (cfg.wire === "anthropic") {
-          if (json.type === "message_stop") return;
+          if (json.type === "error") throw new Error(`${tag} stream error: ${json.error?.message ?? JSON.stringify(json.error ?? json)}`);
+          if (json.type === "message_delta" && json.delta?.stop_reason) stopReason = json.delta.stop_reason as string;
+          if (json.type === "message_stop") {
+            terminated = stopped = true;
+            break;
+          }
           if (json.type === "content_block_delta" && json.delta?.type === "text_delta" && json.delta.text) {
             yield json.delta.text as string;
           }
         } else {
-          const delta = json.choices?.[0]?.delta?.content;
+          if (json.error) throw new Error(`${tag} stream error: ${json.error?.message ?? JSON.stringify(json.error)}`);
+          const choice = json.choices?.[0];
+          const delta = choice?.delta?.content;
           if (delta) yield delta as string;
+          if (choice?.finish_reason) {
+            stopReason = choice.finish_reason as string;
+            terminated = true; // 继续读到 [DONE]/流结束，以便捕获之后的 error 块
+          }
         }
-      } catch {
-        // 跨块截断的 JSON 留待下轮
       }
+      if (done) break;
     }
+  } finally {
+    // 正常结束、抛错、或消费方提前 return 都释放上游连接
+    await reader.cancel().catch(() => {});
+  }
+  if (!terminated) throw new Error(`${tag}: stream ended without a terminator (upstream cut off)`);
+  if (opts.failOnTruncation && (stopReason === "max_tokens" || stopReason === "length")) {
+    throw new Error(`${tag}: output truncated (stop reason ${stopReason})`);
   }
 }

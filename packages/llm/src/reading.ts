@@ -53,7 +53,8 @@ export async function* streamReading(chart: UnifiedChart, opts: ReadingOptions =
   if (!isLlmConfigured(cfg)) throw new Error("LLM 未配置：请设置 LLM_API_KEY（及可选 LLM_PROVIDER/LLM_MODEL）。");
   const language = opts.language ?? "en";
   const mut = chart.ziwei.birthMutagens;
-  const stream = chatStream(cfg, buildMessages(chart, opts), { signal: opts.signal, maxTokens: 4096 });
+  // 整篇解读：截断（max_tokens）即失败，不落库半篇（最终评审 I1）
+  const stream = chatStream(cfg, buildMessages(chart, opts), { signal: opts.signal, maxTokens: 4096, failOnTruncation: true });
 
   if (chart.western === null) {
     // 降级路径：全缓冲 → 净化（删西方杜撰）+ 四化纠正

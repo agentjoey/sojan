@@ -46,7 +46,7 @@
 | 远端完全不通 | 远端不在同一局域网（本机默认路由走 VPN `ipsec0`） | 改用内网穿透（cloudflared/ngrok）或让远端连同一网段/VPN |
 | 地址访问不到、IP 变了 | `192.168.0.14` 是 DHCP 分配，重启路由器/换网会变 | 重新 `ipconfig getifaddr en1` |
 
-> ⚠️ **安全**：LAN 暴露 `/api/reading` 会消耗 MiniMax 额度（任何同网段设备可调用）。仅可信网络临时使用，用完停服。
+> ⚠️ **安全**：`/api/reading` 及其他 LLM 入口现在要求登录（非 anonymous 会话）并经 `consumeLlm` 计量，同网段设备不能再匿名白烧 MiniMax 额度；但 LAN 暴露的仍是带真实 key 的 dev 服务器，登录用户照样能消耗额度。仅可信网络临时使用，用完停服。
 > 停服：`lsof -nP -iTCP:3030 -sTCP:LISTEN -t | xargs kill -9`
 
 ## 合规要点（常驻）

@@ -7,7 +7,9 @@ import {
   isFengshuiEntitledForUid,
   wantsLayer1,
 } from "@/lib/fengshui-reading";
-import { getUid } from "@/lib/account/uid";
+import { getUid, getViewer } from "@/lib/account/uid";
+import { resolveAccess } from "@/lib/access";
+import { consumeLlm } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +38,8 @@ export async function GET(): Promise<Response> {
 /**
  * POST /api/fengshui/reading —— 确定性排盘 + 风水派生 → 三分节报告。
  * 一次性返回（非流式）：报告较短且客户端会缓存。
- * LLM 未配置返回 503；客户端据此降级为纯确定性呈现，不留白页。
+ * LLM 未配置返回 503；未登录（无会话/邮箱未验证）401；免费额度用尽 402。客户端据此降级为
+ * 纯确定性呈现，不留白页。顺序：503 → 401 → 入参 400 → Layer1 会员闸门 402 → 额度 402 → 生成。
  *
  * 响应契约（Task 14 复审必修1，取代此前的「纯 markdown 文本 + X-Fengshui-Degraded
  * 响应头」）：body 是 JSON，`{ sections: { situation, youAndSpace, actions }, degraded }`。
@@ -68,17 +71,25 @@ export async function POST(req: Request): Promise<Response> {
     });
   }
 
+  // 身份只认会话；整篇叙述是 LLM 调用，要求已验证邮箱登录并计量（review #4）
+  const viewer = await getViewer();
+  if (!viewer || (await resolveAccess(viewer)).level === "anonymous") return new Response("未登录", { status: 401 });
+
   const parsed = ReadingRequestSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {
     return new Response(parsed.error.issues.map((i) => i.message).join("; "), { status: 400 });
   }
 
-  if (wantsLayer1(parsed.data) && !(await isFengshuiEntitled())) {
-    return new Response(JSON.stringify({ error: "paywall" }), {
+  const paywall = () =>
+    new Response(JSON.stringify({ error: "paywall" }), {
       status: 402,
       headers: { "content-type": "application/json" },
     });
-  }
+
+  if (wantsLayer1(parsed.data) && !(await isFengshuiEntitledForUid(viewer.uid))) return paywall();
+
+  // 会员闸门之后再扣额度：被 Layer1 闸门拒绝的请求不消耗免费额度
+  if (!(await consumeLlm(viewer.uid)).ok) return paywall();
 
   try {
     const r = await generateFengshuiSections(parsed.data, localeFromRequest(req));

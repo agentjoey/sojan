@@ -141,6 +141,20 @@ describe("SpiritPanel：追问打 /api/spirit/jiao（I4），不再是通用 /ap
     expect(body.priorTurns).toEqual([{ role: "spirit", content: "这一掷是阴筊。你当时松了口气还是失望？" }]);
   });
 
+  it("长对话只发最近 12 条（服务端对 >12 显式 400，不再静默截断，见 review #6）", async () => {
+    const seedTurns = Array.from({ length: 20 }, (_, i) => ({ role: (i % 2 === 0 ? "user" : "spirit") as "user" | "spirit", content: `s${i}` }));
+    renderPanel({ seedTurns });
+    fireEvent.change(screen.getByPlaceholderText("还想接着问点什么？"), { target: { value: "再问一句" } });
+    fireEvent.click(screen.getByRole("button", { name: "接着问" }));
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+    const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.priorTurns).toHaveLength(12);
+    // 取的是尾部（最新 12 条）：seed 去掉首条后共 19 条，保留 s8..s19
+    expect(body.priorTurns[0]).toEqual({ role: "user", content: "s8" });
+    expect(body.priorTurns.at(-1)).toEqual({ role: "spirit", content: "s19" });
+  });
+
   it("401 → 撤回刚追加的用户消息、显示 needLogin 引导，不留孤零零的一条用户发言", async () => {
     fetchSpy.mockResolvedValueOnce(new Response("unauthorized", { status: 401 }));
     renderPanel();

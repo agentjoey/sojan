@@ -1,6 +1,9 @@
 import { adviseObjectText, resolveLlmConfig, isLlmConfigured } from "@sojan/llm";
 import { OBJECT_CATEGORIES, type ObjectAdvice } from "@sojan/core";
 import { localeFromRequest } from "@/lib/i18n/server";
+import { getViewer } from "@/lib/account/uid";
+import { resolveAccess } from "@/lib/access";
+import { consumeLlm } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +37,8 @@ function isObjectAdvice(body: unknown): body is ObjectAdvice {
  * `adviseObject`（纯函数）确定性算出；本接口只负责说人话，失败不影响页面可用性——
  * 调用方（ObjectAdvisorForm）在非 2xx 或网络错误时静默降级，确定性结果照常展示。
  *
- * 错误路径与 /api/fengshui/reading 对齐：LLM 未配置 503、入参非法 400、生成抛错 500。
+ * 错误路径与 /api/fengshui/reading 对齐：LLM 未配置 503、未登录 401、入参非法 400、
+ * 免费额度用尽 402、生成抛错 500。润色是 LLM 调用，要求已验证邮箱登录并计量（review #4）。
  */
 export async function POST(req: Request): Promise<Response> {
   const cfg = resolveLlmConfig();
@@ -44,10 +48,15 @@ export async function POST(req: Request): Promise<Response> {
     });
   }
 
+  const viewer = await getViewer();
+  if (!viewer || (await resolveAccess(viewer)).level === "anonymous") return new Response("未登录", { status: 401 });
+
   const body = await req.json().catch(() => null);
   if (!isObjectAdvice(body)) {
     return new Response("入参非法：请求体应为 adviseObject() 产出的 ObjectAdvice。", { status: 400 });
   }
+
+  if (!(await consumeLlm(viewer.uid)).ok) return Response.json({ error: "paywall" }, { status: 402 });
 
   try {
     const text = await adviseObjectText(body, { language: localeFromRequest(req) });

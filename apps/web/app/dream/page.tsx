@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui";
 import { CastingOverlay } from "@/components/CastingOverlay";
 import { useT, useLocale } from "@/lib/i18n/I18nProvider";
+import { SPIRIT_MAX_TURNS } from "@/lib/spirit-limits";
 import { spiritMemoryAction, dreamSummaryAction } from "@/app/actions";
 
 // 与 fengshui/page.tsx、spirit/page.tsx 同一模式：模块加载时求值（测试须
@@ -100,7 +101,8 @@ export default function DreamPage() {
         payload.followUp = text;
         // 同一会话追问：priorTurns 不含首轮梦原文——首轮由 dream 单独重建。
         // 续接历史：没有梦原文可单独重建，priorTurns 直接是完整 turns（[0] 是历史解读）。
-        payload.priorTurns = resumedFromHistory ? turns : turns.slice(1);
+        // 服务端对 >SPIRIT_MAX_TURNS 条显式 400，故只发最近的若干条（与原先服务端静默取尾部等效）。
+        payload.priorTurns = (resumedFromHistory ? turns : turns.slice(1)).slice(-SPIRIT_MAX_TURNS);
       }
       // 身份由会话 cookie 带（同源 fetch 自动附上），不再手拼 Authorization。
       const res = await fetch("/api/spirit/dream", {

@@ -1,9 +1,10 @@
-import { resolveLlmConfig, isLlmConfigured, generateJiaoReply, continueJiaoReply, JIAO_MAX_CHARS, type SpiritTurn } from "@sojan/llm";
+import { resolveLlmConfig, isLlmConfigured, generateJiaoReply, continueJiaoReply, JIAO_MAX_CHARS } from "@sojan/llm";
 import type { UnifiedChart, Omen } from "@sojan/core";
 import { consumeLlm } from "@/lib/entitlements";
 import { resolveAccess } from "@/lib/access";
 import { getUid, getViewer } from "@/lib/account/uid";
 import { localeFromRequest } from "@/lib/i18n/server";
+import { parseSpiritCommon } from "@/lib/spirit-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,9 +30,12 @@ export async function POST(req: Request): Promise<Response> {
   const omenRaw = typeof body?.omen === "string" ? body.omen : undefined;
   const exhausted = body?.exhausted === true;
   const followUp = typeof body?.followUp === "string" ? body.followUp.trim() : "";
-  const priorTurns = (Array.isArray(body?.priorTurns) ? body.priorTurns : []).slice(-12) as SpiritTurn[];
 
   if (!chart) return new Response("缺少命盘 chart", { status: 400 });
+  // priorTurns / memory / questionnaire 限长与 role 校验：先于鉴权与计量，非法入参不扣额度。
+  const common = parseSpiritCommon(body);
+  if (!common.ok) return new Response(common.message, { status: 400 });
+  const { priorTurns, memory, questionnaire } = common.data;
   if (!followUp) {
     // 首次问卦：问题与筊象都必需。追问（含续接历史）时两者都可省。
     if (!question) return new Response("缺少问题 question", { status: 400 });
@@ -58,8 +62,8 @@ export async function POST(req: Request): Promise<Response> {
   const opts = {
     language,
     exhausted,
-    memory: typeof body?.memory === "string" ? body.memory : undefined,
-    questionnaire: typeof body?.questionnaire === "string" ? body.questionnaire : undefined,
+    memory,
+    questionnaire,
     ...(omen ? { omenForFollowUp: omen } : {}),
   };
   try {

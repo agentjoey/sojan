@@ -19,6 +19,13 @@ vi.mock("@sojan/llm", () => ({
   adviseObjectText: (...a: unknown[]) => adviseObjectTextMock(...a),
 }));
 
+const getViewerMock = vi.fn(async (): Promise<unknown> => ({ uid: "u1", email: "a@x.com", emailVerified: true }));
+vi.mock("@/lib/account/uid", () => ({ getViewer: () => getViewerMock() }));
+const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
+vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
+const consumeLlmMock = vi.fn(async (..._a: unknown[]): Promise<{ ok: boolean }> => ({ ok: true }));
+vi.mock("@/lib/entitlements", () => ({ consumeLlm: (...a: unknown[]) => consumeLlmMock(...a) }));
+
 const { POST } = await import("../route");
 
 /** 一份形状合法的 ObjectAdvice（字段与 packages/core/src/fengshui/object-advisor.ts 的类型对齐）。 */
@@ -44,6 +51,51 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
 beforeEach(() => {
   isLlmConfiguredMock.mockReset().mockReturnValue(true);
   adviseObjectTextMock.mockReset();
+  getViewerMock.mockReset().mockResolvedValue({ uid: "u1", email: "a@x.com", emailVerified: true });
+  resolveAccessMock.mockReset().mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
+  consumeLlmMock.mockReset().mockResolvedValue({ ok: true });
+});
+
+/** review #4：物件顾问润色是 LLM 调用，必须登录并计量；顺序 503 → 401 → 400 → 402 → LLM。 */
+describe("POST /api/fengshui/object — 登录与计量（review #4）", () => {
+  it("无会话 → 401，不扣额度、不调 LLM", async () => {
+    getViewerMock.mockResolvedValue(null);
+    const res = await POST(req(VALID_ADVICE));
+    expect(res.status).toBe(401);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(adviseObjectTextMock).not.toHaveBeenCalled();
+  });
+
+  it("有会话但 anonymous（邮箱未验证）→ 401，不扣额度、不调 LLM", async () => {
+    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
+    const res = await POST(req(VALID_ADVICE));
+    expect(res.status).toBe(401);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(adviseObjectTextMock).not.toHaveBeenCalled();
+  });
+
+  it("入参非法 → 400，不扣额度", async () => {
+    const res = await POST(req({ foo: "bar" }));
+    expect(res.status).toBe(400);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+  });
+
+  it("额度用尽 → 402 paywall，不调 LLM", async () => {
+    consumeLlmMock.mockResolvedValue({ ok: false });
+    const res = await POST(req(VALID_ADVICE));
+    expect(res.status).toBe(402);
+    expect(await res.json()).toEqual({ error: "paywall" });
+    expect(adviseObjectTextMock).not.toHaveBeenCalled();
+  });
+
+  it("成功：按会话 uid 恰好扣一次额度", async () => {
+    getViewerMock.mockResolvedValue({ uid: "u9", email: "a@x.com", emailVerified: true });
+    adviseObjectTextMock.mockResolvedValue("ok");
+    const res = await POST(req(VALID_ADVICE));
+    expect(res.status).toBe(200);
+    expect(consumeLlmMock).toHaveBeenCalledTimes(1);
+    expect(consumeLlmMock).toHaveBeenCalledWith("u9");
+  });
 });
 
 describe("POST /api/fengshui/object", () => {

@@ -81,11 +81,11 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 - **核心库零数据重叠**：lunar-typescript（八字）与 iztro（紫微）数据层互补，已建统一 `UnifiedChart` Schema（`packages/core/src/types/chart.ts`）。
 - **iztro v2.5.8 配置 API**：`astro.config({ algorithm: 'default'|'zhongzhou' })`（**非** 旧版 `configure({mutagen})`，research 笔记里的旧 API 已失效）；默认 `zhongzhou`。
 - **iztro `timeIndex` 0–12**：00–00:59=子(0)…14:30=未(7)…23:xx=晚子(12)；用 `hourToTimeIndex()`，勿传小时。
-- **三引擎共用 `normalizeBirth()`**：真太阳时（经 IANA 时区自动含历史 DST）+ **均时差 EoT** + 农历转换 + 时辰索引，保证四柱/星盘时刻一致。晚子时归日由 BaZi `ziHourConvention`→lunar `setSect`。
+- **三引擎共用 `normalizeBirth()`，但取的时刻不同**：八字/紫微用**真太阳时**（经度平太阳时 + **均时差 EoT**）+ 农历转换 + 时辰索引；**西方盘用民用钟表时**（`NormalizedBirth.civil`，库自己按经纬度推时区）——别把真太阳时喂给西方盘。UTC 偏移按**真实时刻**取值（两步：先按钟表时估、再按换算出的真实时刻重取），DST 切换边界才不会差一小时。晚子时归日由 BaZi `ziHourConvention`→lunar `setSect`。
 - **引擎深化派生事实在 facts 层算、不进冻结命盘**：旺衰证据(`deriveStrength`)/用神(`deriveUsefulElements`)/紫微三方四正(`deriveTriad`)/西方画像(`deriveWesternProfile`) 均由核心纯函数从既有 `UnifiedChart` 派生，`extractFacts` 时调用 → 新旧冻结命盘通吃、零迁移。旺衰/用神是扶抑启发式（prompt 标「据证判断」）。
 - **时序层按年现算、不进冻结**：`computeZiweiHoroscope`(大限/流年四化) → `generateTimeline` 时序声部（非事件预测）；/chart 当下时序卡 + /calendar 本年上下文，按 (档案,年) 缓存。
 - **MiniMax-M3 支持 prompt cache_control**（anthropic 线，`LLM_CACHE` 默认开）；LLM 客户端含退避重试(`withRetry`)+非流式 60s 超时（见 `docs/specs/engine-v2-deepening.md`）。
-- **身份与数据访问约定（Neon 迁移后）**：身份只认会话——`lib/account/uid.ts` 的 `getViewer()/getUid()/requireUid()` 是全站唯一入口，**不读请求里传来的 uid、不再用 Bearer token**。数据库不走 RLS、不设指向 `neon_auth` 的外键，**每条 SQL 自己按会话 uid 过滤**。浏览器不直连数据库：`lib/data/*.ts` 是 `"use server"` 模块（写操作经 `withUid`、返回 `ActionResult`——Next 生产构建会脱敏 server action 抛出的错误，不能靠 throw 传业务错误），`lib/{profiles,dwellings,fengshui-report,dream-history,jiao-history}.ts` 是客户端门面（`unwrap`），页面 import 路径不变。**没有匿名账号**：未登录访客不能存档，用 `useSignInGate` + `SignInPrompt` 引导登录，起盘表单草稿暂存 sessionStorage `zhaojian.readingDraft`。注销是一个事务先删 8 张业务表再删 `neon_auth."user"`（托管 `delete-user` 端点 404），然后清 `__Secure-neon-auth.*` cookie。
+- **身份与数据访问约定（Neon 迁移后）**：身份只认会话——`lib/account/uid.ts` 的 `getViewer()/getUid()/requireUid()` 是全站唯一入口，**不读请求里传来的 uid、不再用 Bearer token**。数据库不走 RLS、不设指向 `neon_auth` 的外键，**每条 SQL 自己按会话 uid 过滤**。浏览器不直连数据库：`lib/data/*.ts` 是 `"use server"` 模块（写操作经 `withUid`、返回 `ActionResult`——Next 生产构建会脱敏 server action 抛出的错误，不能靠 throw 传业务错误），`lib/{profiles,dwellings,fengshui-report,dream-history,jiao-history}.ts` 是客户端门面（`unwrap`），页面 import 路径不变。**例外**：`lib/data/reading.ts`、`lib/data/delete-account.ts` 刻意是 `import "server-only"` 而**不是** `"use server"`——**任何函数签名里带 uid 的模块都不许加 `"use server"`**，否则它们就成了浏览器可直接调用的 server action，可以伪造 uid。`/api/reading` 只在流正常结束且四分节齐全时由服务端落库（成功以 `READING_SAVED_MARKER` 收尾，页面只认它）；所有 LLM 入口都要求非 anonymous 会话——整篇生成（`/api/reading`、`/api/fengshui/*`、`/api/spirit/*`）经 `consumeLlm` 计量，辅助 action（`app/actions.ts`）只要求登录。**没有匿名账号**：未登录访客不能存档，用 `useSignInGate` + `SignInPrompt` 引导登录，起盘表单草稿暂存 sessionStorage `zhaojian.readingDraft`。注销是一个事务先删 8 张业务表再删 `neon_auth."user"`（托管 `delete-user` 端点 404），然后清 `__Secure-neon-auth.*` cookie。
 - **Telegram bot / Mini App 已整体下线**（2026-10，`lib/tg`、`/api/tg/*`、cron、grammy、`packages/core/src/tg` 全删）。重新接入见 BACKLOG `EP-tg-replan`，须按新身份模型设计，不要从 git 历史原样恢复。
 - **风水两套八方不得互推**：「本命八方」由命卦定、「房屋八方」由宅卦定，同一方位在两表里经常是不同的星。`verifyDirectionConsistency` 按分句→整句→块三层解析归属，**无法归属则弃权**而不是拿其中一张表去判另一张的陈述。
 - **八宅结构：命卦吉方 ∩ 宅卦吉方 只可能是 4 或 0**（同东/西四命组则四个全留、异组则一个不留）。推论：物件顾问「强版」与弱版的推荐方位**逐字节相同**，唯一差异是 `dwellingNote`。别再基于「强版给出不同方位」做设计。
@@ -115,11 +115,10 @@ TEST_DATABASE_URL=<Neon dev 分支串> pnpm --filter @sojan/web exec vitest run 
 ## 本地实测解读（需自备 MiniMax Coding/Token Plan key, sk-cp…）
 > ⚠️ Web 端口固定 **3030**（端口 3000 被本机 Hermes WhatsApp bridge 长期占用，故避开）。
 ```bash
-LLM_API_KEY=sk-cp-... pnpm --filter @sojan/web dev   # → http://localhost:3030 ，/reading 点「Generate full reading」
-# 或直接打 API：
-curl -s -X POST localhost:3030/api/reading -H 'content-type: application/json' \
-  -d '{"date":"1991-03-15","time":"14:30","gender":"male","latitude":31.23,"longitude":121.47}'
+LLM_API_KEY=sk-cp-... pnpm --filter @sojan/web dev   # → http://localhost:3030
 ```
+在浏览器打开 localhost:3030 → 邮箱验证码登录 → `/reading` 起盘建档 → 命盘页点「生成完整解读」。
+`/api/reading` 现在要求已登录会话 cookie，请求体只有 `{ "profileId": … }`（命盘取自库里冻结的档案），流结束且四分节齐全时由服务端保存——不再支持直接 curl 一份 BirthInput。
 
 ## Release 后必做（任何 agent 通用）
 1. `.agent/CURRENT.md`：补充 Version History 描述 + 更新 Last Updated agent-id

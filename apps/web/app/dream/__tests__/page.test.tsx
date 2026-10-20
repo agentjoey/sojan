@@ -270,6 +270,32 @@ describe("EP-dream-history：历史列表 + 追问", () => {
     expect(appendDreamHistoryMock).not.toHaveBeenCalled();
   });
 
+  it("长对话只发最近 12 条 priorTurns（服务端对 >12 显式 400，不再静默截断，见 review #6）", async () => {
+    let n = 0;
+    const fetchMock = vi.fn(async (..._a: unknown[]) => new Response(`回应${n++}`, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await renderDreamPage();
+    const first = await screen.findByRole("textbox");
+    fireEvent.change(first, { target: { value: "我梦见自己在坠落，怎么都落不到底。" } });
+    fireEvent.click(screen.getByText("解这个梦"));
+    await waitFor(() => expect(screen.getByText("回应0")).toBeInTheDocument());
+
+    // 追到第 8 次提交时 turns 已有 16 条（首轮 2 + 7 轮追问 * 2），turns.slice(1) = 15 条
+    for (let i = 1; i <= 8; i++) {
+      fireEvent.change(screen.getByPlaceholderText("还想问点什么？"), { target: { value: `继续追问第${i}次` } });
+      fireEvent.click(screen.getByText("追问"));
+      await waitFor(() => expect(screen.getByText(`回应${i}`)).toBeInTheDocument());
+    }
+    const bodies = fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(bodies).toHaveLength(9);
+    // 每次追问都不超过 12 条；第 8 次（最长）正好被裁到 12，且保留尾部
+    for (const b of bodies.slice(1)) expect(b.priorTurns.length).toBeLessThanOrEqual(12);
+    const last = bodies[8];
+    expect(last.priorTurns).toHaveLength(12);
+    expect(last.priorTurns.at(-1)).toEqual({ role: "spirit", content: "回应7" });
+  });
+
   it("历史加载失败不影响表单渲染（独立 try/catch，不污染 profile 早退路径）", async () => {
     listDreamHistoryMock.mockRejectedValueOnce(new Error("db down"));
     await renderDreamPage();

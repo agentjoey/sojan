@@ -5,7 +5,6 @@ const data = vi.hoisted(() => ({
   createProfile: vi.fn(),
   deleteProfile: vi.fn(),
   renameProfile: vi.fn(),
-  saveReading: vi.fn(),
   listProfiles: vi.fn(),
   getProfile: vi.fn(),
   getSpiritMemory: vi.fn(),
@@ -61,12 +60,12 @@ describe("lib/profiles 客户端门面", () => {
     expect(profiles.getActiveProfileId()).toBe("p1");
   });
 
-  it("renameProfile / saveReading 解包 ActionResult", async () => {
+  it("renameProfile 解包 ActionResult", async () => {
     data.renameProfile.mockResolvedValue({ ok: true, value: undefined });
     await expect(profiles.renameProfile("p1", "新名")).resolves.toBeUndefined();
     expect(data.renameProfile).toHaveBeenCalledWith("p1", "新名");
-    data.saveReading.mockResolvedValue({ ok: false, code: "unauthenticated" });
-    await expect(profiles.saveReading("p1", "# x")).rejects.toBeInstanceOf(UnauthenticatedError);
+    data.renameProfile.mockResolvedValue({ ok: false, code: "unauthenticated" });
+    await expect(profiles.renameProfile("p1", "新名")).rejects.toBeInstanceOf(UnauthenticatedError);
   });
 
   it("getActiveProfile：指针优先，否则取最近一条；无档案返回 null", async () => {

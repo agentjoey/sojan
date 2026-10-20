@@ -191,6 +191,8 @@ export const en: Messages = {
     generating: "正在为你照见 (Reflecting for you)…",
     generateReading: "为我照见 (Sojan for me) · 生成完整解读 (Generate full reading)",
     generateReadingSub: "Your chart is ready — read your core self, growth themes, and a word for this moment through 命理结构 (Mingli structure) + 深层心理 (depth psychology).",
+    readingFailed: "The reading didn't finish, so it wasn't saved. Please regenerate it.",
+    regenerateReading: "Regenerate reading",
 
 
     timelineTitle: "当下时序 (Current Cycles)",

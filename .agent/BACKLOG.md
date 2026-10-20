@@ -3,12 +3,20 @@
 
 ## 🔴 Neon 迁移遗留（2026-10-19，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`）
 - [ ] **[EP-tg-replan] Telegram 重新规划**：bot + Mini App + `/api/tg/*` + cron 已在迁移中整体下线（D2），代码留在 git 历史。重新接入必须按**新身份模型**设计（Neon Auth 会话 uid；TG initData 与邮箱账号如何绑定、合成邮箱/付费门槛漏洞要重新评估），**不要从历史原样恢复**。先 brainstorming 再决定是否做；TG 里没有 web 导航、webview 无浏览器侧会话这两条旧陷阱（见 git 历史里的 CLAUDE.md）重做时仍成立。关闭的 TG 条目：`EP-jiao-tg`、`EP-domain-2a/2b/2c`、`EP-tg-bot-close`、`EP-spirit-chat-orphan`、`EP-tg-bot-test`、`EP-billing-pay`（TG Stars 一项）。
-- [ ] **[EP-llm-unauth] LLM 入口未鉴权**：`/api/reading`（流式解读）与 `app/actions.ts` 的 `dailyPolishAction` / `dailyBehaviorAction`，以及 `/api/fengshui/object`、`/api/fengshui/reading`（Layer 0）同样不要求登录即可调用，会被任意消耗 LLM 额度。迁移前就存在，不在本次范围（设计 §1/§9）。方案：改走 `requireUid()` + 额度闸门（复用 `llm_usage` / `consume_llm_credit_account`）。
+- [x] ~~**[EP-llm-unauth] LLM 入口未鉴权**~~ —— **2026-10-20 关闭**（`fix/review-findings`）：`/api/reading`、`/api/fengshui/reading` POST、`/api/fengshui/object` 要求非 anonymous 会话并 `consumeLlm`；`app/actions.ts` 七个辅助 action 要求已验证会话（不计量，见新条目「辅助 action 未计量且入参无上限」）。
 - [ ] **[EP-session-cache-orphan] 注销后其他设备/标签页的会话缓存仍有效，可写出孤儿行**：Neon Auth 的 `__Secure-neon-auth.local.session_data` 是带签名的会话缓存 cookie，TTL 最长 300 s。账号注销后，**其他设备/标签页**不会被清 cookie，在缓存过期前 `getSession()` 仍返回已删除用户的 uid，此窗口内 `createProfile` / `createDwelling` / `saveFengshuiReport` 等写路径可能写入无人可达的孤儿行（`profiles` 等表无到 auth 用户的外键）。方案：`withUid` 的写路径改用 `auth.getSession({ query: { disableCookieCache: "true" } })` 绕开缓存直查上游（SDK 支持，见 `@neondatabase/auth` dist `server-pZf5ArnA.mjs` ~1065）；读路径可继续用缓存。代价：每次写多一次上游往返，需评估。
 - [x] **[EP-reading-save-timing] 命盘解读要等打字机动画播完才保存**（2026-10-19 staging 实测发现，迁移前即如此）：`app/chart/page.tsx` 的 `finalize()`（含 `saveReading`）只在 `requestAnimationFrame` 打字机追平全文后触发。长解读按 60–120 字/秒要播一分钟左右；用户中途离开/刷新/关页，或标签页在后台（rAF 被降频乃至暂停），解读就不会落库，LLM 额度白花，下次回来又要重新生成。方案：流读完（`streamDone`）即保存，动画只负责展示；补一条「流结束即调 saveReading」的页面测试。 ✅ 2026-10-19 已修于分支 `claude/determined-elion-cd9953`（待 owner 合并）：流读完即 `saveReading`，`finalize` 只做收尾；`app/chart/__tests__/page.test.tsx` 加两条守护（rAF 永不推进也落库 / 收尾不重复保存）。
 - [ ] **[EP-otp-expired-copy] 验证码过期时只提示笼统的「登录失败，请稍后再试」**（2026-10-20 staging 实测）：服务端返回 `400 {code: "OTP_EXPIRED"}`，`app/account/page.tsx` 没区分错误码，用户不知道是码过期、该点重发。方案：按 `error.code` 映射 `OTP_EXPIRED` / `INVALID_OTP` / `TOO_MANY_ATTEMPTS` 到具体文案（zh/en），过期时高亮「重新发送」；补页面测试。
 - [ ] **[EP-reading-field-leak] 解读正文出现 facts 字段名**（2026-10-19 staging 实测）：命理段标题写出了「命宫（未支）为空宫（soulTriad.isEmpty）」——模型把承重事实的字段名原样写进正文。需在 `@sojan/llm` prompt 硬规则里禁止引用字段名，并在 sanitize 层去掉 `xxx.yyy` 形式的标识符；补 eval 用例。
 - [x] ~~**[EP-supabase-sunset] Supabase 下线**~~ —— **2026-10-20 完成**：production 切到 Neon 后先暂停、复核生产正常，随后 owner 在 Supabase 控制台删除项目 `sxjcpoxhphlnwhpzachi`（已确认不在项目列表中）。owner 数据此前已导入 Neon 并 md5 核对。剩余收尾：Vercel Production/Preview 上若还有 `SUPABASE*`/`NEXT_PUBLIC_SUPABASE_*`/`TELEGRAM_*`/`TG_*`/`CRON_SECRET` 等旧变量，删除即可（新代码不读取）。
+
+## 🟡 最终评审遗留（2026-10-20，分支 `fix/review-findings`，计划 `docs/superpowers/plans/2026-10-20-review-fixes.md`）
+- [ ] **[EP-tz-edge] [优先级上调] 新疆等边缘时区：出生时间的「记录时区」与地理时区不一致**：tz-lookup 对新疆坐标返回 `Asia/Urumqi`（UTC+6），而当地出生时间普遍按北京时间（UTC+8）记录 → 八字/紫微（真太阳时）与西方盘（钟表时）**两边都可能偏约 2 小时**，足以换时辰乃至换日。方案：起盘表单对这类时区显式让用户确认「出生时间按哪个时区记录」（新疆默认北京时间），并把选择写进 BirthInput.timezone；补 core 用例。
+- [ ] **[EP-western-recompute] 存量冻结档案的西方层是按真太阳时算的**：2026-10-20 之前建档的命盘，西方盘把真太阳时当钟表时喂给了库（已修：现用 `NormalizedBirth.civil`），但冻结档案**没有重算**，目前唯一的修法是用户删档重建。考虑一次「重算西方层」迁移（只重写 `chart.western`，需临时放开 `profiles_freeze` 触发器或走专门的迁移路径），并评估已存解读里西方段是否随之失真。
+- [ ] **[EP-aux-llm-unmetered] 辅助 LLM action 不计量、入参无上限**：`app/actions.ts` 的辅助 action 只要求登录、不走 `consumeLlm`；`spiritMemoryAction` 的 history、`timelineAction` 的 chart 都不限长。方案：history 用 `SPIRIT_MAX_TURNS` / `SPIRIT_TURN_MAX_CHARS`（`lib/spirit-limits.ts`）裁剪/拒绝，chart 做结构校验或改为按 profileId 从库里取；再评估是否需要计量。
+- [ ] **[EP-llm-refund] LLM 失败/重试不退额度**：解读/解梦/掷筊/风水在 `consumeLlm` 扣费后，LLM 失败或输出不完整都不退款；风水叙事的重试/降级路径还会再扣一次。方案：失败时补偿退回一次额度，或改成「成功落库后才扣」。
+- [ ] **[EP-fs-paywall-402] 风水页面收到 402 不显示 Paywall**：`/api/fengshui/*` 额度不足返回 402，但风水页面没有像命盘页那样切到 `<Paywall>`，用户只看到失败。方案：按命盘页的 402 处理接上 Paywall，补页面测试。
+- [ ] **[EP-spirit-prior-cap] priorTurns 总长度没有聚合上限（可选）**：单条 turn ≤ `SPIRIT_TURN_MAX_CHARS`(8000)、条数 ≤ `SPIRIT_MAX_TURNS`(12)，单次请求最坏仍可达 12×8000 字符。可加一个总长上限（超出从最早的 turn 开始丢）。
 
 ## 🔴 HIGH
 ### 账号登录（EP-account-login，owner 实测发现 2026-08-21，**同日修复**）

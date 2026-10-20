@@ -28,8 +28,18 @@ vi.mock("@sojan/llm", () => ({
  *  2) 用户是不是会员——`getEntitlement`/`isMember`。
  * 全部 mock 掉，逐条控制「谁在请求、是不是会员」，不依赖真实数据库 / 会话。
  */
-const getUidMock = vi.fn<() => Promise<string | null>>(async () => null);
-vi.mock("@/lib/account/uid", () => ({ getUid: () => getUidMock() }));
+const getUidMock = vi.fn<() => Promise<string | null>>(async () => "u1");
+// review #4：POST 现在要求登录——getViewer 由 getUid 派生（同一个会话事实源），默认已登录。
+vi.mock("@/lib/account/uid", () => ({
+  getUid: () => getUidMock(),
+  getViewer: async () => {
+    const uid = await getUidMock();
+    return uid ? { uid, email: "a@x.com", emailVerified: true } : null;
+  },
+}));
+const resolveAccessMock = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ level: "identified", hasVerifiedEmail: true }));
+vi.mock("@/lib/access", () => ({ resolveAccess: (...a: unknown[]) => resolveAccessMock(...a) }));
+const consumeLlmMock = vi.fn(async (..._a: unknown[]): Promise<{ ok: boolean }> => ({ ok: true }));
 
 const getEntitlementMock = vi.fn<(...args: unknown[]) => Promise<{ tier: string; memberUntil: string | null }>>(
   async () => ({ tier: "free", memberUntil: null }),
@@ -38,6 +48,7 @@ const isMemberMock = vi.fn<(...args: unknown[]) => boolean>(() => false);
 vi.mock("@/lib/entitlements", () => ({
   getEntitlement: (...a: unknown[]) => getEntitlementMock(...a),
   isMember: (...a: unknown[]) => isMemberMock(...a),
+  consumeLlm: (...a: unknown[]) => consumeLlmMock(...a),
 }));
 
 const { POST, GET } = await import("../route");
@@ -62,7 +73,9 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
 beforeEach(() => {
   isLlmConfiguredMock.mockReset().mockReturnValue(true);
   generateFengshuiReadingMock.mockReset();
-  getUidMock.mockReset().mockResolvedValue(null);
+  getUidMock.mockReset().mockResolvedValue("u1");
+  resolveAccessMock.mockReset().mockResolvedValue({ level: "identified", hasVerifiedEmail: true });
+  consumeLlmMock.mockReset().mockResolvedValue({ ok: true });
   getEntitlementMock.mockReset().mockResolvedValue({ tier: "free", memberUntil: null });
   isMemberMock.mockReset().mockReturnValue(false);
   delete process.env.BILLING_ENABLED;
@@ -304,12 +317,13 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
     expect(generateFengshuiReadingMock).toHaveBeenCalledTimes(1);
   });
 
-  it("BILLING_ENABLED=1 且请求方身份无法识别（无会话）：视同非会员，返回 402", async () => {
+  it("BILLING_ENABLED=1 且请求方身份无法识别（无会话）：POST 先被 401 拦下，不进会员闸门", async () => {
     process.env.BILLING_ENABLED = "1";
+    getUidMock.mockResolvedValue(null);
 
     const res = await POST(req({ ...birth, dwelling: dwellingBody }));
 
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(401);
     expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
     // 身份都没解析出来，不该走到会员状态查询这一步
     expect(getEntitlementMock).not.toHaveBeenCalled();
@@ -325,6 +339,54 @@ describe("POST /api/fengshui/reading — 会员闸门（Task 10，EP-fs-17）", 
 
     expect(res.status).toBe(402);
     expect(getEntitlementMock).toHaveBeenCalledWith("web-u1");
+  });
+});
+
+/**
+ * review #4：整篇风水叙述是 LLM 调用，必须登录并计量。
+ * 顺序：503 → 无会话 401 → anonymous 401 → 入参 400 → Layer1 会员闸门 402 → 额度 402 → LLM。
+ * Layer1 闸门在额度之前，被会员闸门拒绝的请求不扣额度。
+ */
+describe("POST /api/fengshui/reading — 登录与计量（review #4）", () => {
+  it("无会话 → 401，不扣额度、不调 LLM", async () => {
+    getUidMock.mockResolvedValue(null);
+    const res = await POST(req(birth));
+    expect(res.status).toBe(401);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
+  });
+
+  it("有会话但 anonymous（邮箱未验证）→ 401，不扣额度、不调 LLM", async () => {
+    resolveAccessMock.mockResolvedValue({ level: "anonymous", hasVerifiedEmail: false });
+    const res = await POST(req(birth));
+    expect(res.status).toBe(401);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
+  });
+
+  it("Layer1 会员闸门拒绝（402）时不扣额度", async () => {
+    process.env.BILLING_ENABLED = "1";
+    const res = await POST(req({ ...birth, dwelling: { id: "d1", name: "家", kind: "home", tenancy: "rent", facing: "S" } }));
+    expect(res.status).toBe(402);
+    expect(consumeLlmMock).not.toHaveBeenCalled();
+    expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
+  });
+
+  it("额度用尽 → 402 paywall，不调 LLM", async () => {
+    consumeLlmMock.mockResolvedValue({ ok: false });
+    const res = await POST(req(birth));
+    expect(res.status).toBe(402);
+    expect(await res.json()).toEqual({ error: "paywall" });
+    expect(generateFengshuiReadingMock).not.toHaveBeenCalled();
+  });
+
+  it("成功：按会话 uid 恰好扣一次额度", async () => {
+    getUidMock.mockResolvedValue("u9");
+    generateFengshuiReadingMock.mockResolvedValue(VALID_READING);
+    const res = await POST(req(birth));
+    expect(res.status).toBe(200);
+    expect(consumeLlmMock).toHaveBeenCalledTimes(1);
+    expect(consumeLlmMock).toHaveBeenCalledWith("u9");
   });
 });
 

@@ -199,6 +199,9 @@ export const zh = {
     generating: "正在为你照见…",
     generateReading: "为我照见 · 生成完整解读",
     generateReadingSub: "命盘已就位 —— 用命理结构 + 深层心理，读出你的核心自我、成长课题与一句此刻之言",
+    // review #1：服务端没落库（流中出错/截断/写库失败）时的提示与重试按钮
+    readingFailed: "解读没有完整生成，这次不会保存。请重新生成。",
+    regenerateReading: "重新生成解读",
 
     timelineTitle: "当下时序",
     timelineDisclaimer: "时序按当前年份（{year}）的大限/流年推算，随年更新；仅供自我观照，非事件预测。",

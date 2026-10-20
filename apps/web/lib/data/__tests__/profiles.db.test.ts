@@ -27,7 +27,6 @@ const {
   listProfiles,
   getProfile,
   createProfile,
-  saveReading,
   deleteProfile,
   renameProfile,
   getSpiritMemory,
@@ -87,7 +86,6 @@ describe.skipIf(!hasTestDb)("lib/data/profiles（Neon）", { timeout: 30_000 }, 
     expect(await getProfile(p.id)).toBeNull();
     expect(await getSpiritMemory(p.id)).toBeNull();
     expect(await getQuestionnaire(p.id)).toBeNull();
-    expect(await saveReading(p.id, "# 别人的解读", "m")).toEqual({ ok: true, value: undefined });
     expect(await saveSpiritMemory(p.id, "别人的记忆")).toEqual({ ok: true, value: undefined });
     expect(await saveQuestionnaire(p.id, { q1: "a" })).toEqual({ ok: true, value: undefined });
     expect(await renameProfile(p.id, "改掉")).toEqual({ ok: true, value: undefined });
@@ -103,22 +101,18 @@ describe.skipIf(!hasTestDb)("lib/data/profiles（Neon）", { timeout: 30_000 }, 
     expect(await getQuestionnaire(p.id)).toBeNull();
   });
 
-  it("本人写：解读 / 关系记忆 / 问卷 / 改名 / 删除", async () => {
+  it("本人写：关系记忆 / 问卷 / 改名 / 删除", async () => {
     const u1 = fresh();
     const p = await createAs(u1);
 
-    expect((await saveReading(p.id, "# 解读", "MiniMax-M3")).ok).toBe(true);
     expect((await saveSpiritMemory(p.id, "记得他怕水")).ok).toBe(true);
     expect((await saveQuestionnaire(p.id, { q1: "a", q2: "b" })).ok).toBe(true);
     expect((await renameProfile(p.id, "  新名  ")).ok).toBe(true);
 
     const got = await getProfile(p.id);
-    expect(got).toMatchObject({ reading: "# 解读", nickname: "新名" });
+    expect(got).toMatchObject({ reading: null, nickname: "新名" });
     expect(await getSpiritMemory(p.id)).toBe("记得他怕水");
     expect(await getQuestionnaire(p.id)).toEqual({ q1: "a", q2: "b" });
-    const rows = await sql()`select reading_model, reading_at from profiles where id = ${p.id}`;
-    expect(rows[0]!.reading_model).toBe("MiniMax-M3");
-    expect(rows[0]!.reading_at).not.toBeNull();
 
     expect((await deleteProfile(p.id)).ok).toBe(true);
     expect(await getProfile(p.id)).toBeNull();
@@ -141,7 +135,7 @@ describe.skipIf(!hasTestDb)("lib/data/profiles（Neon）", { timeout: 30_000 }, 
     expect(await createProfile({ nickname: "游客", birthInput, chart })).toEqual({ ok: false, code: "unauthenticated" });
     const after = await sql()`select count(*)::int as n from profiles where nickname = '游客'`;
     expect(after[0]!.n).toBe(before[0]!.n);
-    expect(await saveReading("00000000-0000-0000-0000-000000000000", "x")).toEqual({ ok: false, code: "unauthenticated" });
+    expect(await renameProfile("00000000-0000-0000-0000-000000000000", "x")).toEqual({ ok: false, code: "unauthenticated" });
   });
 
   it("BILLING_ENABLED=1、FREE_PROFILE_LIMIT=1：第二次 createProfile 返回 profile_limit", async () => {

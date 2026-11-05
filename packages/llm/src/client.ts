@@ -46,6 +46,7 @@ function body(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions, stream
       : system;
     const body: Record<string, unknown> = { model: cfg.model, system: sys, messages: msgs, max_tokens, temperature, stream };
     if (cfg.thinking) body.thinking = { type: cfg.thinking };
+    if (cfg.effort) body.output_config = { effort: cfg.effort };
     return JSON.stringify(body);
   }
   return JSON.stringify({ model: cfg.model, messages, temperature, max_tokens, stream });

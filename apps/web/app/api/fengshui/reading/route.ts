@@ -66,7 +66,7 @@ export async function GET(): Promise<Response> {
 export async function POST(req: Request): Promise<Response> {
   const cfg = resolveLlmConfig();
   if (!isLlmConfigured(cfg)) {
-    return new Response("LLM 未配置：请在环境变量设置 LLM_API_KEY（默认 provider=minimax, model=MiniMax-M3）。", {
+    return new Response("LLM 未配置：请在环境变量设置 LLM_API_KEY（默认 provider=minimax, model=MiniMax-M3.1-Flash）。", {
       status: 503,
     });
   }

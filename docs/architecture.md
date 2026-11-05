@@ -51,7 +51,7 @@ flowchart TB
 ```
 BirthInput → Zod 校验 → normalizeBirth(真太阳时+EoT / 民用钟表时 civil / 农历 / 子时索引)
   → 八字·紫微用真太阳时、西方盘用 civil 钟表时 → UnifiedChart(Zod) → createProfile(lib/data → Neon, 需登录, 冻结)
-  → /api/reading {profileId}（需登录 + consumeLlm 计量；命盘取库里冻结档案）: extractFacts → 三声部 prompt → MiniMax-M3 流式
+  → /api/reading {profileId}（需登录 + consumeLlm 计量；命盘取库里冻结档案）: extractFacts → 三声部 prompt → MiniMax-M3.1-Flash 流式
      → sanitize(西方降级兜底) → correctMutagens(四化纠正)
      → 流正常结束且四分节齐全 → 服务端 storeReading 落库，以 READING_SAVED_MARKER 收尾（否则 READING_ERROR_MARKER，不存）
      → 页面只认成功标记 → 四分节卡片（回访读存档，不重算）
@@ -81,7 +81,7 @@ UnifiedChart.bazi + date → computeDailyFortune(流日×命主十神 → 五维
   3. `sanitizeReading`：western=null 时无论模型写什么，心理段整段替换为固定提示（杜绝杜撰行星）。
   4. `correctMutagens`：确定性删除错配的「X化禄/权/科/忌」断言（引擎四化 = 标准表，错配必为模型幻觉）。
   5. `eval/`：离线接地性打分（20 例语料，scorer 检查接地/四化/守护栏/格式）。
-- **双线协议**（`provider.ts` / `client.ts`）：`anthropic`（MiniMax-M3 Coding Plan，`/v1/messages`，SSE content_block_delta）/ `openai`（DeepSeek，`/chat/completions`）。换模型 = 改 env，无需改码。
+- **双线协议**（`provider.ts` / `client.ts`）：`anthropic`（MiniMax-M3.1-Flash Coding Plan，`/v1/messages`，SSE content_block_delta）/ `openai`（DeepSeek，`/chat/completions`）。换模型 = 改 env，无需改码。
 
 ## 6. 关键技术约定（陷阱）
 

@@ -20,14 +20,21 @@ const chart = computeUnifiedChart(
   }),
 );
 
-describe("provider 配置（env 驱动，默认 MiniMax-M3 Coding Plan = Anthropic 兼容）", () => {
-  it("默认 = MiniMax-M3，Anthropic 兼容 base /anthropic", () => {
+describe("provider 配置（env 驱动，默认 MiniMax-M3.1-Flash = Anthropic 兼容）", () => {
+  it("默认 = MiniMax-M3.1-Flash（思考深度 low），Anthropic 兼容 base /anthropic", () => {
     const cfg = resolveLlmConfig({});
     expect(cfg.provider).toBe("minimax");
     expect(cfg.wire).toBe("anthropic");
-    expect(cfg.model).toBe("MiniMax-M3");
+    expect(cfg.model).toBe("MiniMax-M3.1-Flash");
+    expect(cfg.effort).toBe("low");
     expect(cfg.baseUrl).toBe("https://api.minimax.io/anthropic");
     expect(isLlmConfigured(cfg)).toBe(false); // 无 key
+  });
+  it("LLM_EFFORT 可覆盖、非法值回落默认；LLM_MODEL 可切回 MiniMax-M3；非 minimax 不带 effort", () => {
+    expect(resolveLlmConfig({ LLM_EFFORT: "high" }).effort).toBe("high");
+    expect(resolveLlmConfig({ LLM_EFFORT: "bogus" }).effort).toBe("low");
+    expect(resolveLlmConfig({ LLM_MODEL: "MiniMax-M3" }).model).toBe("MiniMax-M3");
+    expect(resolveLlmConfig({ LLM_PROVIDER: "deepseek" }).effort).toBeUndefined();
   });
   it("anthropic wire 兼容读取 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL", () => {
     const cfg = resolveLlmConfig({ ANTHROPIC_AUTH_TOKEN: "sk-cp-x" });

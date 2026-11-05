@@ -12,8 +12,8 @@
 | `NEON_AUTH_BASE_URL` | Neon Auth 地址，**每个 Neon 分支各一个**（见下节）|
 | `NEON_AUTH_COOKIE_SECRET` | 签名 session cookie 的密钥，≥32 字符（`openssl rand -base64 32`）。**staging 与 production 必须不同** |
 | `TEST_DATABASE_URL` | 可选，仅 `*.db.test.ts` 用，指向 Neon dev 分支；不设则这些测试 skip。**不要配进 Vercel** |
-| `LLM_API_KEY` | LLM 密钥。默认 MiniMax-M3 走 anthropic 兼容线（`sk-cp…`）；兼容读取 `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` 作为回退 |
-| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_BASE_URL` / `LLM_WIRE` | 可插拔 LLM，未设时用 MiniMax-M3 默认值（见 CLAUDE.md）|
+| `LLM_API_KEY` | LLM 密钥。默认 MiniMax-M3.1-Flash 走 anthropic 兼容线（`sk-cp…`）；兼容读取 `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` 作为回退 |
+| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_BASE_URL` / `LLM_WIRE` / `LLM_EFFORT` | 可插拔 LLM，未设时用 MiniMax-M3.1-Flash 默认值；`LLM_EFFORT` 调思考深度（默认 low）（见 CLAUDE.md）|
 | `BILLING_ENABLED` | 会员闸门总开关。**不为 `"1"`（默认）时不做任何限制** |
 | `FREE_LLM_MONTHLY` | 免费账号每月 LLM 额度，不设 = 30（`lib/entitlements.ts`；仅 `BILLING_ENABLED=1` 时生效）|
 | `FREE_PROFILE_LIMIT` | 免费档案上限，不设 = 3（仅 `BILLING_ENABLED=1` 时生效）|

@@ -69,7 +69,7 @@ cat .agent/CURRENT.md                             # 版本 / Sprint / Open Bugs
 | 紫微排盘 | iztro (MIT) | ✅ 已定 |
 | 西方星盘 | circular-natal-horoscope-js（公有领域，规避 Swiss Ephemeris AGPL）| ✅ 已定 |
 | 校验 | Zod | ✅ 已定 |
-| LLM 解读 | **可插拔（OpenAI 兼容）**，默认 **MiniMax-M3**，env 可切 DeepSeek/任意兼容端点 | ✅ `@sojan/llm` 已建 |
+| LLM 解读 | **可插拔（OpenAI 兼容）**，默认 **MiniMax-M3.1-Flash**（2026-11 起，原 M3），env 可切 DeepSeek/任意兼容端点 | ✅ `@sojan/llm` 已建 |
 
 **首发市场：海外**（华裔 + 西方探索者，英文 UI 优先）。
 
@@ -108,7 +108,7 @@ TEST_DATABASE_URL=<Neon dev 分支串> pnpm --filter @sojan/web exec vitest run 
 **Monorepo:** `apps/web`（Next）+ `packages/core`（排盘）+ `packages/llm`（解读，均经 `transpilePackages` 接入）。
 集成边界：`apps/web/app/reading/actions.ts`（→ core 排盘）、`apps/web/app/api/reading/route.ts`（→ llm 流式解读）。
 **LLM 解读层（`@sojan/llm`）：** provider 无关 fetch 客户端，**双线协议**：`anthropic`（Messages `/v1/messages`）/ `openai`（`/chat/completions`），env 驱动（`LLM_PROVIDER`/`LLM_MODEL`/`LLM_BASE_URL`/`LLM_API_KEY`[/`LLM_WIRE`]）。
-- **默认 = MiniMax-M3 Coding/Token Plan = Anthropic 兼容**：base `https://api.minimax.io/anthropic`，端点 `/v1/messages`，`Authorization: Bearer <sk-cp…>` + `anthropic-version`，body 顶层 `system`+`messages`+`max_tokens`，SSE 用 `content_block_delta…message_stop`。兼容读取 `ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL`。
+- **默认 = MiniMax-M3.1-Flash（Coding/Token Plan，Anthropic 兼容）**：思考恒开关不掉（`thinking:disabled` 会 400），只能用 `output_config.effort` 调深度，预设 `low`（`LLM_EFFORT` 可覆盖；官方默认 max 会把小 max_tokens 吃光）；base `https://api.minimax.io/anthropic`，端点 `/v1/messages`，`Authorization: Bearer <sk-cp…>` + `anthropic-version`，body 顶层 `system`+`messages`+`max_tokens`，SSE 用 `content_block_delta…message_stop`。兼容读取 `ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL`。
 - DeepSeek 等走 `openai` 线协议。
 - 三声部提示（命理/心理/整合）+ 守护栏从 core `SYNTHESIS_GUARDRAILS`/`RESONANCE_ANCHORS` 取；输出契约 **markdown 四分节**（不依赖 json_schema）。反幻觉：只喂 `extractFacts(chart)` 承重事实，禁模型自行排盘。
 

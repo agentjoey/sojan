@@ -89,3 +89,17 @@ describe("chatStream · openai 线", () => {
     expect(await drain(openai, [oText("x", "length"), "data: [DONE]\n\n"])).toBe("x");
   });
 });
+
+describe("请求体 · output_config.effort", () => {
+  it("anthropic 线：配置了 effort → body 带 output_config.effort；未配置则不带", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return sse([aText("ok"), a({ type: "message_stop" })]);
+    }));
+    for await (const _ of chatStream({ ...anthropic, effort: "low" }, [{ role: "user", content: "hi" }])) void _;
+    for await (const _ of chatStream(anthropic, [{ role: "user", content: "hi" }])) void _;
+    expect(bodies[0]?.output_config).toEqual({ effort: "low" });
+    expect(bodies[1]).not.toHaveProperty("output_config");
+  });
+});

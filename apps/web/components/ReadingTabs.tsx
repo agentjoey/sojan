@@ -17,9 +17,20 @@ const SIGN_CN: Record<string, string> = {
 const STRENGTH_CN: Record<string, string> = { strong: "身偏强", weak: "身偏弱", balanced: "身中和", unknown: "" };
 
 /** 摘要先行：优先取「短首行」作凝练结论；否则退而取首句。其余为正文。 */
+const LIST_MARK = /^(?:[-*+]|\d+[.、)])\s+/;
 function splitHead(body: string): { head: string; rest: string } {
-  const text = body.trim();
+  let text = body.trim();
   if (!text) return { head: "", rest: "" };
+  // 模型偶尔不按「短结论单独成行」开头，直接以列表项起笔：列表符号不能进大字标题。
+  // 「- **标签**：说明」取标签作大字、说明并入正文；无标签则去掉符号后照常取首句。
+  if (LIST_MARK.test(text)) {
+    const nl0 = text.indexOf("\n");
+    const item = (nl0 >= 0 ? text.slice(0, nl0) : text).replace(LIST_MARK, "").replace(/[*#>]/g, "").trim();
+    const after = nl0 >= 0 ? text.slice(nl0 + 1).trim() : "";
+    const m = item.match(/^([^：:。！？]{2,24})[：:]\s*(.+)$/);
+    if (m) return { head: m[1]!.trim(), rest: [m[2], after].filter(Boolean).join("\n\n") };
+    text = [item, after].filter(Boolean).join("\n");
+  }
   const nl = text.indexOf("\n");
   const firstLine = (nl >= 0 ? text.slice(0, nl) : text).replace(/[*#>]/g, "").trim();
   if (nl >= 0 && firstLine.length <= 24) return { head: firstLine, rest: text.slice(nl + 1).trim() };

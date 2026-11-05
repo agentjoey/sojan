@@ -149,4 +149,29 @@ describe("ReadingTabs（3c）", () => {
     expect(screen.getByTestId("reading-head").textContent).toBe("心理结论一句。");
     expect(screen.getByTestId("reading-body").textContent).toContain("心理正文段落");
   });
+
+  // 2026-11 staging 实测：模型没按「短结论单独成行」开头，而是直接以列表项起笔，
+  // 「- 给行动设置……：面对……；」整条带着列表符号被当成大字标题。
+  it("首行是「- 标签：说明」列表项 → 大字只取标签，不带列表符号，说明并入正文", () => {
+    const sections: ReadingSection[] = [
+      ...SECTIONS.slice(0, 3),
+      { key: "3-共振", title: "共振", body: "- **给行动设置可回收的节奏**：面对情绪刺激，先写下事实；以停顿代替立即回应。\n- **用金水火滋养日常**：选择明亮温暖的活动。", accent: "metal" },
+    ];
+    render(<I18nProvider locale="zh"><ReadingTabs sections={sections} chart={CHART} streaming={false} /></I18nProvider>);
+    fireEvent.click(screen.getByTestId("reading-tab-共振"));
+    expect(screen.getByTestId("reading-head").textContent).toBe("给行动设置可回收的节奏");
+    const body = screen.getByTestId("reading-body").textContent ?? "";
+    expect(body).toContain("面对情绪刺激，先写下事实");
+    expect(body).toContain("用金水火滋养日常");
+  });
+
+  it("首行是没有标签的长列表项 → 大字取首句且去掉列表符号", () => {
+    const sections: ReadingSection[] = [
+      ...SECTIONS.slice(0, 3),
+      { key: "3-共振", title: "共振", body: "- 面对情绪刺激时先停一停再回应，这能让直觉与长期建设互相支持。\n- 第二条建议。", accent: "metal" },
+    ];
+    render(<I18nProvider locale="zh"><ReadingTabs sections={sections} chart={CHART} streaming={false} /></I18nProvider>);
+    fireEvent.click(screen.getByTestId("reading-tab-共振"));
+    expect(screen.getByTestId("reading-head").textContent).toBe("面对情绪刺激时先停一停再回应，这能让直觉与长期建设互相支持。");
+  });
 });

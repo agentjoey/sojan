@@ -76,6 +76,13 @@ describe("prompt 组装（反幻觉 + 守护栏）", () => {
     expect(sys).toContain("resonance anchor");
     expect(sys).toMatch(/福德宫|Fortune/);
   });
+  it("中文提示：禁夹英文单词；摘要句不能是列表项/「标签：说明」，成长节也要先写结论", () => {
+    const zh = buildSystemPrompt("zh");
+    expect(zh).toContain("不得夹杂英文单词");
+    expect(zh).toContain("不能是列表项");
+    expect(zh).toContain("成长节也一样");
+    expect(sys).not.toContain("不得夹杂英文单词"); // 英文版不受影响
+  });
   it("用户轮把承重事实 JSON 喂入", () => {
     const msgs = buildMessages(chart, { nickname: "Joey" });
     expect(msgs[0]!.role).toBe("system");

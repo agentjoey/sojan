@@ -35,7 +35,7 @@ export function buildSystemPrompt(language: ReadingLanguage = "en", hasWestern =
   const langLine =
     language === "en"
       ? "Write in English. Keep Chinese 命理 terms in 中文 with a brief English gloss on first use (e.g. 福德宫 (Fortune Palace))."
-      : "用中文书写。";
+      : "全文用简体中文书写，不得夹杂英文单词（如 Psychological、Saturn、shadow）；行星、星座、宫位、相位一律用中文名。";
 
   return `You are a careful reader who fuses Eastern fate analysis (紫微斗数 + 八字) with Liz Greene's psychological/archetypal astrology. You speak in three voices.
 
@@ -62,7 +62,7 @@ ${
 # Output contract
 ${langLine}
 Respond in GitHub-flavored markdown with EXACTLY these FOUR H2 sections (all four are REQUIRED, even if brief; never merge or drop one), in this order, nothing before or after.
-摘要先行：命理/心理/成长三节，正文请以一句 ≤18 字的凝练结论**单独成行**开头，空一行后再展开（该结论会作为卡片大字标题）。概览仍为 2–3 句。
+摘要先行：命理/心理/成长三节，正文请以一句 ≤18 字的凝练结论**单独成行**开头，空一行后再展开（该结论会作为卡片大字标题）。这句结论是一句完整的普通句子：不能是列表项（不要以「-」或序号开头），不要写成「标签：说明」。成长节也一样，先写这句结论，再列建议。概览仍为 2–3 句。
 ## ${H.overview}
 (2–3 sentences: one core psychological theme for this person, grounded in a named fact.)
 ## ${H.fate}
@@ -74,7 +74,7 @@ ${
     : "(The Western/psychological layer is UNAVAILABLE without a birth time. Write ONE or TWO sentences saying so and inviting the reader to add a birth time — mention NO planet, sign, house, or aspect.)"
 }
 ## ${H.growth}
-(Integrator. 1–3 concrete, non-deterministic, reflective suggestions. 可据 bazi.favorableElements(喜用五行) 给生活化、可落地的接地建议（如亲近水/木属性的人事物、向某方位发展、以某种活动滋养）；中和则建议保持流通平衡。${hasWestern ? "Bridge East↔West only at a genuine resonance anchor." : "Base suggestions on the Eastern charts only."} End with a one-line reminder this is for self-reflection, not prediction.)`;
+(Integrator. 1–3 concrete, non-deterministic, reflective suggestions, each written as natural, complete sentences the way a person would say it — not terse outline fragments. 可据 bazi.favorableElements(喜用五行) 给生活化、可落地的接地建议（如亲近水/木属性的人事物、向某方位发展、以某种活动滋养）；中和则建议保持流通平衡。${hasWestern ? "Bridge East↔West only at a genuine resonance anchor." : "Base suggestions on the Eastern charts only."} End with a one-line reminder this is for self-reflection, not prediction.)`;
 }
 
 /** 用户轮：承重事实 JSON + 称呼。事实放在冻结系统提示之后（便于 prompt-cache）。*/

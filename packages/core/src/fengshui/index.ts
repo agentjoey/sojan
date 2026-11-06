@@ -17,9 +17,18 @@ export * from "./object-advisor";
 export * from "./dwelling";
 export * from "./cohabitants";
 export * from "./tagline";
+export * from "./en";
 
 /** 改动命卦公式 / 游年表 / 化解生成规则时**必须**递增——它进报告指纹，旧报告靠它失效。 */
 export const FENGSHUI_ENGINE_VERSION = "fs-2";
+
+/**
+ * 叙述层修订号，按语言（进报告指纹，见 web `fengshuiFingerprint`）。与引擎版本分开：
+ * 只有某一语言的叙述链改动到「该语言旧报告不该再被沿用」时才给它设/递增，
+ * 其他语言的缓存不受牵连（重生成要花用户的 LLM 额度）。
+ * - en `fs-en-1`：EP-fs-en，英文 prompt 重写 + 英文方位对拍/伪科学净化接上；此前的英文报告未经任何机械校验。
+ */
+export const FENGSHUI_NARRATIVE_REVISION: Partial<Record<"zh" | "en", string>> = { en: "fs-en-1" };
 
 export type FengshuiInput = {
   birth: BirthInput;

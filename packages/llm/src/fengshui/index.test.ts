@@ -158,3 +158,23 @@ describe("Task11 adviseObjectText — language 与 nickname 真的接线", () =>
     await expect(adviseObjectText(objectAdvice, { config: { apiKey: "" } as never })).rejects.toThrow();
   });
 });
+
+describe("EP-fs-en generateFengshuiReading 英文全链路", () => {
+  it("英文 prompt + 英文方位对拍 + 英文伪科学净化都接上了", async () => {
+    const se = fs.personalDirections.SE.star; // 1990 男 坎1：东南 = 生气
+    expect(se).toBe("生气");
+    chatMock.mockResolvedValue(
+      "## The Layout\nThe Southeast is your Jue Ming direction.\n\n## You and Your Space\nB\n\n" +
+        "## What You Can Do\n- A metal bowl (traditional symbolism). Studies show it helps.\n",
+    );
+    const r = await generateFengshuiReading(fs, { config: cfg, language: "en" });
+    const [sys, user] = sentMessages();
+    expect(sys!.content).toContain("## The Layout");
+    expect(user!.content).toContain("Southeast: Sheng Qi");
+    expect(r.markdown).toContain("The Southeast is your Sheng Qi direction.");
+    expect(r.corrections).toHaveLength(1);
+    expect(r.degraded).toBe(true);
+    expect(r.markdown).not.toMatch(/studies show/i);
+    expect(r.sections.situation).toBe("The Southeast is your Sheng Qi direction.");
+  });
+});

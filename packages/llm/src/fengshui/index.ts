@@ -71,11 +71,11 @@ export async function generateFengshuiReading(
 
   const raw = await chat(cfg, [
     { role: "system", content: buildFengshuiSystemPrompt(language) },
-    { role: "user", content: buildFengshuiUserPrompt(facts, { nickname: opts?.nickname }) },
+    { role: "user", content: buildFengshuiUserPrompt(facts, { nickname: opts?.nickname, language }) },
   ], { maxTokens: 1600, temperature: 0.7 });
 
-  const cleaned = sanitizeFengshui(raw, facts);
-  const { text, corrections } = verifyDirectionConsistency(cleaned, facts);
+  const cleaned = sanitizeFengshui(raw, facts, language);
+  const { text, corrections } = verifyDirectionConsistency(cleaned, facts, language);
   const sections = parseFengshuiSections(text, language);
   // 最终评审 Blocking 1：parseFengshuiSections 对缺节容错、缺节置空——这在「模型漏了
   // 一节」时是合理行为，但当三节全部解析为空（例如模型把 H2 写成 H3、或把标题加粗），

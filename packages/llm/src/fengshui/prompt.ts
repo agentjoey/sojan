@@ -1,4 +1,8 @@
-import { FENGSHUI_GUARDRAILS } from "@sojan/core";
+import {
+  FENGSHUI_GUARDRAILS, DIRECTION_LABEL, DIRECTION_LABEL_EN, STAR_LABEL_EN, STAR_GLOSS_EN,
+  GUA_PINYIN, GROUP_EN, ELEMENT_EN, COLOR_EN, MATERIAL_EN, DIRECTIONS,
+  type Direction, type Gua,
+} from "@sojan/core";
 import type { ObjectAdvice } from "@sojan/core";
 import type { ReadingLanguage } from "../prompt";
 import type { FengshuiFacts } from "./facts";
@@ -11,9 +15,19 @@ const SECTION_HEADERS: Record<ReadingLanguage, Record<FengshuiSectionKey, string
   en: { situation: "The Layout", youAndSpace: "You and Your Space", actions: "What You Can Do" },
 };
 
+/**
+ * 主报告 system prompt。`language="en"` 是**整份英文撰写**的 prompt（EP-fs-en），不是
+ * 「中文指令 + 末尾一句 answer in English」——与 {@link buildObjectAdviceSystemPrompt} 同一做法：
+ * 只有 core 的 `FENGSHUI_GUARDRAILS` 保持中文原文（单一事实源，不翻译分叉）。
+ *
+ * 英文版额外要求两件事，都是为了让 guard 的英文路径对得上：
+ * ① 星名一律写拼音（`STAR_LABEL_EN`）——对拍只认拼音；
+ * ② 谈方位时显式写「personal directions」/「house directions」——英文归属判定只认这类强标记。
+ */
 export function buildFengshuiSystemPrompt(language: ReadingLanguage = "zh"): string {
+  if (language === "en") return buildFengshuiSystemPromptEn();
   const H = SECTION_HEADERS[language];
-  const langLine = language === "zh" ? "全文用简体中文。" : "Write the whole answer in English.";
+  const langLine = "全文用简体中文。";
   return [
     "你是 Sojan 的「境」声部 —— 谈人与居住空间的关系。你的材料全部由确定性计算层给出。",
     "",
@@ -36,6 +50,34 @@ export function buildFengshuiSystemPrompt(language: ReadingLanguage = "zh"): str
   ].join("\n");
 }
 
+function buildFengshuiSystemPromptEn(): string {
+  const H = SECTION_HEADERS.en;
+  const n = FENGSHUI_GUARDRAILS.length;
+  const stars = Object.values(STAR_LABEL_EN).join(", ");
+  return [
+    "You are the \"Space\" voice of Sojan, writing about the relationship between a person and the space they live in. Every fact you use comes from a deterministic calculation layer.",
+    "",
+    "Hard rules:",
+    ...FENGSHUI_GUARDRAILS.map((g, i) => `${i + 1}. ${g}`),
+    `${n + 1}. Use only the star given for each direction in the facts (${stars}). Never work out a direction's star yourself and never change which star belongs to which direction.`,
+    `${n + 2}. Always write star names in pinyin exactly as listed (e.g. "Sheng Qi"), optionally followed by a short gloss in parentheses. Do not replace them with English translations.`,
+    `${n + 3}. Remedies marked as traditional symbolism: say only what the tradition holds and what the act can mean as a small ritual for settling yourself. Never use phrases like "studies show", "scientifically proven", "clinically", or "experiments show".`,
+    `${n + 4}. The personal directions (set by your personal gua) and the house directions (set by the house gua) are two independent sets of readings. Never mix them or derive one from the other. Whenever you mention a direction's star, say which set it belongs to, using the words "personal directions" or "house directions".`,
+    "",
+    "Output format: exactly three H2 sections, in this order, with no other headings:",
+    `## ${H.situation}`,
+    "State the personal gua, its group (East Group or West Group), and each direction's star and whether it is favorable. Describe it like terrain; do not pass judgement.",
+    `## ${H.youAndSpace}`,
+    "Translate that layout into everyday experience: which directions make it easier to relax over long stretches and which make it easier to feel tense, with the modern explanation where one is given (only for remedies that list a modern mechanism).",
+    `## ${H.actions}`,
+    "List 4–6 things to do, zero-cost ones first, each as one actionable sentence. Every remedy marked [traditional symbolism] in the candidate list must carry the inline tag \"(traditional symbolism)\" on its line — no exceptions. The post-processing step relies on this tag; it is not decoration.",
+    "",
+    "The facts may be written in Chinese; translate them faithfully, but keep star names in pinyin.",
+    "Write the whole answer in English.",
+    "End with one sentence saying these are suggestions for self-awareness and how you live in your space, not professional advice.",
+  ].join("\n");
+}
+
 /**
  * 把一组方位判语排成提示行：吉方在前、同吉凶内按 rank 升序。
  *
@@ -52,7 +94,11 @@ function formatSectorLines(sectors: FengshuiFacts["directions"]): string[] {
     .map((d) => `- ${d.label}：${d.star}（${d.auspicious ? "吉" : "凶"}，第${d.rank}）`);
 }
 
-export function buildFengshuiUserPrompt(facts: FengshuiFacts, opts?: { nickname?: string }): string {
+export function buildFengshuiUserPrompt(
+  facts: FengshuiFacts,
+  opts?: { nickname?: string; language?: ReadingLanguage },
+): string {
+  if (opts?.language === "en") return buildFengshuiUserPromptEn(facts, opts);
   const dirLines = formatSectorLines(facts.directions).join("\n");
   const remLines = facts.remedies
     .map((r) => `- [${r.effort}][${r.evidence}] ${r.action}｜传统依据：${r.traditional}｜现代机制：${r.modern ?? "无（不得编造）"}`)
@@ -88,6 +134,67 @@ export function buildFengshuiUserPrompt(facts: FengshuiFacts, opts?: { nickname?
     `宜用色：${facts.favorableColors.join("、") || "无"}｜宜用材：${facts.favorableMaterials.join("、") || "无"}｜宜少用色：${facts.unfavorableColors.join("、") || "无"}`,
     ``,
     `候选化解（只准从这些里挑，可合并同类，不得新增）：`,
+    remLines,
+  ].join("\n");
+}
+
+const DIRECTION_BY_ZH_LABEL = new Map<string, Direction>(DIRECTIONS.map((d) => [DIRECTION_LABEL[d], d]));
+/** 中文方位名 → 英文；认不出的原样返回（不丢信息）。 */
+const dirEn = (zh: string) => {
+  const d = DIRECTION_BY_ZH_LABEL.get(zh);
+  return d ? DIRECTION_LABEL_EN[d] : zh;
+};
+const mapEn = (xs: string[], table: Record<string, string>) => xs.map((x) => table[x] ?? x).join(", ");
+/** facts 里命卦是「坎1」这样的拼接串：首字卦名 + 卦数。 */
+const guaEn = (s: string) => `${GUA_PINYIN[s[0] as Gua] ?? s[0]} ${s.slice(1)}`.trim();
+const groupEn = (g: string) => GROUP_EN[g as keyof typeof GROUP_EN] ?? g;
+
+function formatSectorLinesEn(sectors: FengshuiFacts["directions"]): string[] {
+  return [...sectors]
+    .sort((a, b) => Number(b.auspicious) - Number(a.auspicious) || a.rank - b.rank)
+    .map((d) =>
+      `- ${DIRECTION_LABEL_EN[d.direction]}: ${STAR_LABEL_EN[d.star]} (${STAR_GLOSS_EN[d.star]}; ${d.auspicious ? "favorable" : "unfavorable"}, #${d.rank})`);
+}
+
+/**
+ * 英文 user prompt：确定性标签（方位、星名、卦名、组别、五行、色、材）一律换成 core 英文词表，
+ * 与英文对拍的词表同源；化解条目的自由文本仍是 core 产出的中文原文，交给模型忠实翻译
+ * （③ 把这些文案本身做成双语是另一项工作）。
+ */
+function buildFengshuiUserPromptEn(facts: FengshuiFacts, opts?: { nickname?: string }): string {
+  const remLines = facts.remedies
+    .map((r) =>
+      `- [${r.effort}][${r.evidence === "传统象征" ? "traditional symbolism" : "traditional + modern"}] ${r.action} | Tradition: ${r.traditional} | Modern mechanism: ${r.modern ?? "none (do not invent one)"}`)
+    .join("\n");
+  const dw = facts.dwelling;
+  const dwellingBlock = dw ? [
+    ``,
+    `Dwelling: ${dw.name} (${dw.kind === "home" ? "home" : "office"}, ${dw.tenancy === "rent" ? "rented" : "owned"})`,
+    `Orientation: sits ${dirEn(dw.sittingLabel)}, faces ${dirEn(dw.facingLabel)} → ${GUA_PINYIN[dw.guaName as Gua] ?? dw.guaName} house (${groupEn(dw.group)})`,
+    `Fit with you: ${dw.matchWithPerson === "相配" ? "compatible (same group)" : dw.matchWithPerson === "相冲" ? "in tension (different groups)" : dw.matchWithPerson}`,
+    `House directions (a separate set from the personal directions above — never mix them):`,
+    ...formatSectorLinesEn(dw.sectors),
+  ] : [];
+  const cohabBlock = facts.cohabitants.length ? [
+    ``,
+    `Housemates (the same house is favorable or unfavorable differently for each person — a direct Eight Mansions conclusion, not "a matter of personal feeling"):`,
+    ...facts.cohabitants.map((c) =>
+      `- ${c.name}: ${guaEn(c.mingGua)} (${groupEn(c.group)}) | good for you but bad for them: ${c.conflicts.map(dirEn).join(", ") || "none"} | good for both: ${c.sharedGood.map(dirEn).join(", ") || "none"}`),
+  ] : [];
+  return [
+    `Name: ${opts?.nickname ?? "you"}`,
+    `Personal gua: ${guaEn(facts.mingGua)} (${groupEn(facts.guaGroup)})`,
+    `Personal directions:`,
+    ...formatSectorLinesEn(facts.directions),
+    ...dwellingBlock,
+    ...cohabBlock,
+    ``,
+    `Favorable elements: ${mapEn(facts.favorableElements, ELEMENT_EN) || "balanced, no clear lean"}`,
+    `Unfavorable elements: ${mapEn(facts.unfavorableElements, ELEMENT_EN) || "none"}`,
+    `Favorable directions (by element): ${facts.favorableDirections.map(dirEn).join(", ") || "none"}`,
+    `Colors to favor: ${mapEn(facts.favorableColors, COLOR_EN) || "none"} | Materials to favor: ${mapEn(facts.favorableMaterials, MATERIAL_EN) || "none"} | Colors to use sparingly: ${mapEn(facts.unfavorableColors, COLOR_EN) || "none"}`,
+    ``,
+    `Candidate remedies (choose only from these; you may merge similar ones; do not add new ones; the text is in Chinese — translate it):`,
     remLines,
   ].join("\n");
 }

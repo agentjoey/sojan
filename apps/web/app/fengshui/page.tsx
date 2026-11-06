@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  computeFengshui, FENGSHUI_ENGINE_VERSION, directionsFor, DIRECTION_LABEL, DIRECTIONS, deriveFengshuiTagline,
+  computeFengshui, FENGSHUI_ENGINE_VERSION, FENGSHUI_NARRATIVE_REVISION, directionsFor, DIRECTION_LABEL, DIRECTIONS, deriveFengshuiTagline,
   type FengshuiChart, type DwellingInput, type CohabitantInput, type Direction,
 } from "@sojan/core";
 import { getActiveProfile, getProfile, type Profile } from "@/lib/profiles";
@@ -420,6 +420,7 @@ export default function FengshuiPage() {
     // 相同指纹会命中一份不含宅层内容的旧缓存，看不到本该有的 Layer 1 叙述。
     const fp = fengshuiFingerprint({
       profileId: profile.id, locale, engineVersion: FENGSHUI_ENGINE_VERSION,
+      narrativeRevision: FENGSHUI_NARRATIVE_REVISION[locale],
       dwelling: effectiveDwellingInput
         ? { id: effectiveDwellingInput.id, facing: effectiveDwellingInput.facing, tenancy: effectiveDwellingInput.tenancy, kind: effectiveDwellingInput.kind }
         : null,

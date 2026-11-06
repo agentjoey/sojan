@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import {
-  BirthInputSchema, computeUnifiedChart, computeFengshui, directionsFor, FENGSHUI_ENGINE_VERSION,
+  BirthInputSchema, computeUnifiedChart, computeFengshui, directionsFor, FENGSHUI_ENGINE_VERSION, FENGSHUI_NARRATIVE_REVISION,
   DIRECTION_LABEL,
 } from "@sojan/core";
 import { fengshuiFingerprint, type FengshuiSections } from "@/lib/fengshui-report";
@@ -65,8 +65,11 @@ const SECTIONS = { situation: "甲", youAndSpace: "乙", actions: "丙" };
  * `fengshuiFingerprint`（纯函数，未 mock）算出预期指纹，与 page.tsx 内部实际使用的
  * 值保持一致。
  */
-const fpFor = (locale: string, engineVersion: string = FENGSHUI_ENGINE_VERSION) =>
-  fengshuiFingerprint({ profileId: "p1", locale, engineVersion, dwelling: null, memberProfileIds: [] });
+const fpFor = (locale: "zh" | "en", engineVersion: string = FENGSHUI_ENGINE_VERSION) =>
+  fengshuiFingerprint({
+    profileId: "p1", locale, engineVersion, dwelling: null, memberProfileIds: [],
+    narrativeRevision: FENGSHUI_NARRATIVE_REVISION[locale],
+  });
 const FP_ZH = fpFor("zh");
 const FP_EN = fpFor("en");
 
@@ -1752,5 +1755,18 @@ describe("Task 6：未登录访客（D1 / Review Focus 1）", () => {
     vi.mocked(profiles.getActiveProfile).mockResolvedValueOnce(null);
     await renderPage();
     expect(screen.queryByTestId("sign-in-prompt")).toBeNull();
+  });
+});
+
+describe("EP-fs-en：英文报告指纹带叙述修订号", () => {
+  it("英文指纹 ≠ 不带修订号的旧英文指纹（旧的未校验英文报告不再命中）", () => {
+    expect(FENGSHUI_NARRATIVE_REVISION.en).toBeTruthy();
+    expect(FP_EN).not.toBe(
+      fengshuiFingerprint({ profileId: "p1", locale: "en", engineVersion: FENGSHUI_ENGINE_VERSION, dwelling: null, memberProfileIds: [] }),
+    );
+  });
+
+  it("中文指纹不受影响", () => {
+    expect(FENGSHUI_NARRATIVE_REVISION.zh).toBeUndefined();
   });
 });

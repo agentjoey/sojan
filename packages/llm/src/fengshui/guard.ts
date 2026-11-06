@@ -1,4 +1,5 @@
-import type { Direction } from "@sojan/core";
+import { DIRECTION_LABEL_EN, STAR_LABEL_EN, type Direction, type FengshuiStar } from "@sojan/core";
+import type { ReadingLanguage } from "../prompt";
 import type { FengshuiFacts } from "./facts";
 
 /**
@@ -42,7 +43,12 @@ const SYMBOLIC_MARKERS = ["传统象征", "象征意义", "仪式"];
  * 的补救——但 prompt.ts 同时要求「可合并同类」改写化解文案，模型逐字保留
  * `action.slice(0, 8)` 的概率本来就低，不应当作主要依赖，只当保底。
  */
-export function sanitizeFengshui(markdown: string, facts: FengshuiFacts): string {
+export function sanitizeFengshui(
+  markdown: string,
+  facts: FengshuiFacts,
+  language: ReadingLanguage = "zh",
+): string {
+  if (language === "en") return sanitizeFengshuiEn(markdown);
   const symbolicActions = facts.remedies
     .filter((r) => r.evidence === "传统象征")
     .map((r) => r.action.slice(0, 8))
@@ -177,10 +183,16 @@ const SENTENCE_BOUNDARY = /[；;。！？!?\n]/;
 /** 结构化列表/表格行：只有这类行才继承所在块的归属（散文不跨行继承，见 resolveScope）。 */
 const LIST_ROW = /^[ \t]{0,3}(?:[-*+]|\d+[.、)）]|\|)/;
 
+/** 一种语言的归属判定词表：两套标记 + 分句/句子边界。 */
+type ScopeLexicon = { personal: RegExp; dwelling: RegExp; clause: RegExp; sentence: RegExp };
+const ZH_SCOPE: ScopeLexicon = {
+  personal: PERSONAL_MARKER, dwelling: DWELLING_MARKER, clause: CLAUSE_BOUNDARY, sentence: SENTENCE_BOUNDARY,
+};
+
 /** 窗口里恰好只出现一套标记时才算判出归属；两套都有 = 说不清，零套 = 没说，均返回 null。 */
-function scopeOfWindow(window: string): DirectionScope | null {
-  const p = PERSONAL_MARKER.test(window);
-  const d = DWELLING_MARKER.test(window);
+function scopeOfWindow(window: string, lx: ScopeLexicon): DirectionScope | null {
+  const p = lx.personal.test(window);
+  const d = lx.dwelling.test(window);
   if (p === d) return null;
   return p ? "personal" : "dwelling";
 }
@@ -232,14 +244,16 @@ function blockAround(text: string, start: number): string {
  *    继承，一段以居所开头、中间夹一句没标记的本命描述的自然段就会被整段错判——
  *    而列表行由其表头统辖是排版本身给出的结构信号，不是猜的。
  */
-function resolveScope(text: string, start: number, end: number): DirectionScope | null {
-  const byClause = scopeOfWindow(windowAround(text, start, end, CLAUSE_BOUNDARY));
+function resolveScope(
+  text: string, start: number, end: number, lx: ScopeLexicon = ZH_SCOPE,
+): DirectionScope | null {
+  const byClause = scopeOfWindow(windowAround(text, start, end, lx.clause), lx);
   if (byClause) return byClause;
-  const bySentence = scopeOfWindow(windowAround(text, start, end, SENTENCE_BOUNDARY));
+  const bySentence = scopeOfWindow(windowAround(text, start, end, lx.sentence), lx);
   if (bySentence) return bySentence;
   const [ls, le] = lineBounds(text, start);
   if (!LIST_ROW.test(text.slice(ls, le))) return null;
-  return scopeOfWindow(blockAround(text, start));
+  return scopeOfWindow(blockAround(text, start), lx);
 }
 
 /**
@@ -292,7 +306,9 @@ function resolveScope(text: string, start: number, end: number): DirectionScope 
 export function verifyDirectionConsistency(
   markdown: string,
   facts: FengshuiFacts,
+  language: ReadingLanguage = "zh",
 ): { text: string; corrections: DirectionCorrection[] } {
+  if (language === "en") return verifyDirectionConsistencyEn(markdown, facts);
   const corrections: DirectionCorrection[] = [];
 
   const personalRows = facts.directions;
@@ -409,4 +425,162 @@ export function verifyDirectionConsistency(
  */
 export function sortLabelsLongestFirst<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => b.label.length - a.label.length);
+}
+
+/*
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 英文路径（EP-fs-en）
+ *
+ * 结构与中文完全同构：同一套「方位在前 ① / 星名在前 ② + ① 让位给 ②」的单趟组合
+ * 正则、同一套「分句 → 句子 → 列表块」三级归属判定与弃权规则；只是词表换成英文。
+ * 中文路径不经过这里任何一行（默认参数 language="zh"）。
+ *
+ * 词表约定（core `fengshui/en.ts` 单一事实源）：方位名 North…Northwest，星名一律拼音
+ * （Sheng Qi …）。意译星名（"Life Generating" 等）写法不唯一、无法对拍，不在覆盖面内
+ * ——英文 prompt 因此要求模型一律写拼音星名。
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * "Northeast" → `North[ \t-]?east`：认连字符与空格分写；整体大小写不敏感。
+ * 空格分写必须认：否则「North west is Liu Sha」里 North 后接不上星名而失败，
+ * 扫描继续前进到「west is Liu Sha」，把它当成**西方**去查表。
+ */
+const enLabelSource = (label: string) => label.replace(/^(North|South)(east|west)$/, "$1[ \\t-]?$2");
+/** "Sheng Qi" → `Sheng[\s-]?Qi`：认 "Shengqi" / "Sheng-Qi" / 大小写变体。 */
+const enStarSource = (label: string) => label.replace(" ", "[ \\t-]?");
+const enKey = (s: string) => s.toLowerCase().replace(/[\s-]/g, "");
+
+const EN_DIRECTION_BY_KEY = new Map<string, Direction>(
+  (Object.entries(DIRECTION_LABEL_EN) as [Direction, string][]).map(([d, l]) => [enKey(l), d]),
+);
+const EN_STAR_BY_KEY = new Map<string, FengshuiStar>(
+  (Object.entries(STAR_LABEL_EN) as [FengshuiStar, string][]).map(([s, l]) => [enKey(l), s]),
+);
+
+/** 长名优先（Northeast 先于 North），与中文同理；外加 `\b` 两侧锚定，Eastern / Southeastern 不算方位名。 */
+const EN_DIR_ALT = `\\b(?:${Object.values(DIRECTION_LABEL_EN)
+  .sort((a, b) => b.length - a.length)
+  .map(enLabelSource)
+  .join("|")})\\b`;
+/** 「East Group / West Group」是固有词（= 东四命/西四命），其中的 East/West 不是方位名——对应中文的 `(?!四)`。 */
+const EN_NOT_GROUP = "(?![ \\t]*-?[ \\t]*group)";
+const EN_STAR_ALT = `\\b(?:${Object.values(STAR_LABEL_EN).map(enStarSource).join("|")})\\b`;
+
+const EN_DIR_SUFFIX = "(?:[ \\t]+(?:sector|direction|corner|side|area|wall))";
+const EN_STAR_SUFFIX = "(?:[ \\t]+(?:direction|sector|position|spot|star|area|corner))";
+/**
+ * 胶水：与中文一样只放「安全」的东西——行内空白、冒号、短横/破折号、竖线、左括号，
+ * 外加几个不承载语义的系词/限定词。**不含**逗号、句号、分号与换行（它们是边界）。
+ */
+const EN_GLUE = "(?:[ \\t]+|:|-|—|–|\\||\\(|=|\\b(?:is|was|the|your|its|a|an|as)\\b)";
+/** 英文单词之间都隔着空白，同样一句话比中文多出好几个胶水单元，上限相应放宽。 */
+const EN_GLUE_MAX = 8;
+/** 星名在前时要求的显式方位断言（"Jue Ming lies in the Southwest" / "Sheng Qi direction is Southeast"）。 */
+const EN_LOCATIVE =
+  "[ \\t]+(?:(?:is|lies|falls|sits)[ \\t]+(?:in|at|to)[ \\t]+|is[ \\t]+|in[ \\t]+|at[ \\t]+)(?:the[ \\t]+)?";
+
+/**
+ * 英文归属标记。只收**强**标记：「the house」「your home」这类词刻意不收——
+ * 「In your home, the Southeast is your Sheng Qi direction」谈的是本命八方，
+ * 若把 home 当成房屋八方标记，就会按宅卦表把一句正确的话改错（这道闸门的历史失败模式
+ * 就是过度纠正，见上方 DirectionScope 段）。prompt 要求模型显式写出
+ * 「personal directions」/「house directions」，弃权只落在已违规的句子上。
+ */
+const EN_SCOPE: ScopeLexicon = {
+  personal:
+    /\bpersonal (?:eight )?directions?\b|\bpersonal (?:chart|gua|table)\b|\b(?:life|ming) gua\b|\b(?:east|west) group person\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) (?:gua|person)\b|\bfor you personally\b/i,
+  dwelling:
+    /\bhouse(?:'s)? (?:eight )?directions?\b|\bhouse (?:gua|chart|table)\b|\bdwelling\b|\b(?:this|the) house's\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) house\b|\b(?:east|west) group house\b/i,
+  clause: /[,;.!?\n]/,
+  sentence: /[;.!?\n]/,
+};
+
+function verifyDirectionConsistencyEn(
+  markdown: string,
+  facts: FengshuiFacts,
+): { text: string; corrections: DirectionCorrection[] } {
+  const corrections: DirectionCorrection[] = [];
+  const personal = new Map(facts.directions.map((d) => [d.direction, d]));
+  const dwelling = facts.dwelling ? new Map(facts.dwelling.sectors.map((d) => [d.direction, d])) : null;
+
+  const tableFor = (dir: Direction, start: number, end: number) => {
+    const p = personal.get(dir)!;
+    if (!dwelling) return p;
+    const h = dwelling.get(dir)!;
+    const scope = resolveScope(markdown, start, end, EN_SCOPE);
+    if (scope === "personal") return p;
+    if (scope === "dwelling") return h;
+    return p.star === h.star ? p : null;
+  };
+
+  const starFirstTail = (capture: boolean) => {
+    const g = (name: string) => (capture ? `(?<${name}>` : "(?:");
+    return (
+      `${g("bStarSuffix")}${EN_STAR_SUFFIX})?${g("bGlue")}${EN_LOCATIVE})` +
+      `${g("bDirBold")}${BOLD})?${g("bDir")}${EN_DIR_ALT})${EN_NOT_GROUP}`
+    );
+  };
+
+  const pattern = new RegExp(
+    `(?<aDirBoldPre>${BOLD})?(?<aDir>${EN_DIR_ALT})${EN_NOT_GROUP}(?<aDirBoldPost>${BOLD})?(?<aDirSuffix>${EN_DIR_SUFFIX})?` +
+      `(?<aGlue>(?:${EN_GLUE}){0,${EN_GLUE_MAX}})` +
+      `(?<aStarBoldPre>${BOLD})?(?<aStar>${EN_STAR_ALT})(?<aStarBoldPost>${BOLD})?` +
+      `(?!(?:${BOLD})?${starFirstTail(false)})` +
+      "|" +
+      `(?<bStarBoldPre>${BOLD})?(?<bStar>${EN_STAR_ALT})(?<bStarBoldPost>${BOLD})?${starFirstTail(true)}`,
+    "gi",
+  );
+
+  const text = markdown.replace(pattern, (match: string, ...rest: unknown[]) => {
+    const g = rest[rest.length - 1] as Record<string, string | undefined>;
+    const offset = rest[rest.length - 3] as number;
+    const dirFirst = g.aDir !== undefined;
+    const writtenDir = (dirFirst ? g.aDir : g.bDir)!;
+    const writtenStar = (dirFirst ? g.aStar : g.bStar)!;
+    const dir = EN_DIRECTION_BY_KEY.get(enKey(writtenDir))!;
+    const star = EN_STAR_BY_KEY.get(enKey(writtenStar))!;
+    const d = tableFor(dir, offset, offset + match.length);
+    if (!d || star === d.star) return match;
+    const correct = STAR_LABEL_EN[d.star];
+    corrections.push({ direction: dir, label: DIRECTION_LABEL_EN[dir], wrote: writtenStar, correct });
+    return dirFirst
+      ? `${g.aDirBoldPre ?? ""}${writtenDir}${g.aDirBoldPost ?? ""}${g.aDirSuffix ?? ""}${g.aGlue ?? ""}` +
+          `${g.aStarBoldPre ?? ""}${correct}${g.aStarBoldPost ?? ""}`
+      : `${g.bStarBoldPre ?? ""}${correct}${g.bStarBoldPost ?? ""}${g.bStarSuffix ?? ""}` +
+          `${g.bGlue ?? ""}${g.bDirBold ?? ""}${writtenDir}`;
+  });
+
+  return { text, corrections };
+}
+
+/**
+ * 英文伪科学措辞：「名词 + (has/have) + 动词 (+ that)」链式组合，与中文同样是**单趟**
+ * 组合正则（理由见 PSEUDO_SCIENCE_CHAIN）。
+ */
+const EN_PSEUDO_SCIENCE_RE = new RegExp(
+  [
+    "\\b(?:(?:scientific|clinical|medical)[ \\t]+)?(?:studies|study|research|science|data|experiments?|trials?|evidence)" +
+      "[ \\t]+(?:(?:has|have)[ \\t]+)?(?:shows?|shown|proves?|proven|proved|confirms?|confirmed|demonstrates?|demonstrated|suggests?|suggested)" +
+      "(?:[ \\t]+that)?,?[ \\t]*",
+    "\\baccording[ \\t]+to[ \\t]+(?:studies|research|science|scientists),?[ \\t]*",
+    "\\b(?:it[ \\t]+)?has[ \\t]+been[ \\t]+(?:scientifically[ \\t]+)?proven(?:[ \\t]+that)?[ \\t]*",
+  ].join("|"),
+  "gi",
+);
+/** 「is scientifically proven to help」→「is traditionally said to help」：删掉会留下破句，改写成传统说法。 */
+const EN_PROVEN_RE = /\b(?:scientifically|clinically)[ \t]+(?:proven|shown|validated)\b/gi;
+const EN_SYMBOLIC_MARKER = /traditional symbolism|\bsymbolic\b|\britual\b/i;
+
+function sanitizeFengshuiEn(markdown: string): string {
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (!EN_SYMBOLIC_MARKER.test(line)) return line;
+      const out = line.replace(EN_PSEUDO_SCIENCE_RE, "").replace(EN_PROVEN_RE, "traditionally said");
+      if (out === line) return out;
+      // 删掉的若是句首措辞，补回下一个词的首字母大写
+      return out.replace(/([.!?][ \t]+)([a-z])/g, (_m, p: string, c: string) => p + c.toUpperCase());
+    })
+    .join("\n");
 }

@@ -12,6 +12,11 @@ export type FingerprintInput = {
   /** null = Layer 0 */
   dwelling: { id: string; facing: string; tenancy: "rent" | "own"; kind: "home" | "office" } | null;
   memberProfileIds: string[];
+  /**
+   * 叙述层修订号（EP-fs-en）：prompt/校验链改动到「旧报告不该再被沿用」时才设。
+   * 缺省时**不进**指纹原文，保证没设修订号的语言（目前是中文）存量缓存逐字节不变。
+   */
+  narrativeRevision?: string;
 };
 
 /**
@@ -27,6 +32,7 @@ export function fengshuiFingerprint(i: FingerprintInput): string {
     v: i.engineVersion,
     d: i.dwelling ? [i.dwelling.id, i.dwelling.facing, i.dwelling.tenancy, i.dwelling.kind] : null,
     m: [...i.memberProfileIds].sort(),
+    ...(i.narrativeRevision ? { n: i.narrativeRevision } : {}),
   });
   // djb2：确定性、无依赖、够用（这不是安全哈希，只用来做缓存键）
   let h = 5381;

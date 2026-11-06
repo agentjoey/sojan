@@ -27,7 +27,7 @@ export type { SelfPortrait, SelfPortraitDimension } from "./spirit/portrait";
 export { omenOf, phaseAfter, MAX_THROWS, type Omen, type BlockFace, type JiaoPhase } from "./jiao";
 
 export {
-  computeFengshui, FENGSHUI_ENGINE_VERSION,
+  computeFengshui, FENGSHUI_ENGINE_VERSION, FENGSHUI_NARRATIVE_REVISION,
   deriveMingGua, ganzhiOfYear, directionsFor, elementDirections, adviseObject,
   buildPersonalRemedies, buildDwellingRemedies, sortRemedies,
   dwellingGua, matchWithPerson, deriveCohabitants,
@@ -36,6 +36,7 @@ export {
   ENV_PSYCH_ANCHORS, FENGSHUI_GUARDRAILS,
   OBJECT_CATEGORIES, CATEGORY_LABEL,
   deriveFengshuiTagline,
+  DIRECTION_LABEL_EN, STAR_LABEL_EN, STAR_GLOSS_EN, GUA_PINYIN, GROUP_EN, ELEMENT_EN, COLOR_EN, MATERIAL_EN,
 } from "./fengshui/index";
 export type {
   FengshuiInput, FengshuiChart, DwellingView, DwellingInput, DwellingGua,

@@ -254,3 +254,88 @@ describe("EP-fs-16 Layer 1 提示", () => {
     expect(fresh.dwelling!.sectors.map((d) => d.direction)).toEqual(before);
   });
 });
+
+// EP-fs-en ②：英文主报告 prompt 此前是「中文指令 + 末尾一句 Write the whole answer in English」。
+describe("EP-fs-en 英文主报告 prompt", () => {
+  const sys = buildFengshuiSystemPrompt("en");
+  const CJK = /[一-鿿]/;
+
+  it("除 core 守护栏原文外，本模块撰写的每一行都是英文（不含汉字）", () => {
+    const own = sys.split("\n").filter((l) => !FENGSHUI_GUARDRAILS.some((g) => l.includes(g)));
+    const offending = own.filter((l) => CJK.test(l));
+    expect(offending).toEqual([]);
+  });
+
+  it("仍带入 core 守护栏全文（单一事实源，不翻译分叉）", () => {
+    for (const g of FENGSHUI_GUARDRAILS) expect(sys).toContain(g);
+  });
+
+  it("三个英文 H2 标题，parseFengshuiSections(en) 能切回来", () => {
+    for (const h of ["## The Layout", "## You and Your Space", "## What You Can Do"]) expect(sys).toContain(h);
+  });
+
+  it("要求星名一律写拼音，并列出全部八个（机械对拍只认拼音）", () => {
+    for (const s of ["Sheng Qi", "Tian Yi", "Yan Nian", "Fu Wei", "Jue Ming", "Wu Gui", "Liu Sha", "Huo Hai"]) {
+      expect(sys).toContain(s);
+    }
+    expect(sys).toMatch(/pinyin/i);
+  });
+
+  it("要求显式写出 personal directions / house directions（归属判定的强标记）", () => {
+    expect(sys).toContain("personal directions");
+    expect(sys).toContain("house directions");
+  });
+
+  it("要求传统象征条目行内标注「(traditional symbolism)」（英文净化据此判断语境）", () => {
+    expect(sys).toContain("(traditional symbolism)");
+  });
+
+  it("中文 prompt 不受影响", () => {
+    expect(buildFengshuiSystemPrompt("zh")).toContain("## 形势");
+    expect(buildFengshuiSystemPrompt()).toBe(buildFengshuiSystemPrompt("zh"));
+  });
+});
+
+describe("EP-fs-en 英文主报告 user prompt", () => {
+  const user = buildFengshuiUserPrompt(facts, { language: "en" });
+
+  it("八方判语用英文方位名 + 拼音星名", () => {
+    // 1990 男 = 坎1：生气在东南
+    expect(user).toContain("- Southeast: Sheng Qi (vitality; favorable, #1)");
+    expect(user).toContain("- Southwest: Jue Ming (total loss; unfavorable, #1)");
+  });
+
+  it("命卦写拼音 + 英文组别，不出现「东四命」", () => {
+    expect(user).toContain("Kan 1 (East Group)");
+    expect(user).not.toContain("东四命");
+  });
+
+  it("五行写英文", () => {
+    const line = user.split("\n").find((l) => l.startsWith("Favorable elements:"))!;
+    expect(facts.favorableElements.length).toBeGreaterThan(0);
+    expect(line).not.toMatch(/[\u4e00-\u9fff]/);
+    expect(line).toMatch(/Favorable elements: (Wood|Fire|Earth|Metal|Water)/);
+  });
+
+  it("候选化解原文保留（由模型翻译），但传统象征条目明确标出", () => {
+    const sym = facts.remedies.find((r) => r.evidence === "传统象征")!;
+    expect(user).toContain(sym.action);
+    expect(user).toMatch(/\[traditional symbolism\]/);
+  });
+
+  it("Layer 1：房屋八方单独成段、英文标注，并提醒与本命八方是两套", () => {
+    const l1Facts = extractFengshuiFacts(computeFengshui({
+      birth, chart: computeUnifiedChart(birth),
+      dwelling: { id: "d1", name: "Home", kind: "home", tenancy: "rent", facing: "N" },
+    }));
+    const u = buildFengshuiUserPrompt(l1Facts, { language: "en" });
+    expect(u).toContain("Li house (East Group)");
+    expect(u).toMatch(/House directions[^\n]*separate[^\n]*personal directions/i);
+    expect(u).toContain("- East: Sheng Qi");
+  });
+
+  it("中文 user prompt 默认不变", () => {
+    expect(buildFengshuiUserPrompt(facts)).toBe(buildFengshuiUserPrompt(facts, { language: "zh" }));
+    expect(buildFengshuiUserPrompt(facts)).toContain("东南：生气");
+  });
+});

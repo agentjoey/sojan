@@ -3,10 +3,10 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成 + 2026-08-28 打磨批，只剩 D 块过场动效）**
-Last Updated:   2026-11-06 by claude（LLM 换 MiniMax-M3.1-Flash + 新 `LLM_API_KEY` + 中文解读修复，`production` = `03b4575`，部署 `sojan-lsj7cm6xd`；此前 2026-10-20 EP-otp-send-timeout 上线 `24dcf57`）
+Last Updated:   2026-11-07 by claude（EP-fs-en ①②③ + EP-tz-edge 上线，`production` = `bfb085c`；此前 2026-11-06 LLM 换 MiniMax-M3.1-Flash，`03b4575`）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
-测试:           core 182 · llm 279 · web 727（另 36 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；2026-10-19 Neon 迁移分支实测，全绿；`lint` 0 errors 已为阻塞闸门）
-✅ `pnpm typecheck`：core / llm / apps/web 均 0 errors（此前 apps/web 的 7 处既存测试类型错误随 Neon 迁移中相关测试的删改一并消除，BACKLOG `EP-web-typecheck-debt` 可关闭）。
+测试:           core 217 · llm 361 · web 830（另 40 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；`lint` 0 errors 已为阻塞闸门）
+⚠️ `pnpm typecheck`：apps/web 0 errors；core 与 llm 各报 2 处既存错误（`core/src/bazi/nayin.ts:21`、`core/src/daily/season.ts:57`），见 BACKLOG `EP-root-typecheck`。
 
 > 🚚 **Supabase → Vercel + Neon 迁移（staging 2026-10-19、production 2026-10-20 已切换）**：已合 main（`9b0e1c2`）并推 staging，设计 `docs/superpowers/specs/2026-10-19-vercel-neon-migration-design.md`，计划 `docs/superpowers/plans/2026-10-19-vercel-neon-migration.md`。
 >   · **进度**：Task 1–10 已完成（Neon 项目/分支/Auth 开通、schema 迁移工具、`lib/auth` + `lib/data` + 客户端门面、登录门控、注销事务、`sin1` 区域、Supabase 依赖移除）；**staging 已于 2026-10-19 切到 Neon**（Neon staging 分支已迁移；`x-vercel-id` 函数段为 `sin1`；浏览器实测通过：未登录引导、邮箱验证码登录、建档、运势、风水居所+报告、解梦、掷筊、改名、登出/重登数据仍在、注销后 11 张表 0 行）。**production 已于 2026-10-20 切到 Neon**（`production` 分支 = `24dcf57`：在 `514acb5` 之上加了 EP-otp-send-timeout——发码 15 s 客户端超时、重发 30 s 冷却、「以最新一封为准」提示，以及 Neon 客户端非 2xx 直接 throw 的统一处理（此前 429 /「验证码不正确」文案在生产从未生效）；`514acb5` 含 EP-reading-save-timing 修复与 2026-10-20 code review 修复——解读服务端落库且失败/截断不落库、西方盘改用钟表时间、时区偏移按真实时刻取、LLM 入口要求登录并计量、解梦/掷筊入参限长；Neon production 分支已迁移；函数段 `sin1`；邮箱验证码经 Resend `noreply@agentjoey.ai` 送达；owner 数据已从 Supabase 导入——1 档案含解读、1 风水报告、2 解梦、2 掷筊、1 条款同意，md5 与源库逐项一致，页面实测显示正常）。**Supabase 项目 `sxjcpoxhphlnwhpzachi` 已于 2026-10-20 先暂停、后由 owner 手动删除**（删除前复核生产读写全走 Neon；旧版回滚路径随之取消）；Vercel Production 上的旧 `SUPABASE*`/`TELEGRAM_*` 等变量待随 Supabase 下线一并删除。
@@ -14,6 +14,12 @@ Last Updated:   2026-11-06 by claude（LLM 换 MiniMax-M3.1-Flash + 新 `LLM_API
 >   · **Telegram 已整体下线**（bot、Mini App、`/api/tg/*`、cron、grammy 全删）。重新接入见 BACKLOG `EP-tg-replan`；下文各节里 TG 相关内容均为**历史记录**。
 >   · **上线前必做**：staging 与 production 的 `allow_localhost` 均已关闭；两分支 Custom SMTP 已配（Resend，`noreply@agentjoey.ai`，owner 2026-10-20 配置）。小差异：production 发件人名为「Sojan」、staging 为「照见 Sojan」，可在 Neon Console 统一。见 `docs/deployment.md`。
 >   · **遗留**：`EP-llm-unauth`（`/api/reading`、`dailyPolish`/`dailyBehavior` 未登录可调）。
+
+> 🌐 **EP-fs-en + EP-tz-edge（2026-11-07 上线，`bfb085c`）**：
+>   · **英文风水**：①英文叙述也过方位对拍与伪科学净化（星名只认拼音、归属只认 personal/house 强标记）②英文 system/user prompt 整份英文 ③页面确定性文案（化解、基调句、八方盘星名与读屏标签、命卦/宅卦/组别、物件顾问结论与选项、居所方位）由 core `computeFengshui({ language })` / `adviseObject(…, lang)` / `deriveFengshuiTagline(…, lang)` 直出英文，术语表在 `packages/core/src/fengshui/en.ts`，译文经独立英文编辑评审。中文输出逐字节不变（快照锁定）。`Remedy.direction` 取代从 target 文案反解方位。英文报告缓存因叙述修订号 `fs-en-2` 失效重生成，中文缓存不动。
+>   · **新疆记录时区**：起盘选到新疆（`Asia/Urumqi`/`Asia/Kashgar`）时让用户选出生时间按北京时间（默认）还是新疆时间记录；西方盘库按经纬度自查时区，已改为先换算钟表时间再喂入。存量新疆档案未重算（`EP-tz-edge-legacy`）。
+>   · staging 实测（2026-11-07，英文界面）：乌鲁木齐 1985-06-15 14:30 男 → 真太阳时 12:20、时柱壬午；英文风水页、LLM 叙述（未降级）、化解、物件顾问全英文且方位星名正确。
+>   · ⚠️ 测试账号 `yuan1985@outlook.com` 的验证码邮件被 Outlook **全部退信**（Resend 状态 bounced），staging 登录只能从 Resend 记录取码；需查是否所有 Outlook/Hotmail 用户都收不到（见 BACKLOG `EP-otp-outlook-bounce`）。
 
 > 🤖 **LLM 换模型 + 换 key（2026-11-05 staging、2026-11-06 production）**：
 >   · **起因**：旧 `LLM_API_KEY` 失效（MiniMax 401 invalid api key），staging/production 全部 LLM 功能失败。owner 11-05 17:22 在 Vercel 更新了 key（一条变量，同时覆盖 Production + Preview）。⚠️ **改 Vercel 环境变量必须重新部署对应分支才生效**——值在部署时固化；当时 redeploy 错了部署（production 分支的 preview），staging 迟迟不好。
@@ -47,7 +53,7 @@ Last Updated:   2026-11-06 by claude（LLM 换 MiniMax-M3.1-Flash + 新 `LLM_API
 > ⚠️ Vercel 面板、`vercel env pull`、REST API `decrypt=true` 三条路径读 `NEXT_PUBLIC_FENGSHUI_ENABLED` 与 `NEXT_PUBLIC_DREAM_ENABLED` 都返回**空字符串**——那不是真实值，是这两条被建成了 Vercel 的 **Sensitive 类型**（值写入后不可回读）。对照组：同为 sensitive 的 `LLM_API_KEY` 也读出空，而它显然非空。
 > **判定 flag 真实状态只能看行为**：`NEXT_PUBLIC_*` 是构建期内联的，去线上抓 `AppShell` 导航里有没有 `/fengshui`、页面上有没有 `尚未开启` 文案。2026-08-25 对 `production@9925baa` 的生产包实测：三个入口俱在、无 notEnabled 文案。
 > 🎋 **掷筊问事（EP-jiao，2026-08-25 合并）**：`/spirit` 的产品定义已从「随便聊」**收缩为「先对一件具体的事掷筊」**——复用旧 flag `NEXT_PUBLIC_SPIRIT_ENABLED`，未新建；**代码里不设即关，但生产环境该变量实测 `=1`**（见上方「生产 flag 实际取值」），所以 **production 分支一推，掷筊立刻对真实用户可见**，没有第二道闸。**「本命之灵」作为自由对话产品形态已不存在**；`deriveSpirit` 人格层仍在，是解梦/分享卡/五行印记的共用地基，动不得。周边归属：自我画像挪进 `/chart`、每日问今留运势页、风水化解入口改「就这条问一卦」。**TG 侧本轮不上**（token 机制不通，见 BACKLOG `EP-jiao-tg`）。
-> 🧭 **风水「境」波1+波2+TG适配（EP-fs，已合 main）**：`NEXT_PUBLIC_FENGSHUI_ENABLED` **线上已开启**（2026-08-16，Production + Preview 均设 `=1`），底部导航「境」对所有访客可见。迁移 `0011_dwellings` 已 apply 生产（仅新增两表）。**⚠️ 开启时英文侧缺口尚未修（见 EP-fs-en）：`detectLocale()` 对任何非中文浏览器返回 `en`，而两道机械反幻觉校验都是中文匹配、在英文路径上完全失效——这是已知且已被接受的风险，不是遗漏。**
+> 🧭 **风水「境」波1+波2+TG适配（EP-fs，已合 main）**：`NEXT_PUBLIC_FENGSHUI_ENABLED` **线上已开启**（2026-08-16，Production + Preview 均设 `=1`），底部导航「境」对所有访客可见。迁移 `0011_dwellings` 已 apply 生产（仅新增两表）。（英文侧缺口 EP-fs-en 已于 2026-11-07 补齐上线。）
 
 ## 产品现状（一句话）
 东方命理（八字+紫微）× 西方心理占星（利兹·格林）双引擎，已上线完整闭环：

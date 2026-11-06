@@ -3,7 +3,7 @@
 Version:        v0.1.0（线上 MVP + 引擎深化 v2 + 时序层 + UI v2 素白；未走 release.sh）
 Sprint:         001
 Sprint Status:  🔒 **MVP 冻结** + 🎋 **掷筊问事（EP-jiao，「灵」已收缩为占卜问事，flag 默认关）** + 🧭 **风水「境」波1+波2+TG适配（flag 线上已开）** + 🎨 **UI v3 重建（A/B/C1/C2/C3+C4 全部合入，8 屏完成 + 2026-08-28 打磨批，只剩 D 块过场动效）**
-Last Updated:   2026-10-20 by claude（EP-otp-send-timeout 修复已合 main `24dcf57`，staging 实测通过后上 production；此前 code review 修复 #1/#2/#3/#4/#6 见 `514acb5`）
+Last Updated:   2026-11-06 by claude（LLM 换 MiniMax-M3.1-Flash + 新 `LLM_API_KEY` + 中文解读修复，`production` = `03b4575`，部署 `sojan-lsj7cm6xd`；此前 2026-10-20 EP-otp-send-timeout 上线 `24dcf57`）
 线上:           production https://sojan.app · staging https://zhaojian.agentjoey.ai
 测试:           core 182 · llm 279 · web 727（另 36 条 db 测试需 `TEST_DATABASE_URL`，默认跳过；2026-10-19 Neon 迁移分支实测，全绿；`lint` 0 errors 已为阻塞闸门）
 ✅ `pnpm typecheck`：core / llm / apps/web 均 0 errors（此前 apps/web 的 7 处既存测试类型错误随 Neon 迁移中相关测试的删改一并消除，BACKLOG `EP-web-typecheck-debt` 可关闭）。
@@ -14,6 +14,12 @@ Last Updated:   2026-10-20 by claude（EP-otp-send-timeout 修复已合 main `24
 >   · **Telegram 已整体下线**（bot、Mini App、`/api/tg/*`、cron、grammy 全删）。重新接入见 BACKLOG `EP-tg-replan`；下文各节里 TG 相关内容均为**历史记录**。
 >   · **上线前必做**：staging 与 production 的 `allow_localhost` 均已关闭；两分支 Custom SMTP 已配（Resend，`noreply@agentjoey.ai`，owner 2026-10-20 配置）。小差异：production 发件人名为「Sojan」、staging 为「照见 Sojan」，可在 Neon Console 统一。见 `docs/deployment.md`。
 >   · **遗留**：`EP-llm-unauth`（`/api/reading`、`dailyPolish`/`dailyBehavior` 未登录可调）。
+
+> 🤖 **LLM 换模型 + 换 key（2026-11-05 staging、2026-11-06 production）**：
+>   · **起因**：旧 `LLM_API_KEY` 失效（MiniMax 401 invalid api key），staging/production 全部 LLM 功能失败。owner 11-05 17:22 在 Vercel 更新了 key（一条变量，同时覆盖 Production + Preview）。⚠️ **改 Vercel 环境变量必须重新部署对应分支才生效**——值在部署时固化；当时 redeploy 错了部署（production 分支的 preview），staging 迟迟不好。
+>   · **`47a6513`**：默认模型 MiniMax-M3 → **MiniMax-M3.1-Flash**；新增 `LLM_EFFORT`（low|medium|high|xhigh|max，默认 `low`，经 `output_config.effort` 下发）。该模型思考恒开、`thinking:disabled` 会 400，只能调深度；官方默认 max 会吃光小 max_tokens。
+>   · **`03b4575`**：owner 实测反馈修复——中文解读禁夹英文单词；摘要结论句不得是列表项/「标签：说明」（成长节同样）；`ReadingTabs.splitHead` 兜底剥掉列表符号，「- **标签**：说明」取标签作大字。
+>   · 若解读质量仍不足，先试 `LLM_EFFORT=high`（只改 env + redeploy，不动代码）。
 
 > 🎨 **UI v3 重建 A/B/C1（2026-08-26 合 main，已发 staging，待 owner 实测）**：依据新设计包 `design/sojan-design/{design-guide,desktop-guide}`。
 >   · **A 地基外壳**：`lib/nav.ts` 成为导航单一事实源；移动端底栏删除，改「顶部胶囊 + 44px 菜单键 + 六宫格覆盖层」；`ui.tsx` 原语收敛——**`Emphasis` 是全站唯一强调手法**（删了 `Tag` 与 `Card.topAccent`）。
@@ -63,7 +69,7 @@ Last Updated:   2026-10-20 by claude（EP-otp-send-timeout 修复已合 main `24
 
 ## 三层架构（详见 docs/architecture.md）
 - **@sojan/core**：三引擎 + `normalizeBirth`(真太阳时+EoT+子时sect) + `computeDailyFortune` + 引擎深化 v2 派生(见下) + 共振映射；纯函数/Zod/可缓存。
-- **@sojan/llm**：provider 无关双线(anthropic MiniMax-M3 / openai DeepSeek) + 三声部+时序声部 + **反幻觉链四道**(extractFacts→prompt硬规则→sanitize→correctMutagens)+eval + 重试/缓存/观测 + daily润色/行为/时序。
+- **@sojan/llm**：provider 无关双线(anthropic MiniMax-M3.1-Flash / openai DeepSeek) + 三声部+时序声部 + **反幻觉链四道**(extractFacts→prompt硬规则→sanitize→correctMutagens)+eval + 重试/缓存/观测 + daily润色/行为/时序。
 - **apps/web**：Next 16/React 19/Tailwind 4，框景配图、Markdown 渲染、Neon（Postgres + Auth）。
 
 ## 引擎深化 v2（本轮重点，spec `docs/specs/engine-v2-deepening.md`，全 11 项✅，TDD）
@@ -206,3 +212,4 @@ spec `docs/superpowers/specs/2026-08-15-fengshui-telegram-adaptation.md` · pact
 | 🎨 UI v3 打磨批 | 2026-08-28 | owner 九条指令（kimicode 实施于 `feat/ui-v3-polish`）：黄历全站去除（UI 块 + core 降级混入）；首页今日卡与运势同源（共享 `useDailyFortune` + `solarHouAction`，无档案不显示，M7 时区错位窗口消除）；胶囊显「照见」+ 风铃常驻微摆；转盘加深 + 去卷首/目录眉标 + 五印章统一朱文；`nav.spirit` 小字「问事」；过场全局化（`RouteCasting` 路由 1.2s 短版 + 全站 pending 过场，拆境/运每会话仪式）。core 192→193 / llm 279 / web 813→834，lint 2e/15w，mutation 14/14，真实浏览器三档实录。自查揪出一条**既有**缺口：`en` 无 cookie 首访全站 hydration mismatch（记 `EP-i18n-hydration`）。TG 冻结面零改动。2026-08-29 claude 合并 `main`（`fd746a4`）并推 `staging`，实测 `zhaojian.agentjoey.ai` 的 `/spirit`/`/dream`/`/chart` 均 200 |
 | 🎨 UI v3 重建（A/B/C1/C2/C3+C4） | 2026-08-26~27 | 依据新设计包全站重建，**8 屏完成**：A 地基外壳（`lib/nav.ts` 单一事实源、移动顶部胶囊+九宫格、`Emphasis` 收敛为唯一强调手法）→ B 命理可视化（`WuxingWheel`/`SeasonRuler`，core 新增七十二候索引）→ C1 桌面骨架+卷首+运势（`TwoColumn` 左定右动、`CompassWatermark` 五层水印）→ C2 命盘整页（左列 5b + 右列 3c/6b，core 新增 `deriveNayinZodiac`）→ C3+C4 掷筊/解梦/我的+账号（合并方向：两页都留只合导航）/境（外部 agent kimicode 实施，claude 验收两轮）。TG 外壳全程冻结。过程中定位并修复两个可复现的系统级坑：**Tailwind 4 自定义断点用 px 会因无法跨单位排序导致低断点反压高断点**（`--breakpoint-xl` 改 `75rem`）；**五行色系统性低于 WCAG AA**（`wood`/`earth`/`gold`/`line-strong` 纸底 1.38–3.06:1，改为文字用 `ink-2`、五行色只作装饰色点）。core 188→192 / llm 279 / web 738→813。|
 | 🚚 Neon 迁移（进行中） | 2026-10-19 | Supabase → Vercel + Neon（Postgres + Neon Auth）：邮箱验证码登录、无匿名账号、数据访问收口 `lib/data`（server action + 会话 uid 过滤）、函数区域 `sin1`、注销走 SQL 事务、Telegram 整体下线。`feat/neon-migration` Task 1–10 完成 + 文档收尾 12a；staging/production 切换与 Supabase 暂停**待 Task 11/12，日期待补**。 |
+| LLM 换模型 | 2026-11-06 | MiniMax-M3.1-Flash + `LLM_EFFORT`（默认 low）+ 新 key；中文解读禁夹英文、共振/成长大字标题修复（`47a6513`/`03b4575`，已上 production） |

@@ -12,7 +12,10 @@
 - [x] ~~**[EP-supabase-sunset] Supabase 下线**~~ —— **2026-10-20 完成**：production 切到 Neon 后先暂停、复核生产正常，随后 owner 在 Supabase 控制台删除项目 `sxjcpoxhphlnwhpzachi`（已确认不在项目列表中）。owner 数据此前已导入 Neon 并 md5 核对。剩余收尾：Vercel Production/Preview 上若还有 `SUPABASE*`/`NEXT_PUBLIC_SUPABASE_*`/`TELEGRAM_*`/`TG_*`/`CRON_SECRET` 等旧变量，删除即可（新代码不读取）。
 
 ## 🟡 最终评审遗留（2026-10-20，分支 `fix/review-findings`，计划 `docs/superpowers/plans/2026-10-20-review-fixes.md`）
-- [ ] **[EP-tz-edge] [优先级上调] 新疆等边缘时区：出生时间的「记录时区」与地理时区不一致**：tz-lookup 对新疆坐标返回 `Asia/Urumqi`（UTC+6），而当地出生时间普遍按北京时间（UTC+8）记录 → 八字/紫微（真太阳时）与西方盘（钟表时）**两边都可能偏约 2 小时**，足以换时辰乃至换日。方案：起盘表单对这类时区显式让用户确认「出生时间按哪个时区记录」（新疆默认北京时间），并把选择写进 BirthInput.timezone；补 core 用例。
+- [x] ~~**[EP-tz-edge] 新疆等边缘时区：出生时间的「记录时区」与地理时区不一致**~~ —— **2026-11-06 修复**（分支 `fix/fs-en-tz-edge`）：core `recordedTimezoneChoices`/`defaultRecordedTimezone`（Asia/Urumqi、Asia/Kashgar → 北京时间默认 / 新疆时间），起盘表单出现记录时区单选、写入 `BirthInput.timezone`、草稿保留选择；评审另查出西方盘库按坐标自查时区、根本不认 `BirthInput.timezone`，`computeWesternChart` 现先用 `convertWallTime` 换算到库所用时区。core 用例：乌鲁木齐 14:30 北京时间→午时 / 新疆时间→未时，北京 14:30 与新疆 12:30 西方盘逐项相同。
+- [ ] **[EP-tz-edge-legacy] 存量新疆档案仍按 UTC+6 算**：EP-tz-edge 之前在新疆建档的冻结命盘 `timezone` 是 `Asia/Urumqi`，若当事人的出生时间其实按北京时间记录，三盘都偏约 2 小时；目前无提示、无编辑入口，只能删档重建。可选：命盘页对 `Asia/Urumqi` 档案给一条提示 + 「按北京时间重排」入口（需走新建档案路径，命盘冻结）。
+- [ ] **[EP-root-typecheck] 顶层 `pnpm typecheck` 在 main 上失败**（2026-11-06 发现，与当日改动无关）：`tsc -p packages/llm/tsconfig.json` 编译到 core 源码时报 2 处 `string | undefined`——`packages/core/src/bazi/nayin.ts:21`、`packages/core/src/daily/season.ts:57`（llm 的 tsconfig 比 core 严）。core 自身 typecheck 通过。修法：两处加非空收窄。
+- [ ] **[EP-nav-hydration] 英文浏览器首屏导航 hydration mismatch**（2026-11-06 本地 dev 发现）：服务端按 zh 渲染 AppShell 导航（「首页」「运势」），客户端按浏览器语言切成 en，React 报 hydration failed 并整树重建。需让服务端渲染与客户端 locale 一致（cookie/Accept-Language 在服务端取），或导航文案延后到挂载后。
 - [ ] **[EP-western-recompute] 存量冻结档案的西方层是按真太阳时算的**：2026-10-20 之前建档的命盘，西方盘把真太阳时当钟表时喂给了库（已修：现用 `NormalizedBirth.civil`），但冻结档案**没有重算**，目前唯一的修法是用户删档重建。考虑一次「重算西方层」迁移（只重写 `chart.western`，需临时放开 `profiles_freeze` 触发器或走专门的迁移路径），并评估已存解读里西方段是否随之失真。
 - [ ] **[EP-aux-llm-unmetered] 辅助 LLM action 不计量、入参无上限**：`app/actions.ts` 的辅助 action 只要求登录、不走 `consumeLlm`；`spiritMemoryAction` 的 history、`timelineAction` 的 chart 都不限长。方案：history 用 `SPIRIT_MAX_TURNS` / `SPIRIT_TURN_MAX_CHARS`（`lib/spirit-limits.ts`）裁剪/拒绝，chart 做结构校验或改为按 profileId 从库里取；再评估是否需要计量。
 - [ ] **[EP-llm-refund] LLM 失败/重试不退额度**：解读/解梦/掷筊/风水在 `consumeLlm` 扣费后，LLM 失败或输出不完整都不退款；风水叙事的重试/降级路径还会再扣一次。方案：失败时补偿退回一次额度，或改成「成功落库后才扣」。
@@ -37,7 +40,8 @@
 ### 风水「境」（EP-fs-*，**flag 2026-08-16 起线上已开**）
 波1 Layer 0 / 波2 Layer 1 / TG 适配均已交付并合并 main。详见 `.agent/CURRENT.md` 风水三节与 `docs/architecture.md` §7b。
 
-- [ ] **[EP-fs-en] [HIGH·线上待修] 英文侧反幻觉补齐**——两道机械校验（`verifyDirectionConsistency` / `sanitizeFengshui`）都是中文匹配，`en` 输出**完全不被校验**，诚实标注只剩一条中文写的 prompt 规则兜底。
+- [ ] **[EP-fs-en] 英文侧反幻觉补齐 —— ①② 已于 2026-11-06 修复（分支 `fix/fs-en-tz-edge`），③ 待做**：①`verifyDirectionConsistency`/`sanitizeFengshui` 加 `language`，英文路径与中文同构（词表单一事实源 core `fengshui/en.ts`，星名只认拼音、归属只认 personal/house 强标记，朝向动词/所有格后弃权）②`buildFengshuiSystemPrompt("en")` 整份英文、user prompt 确定性标签全英文；报告指纹加 `narrativeRevision`（en=`fs-en-1`）让未经校验的英文旧报告失效，中文缓存不动。**③ 仍未做**：英文页面上的确定性文案（化解 action/traditional/modern、`personalFit`、方位理由、物件品类与材质、`吉/凶`、`fengshui.group.*`）还是中文；物件顾问（`adviseObjectText`）英文仍无机械校验。以下为原始描述：
+  > 原描述：两道机械校验（`verifyDirectionConsistency` / `sanitizeFengshui`）都是中文匹配，`en` 输出**完全不被校验**，诚实标注只剩一条中文写的 prompt 规则兜底。
   **⚠️ 性质已变**：此项原为「开 flag 前置」，但 flag 已于 2026-08-16 开启（用户知悉并接受该风险），所以现在是**线上待修**而非阻塞项。且暴露面比原描述更大——`detectLocale()`（`lib/i18n/locale.ts:9`）对任何非中文浏览器返回 `en`，那是绝大多数访客的**默认**路径，不是边缘情况。
   含三小项：①两道校验支持英文（方位名/星名/伪科学措辞的英文形态）②`buildFengshuiSystemPrompt("en")` 改为完整英文指令（目前仍是「中文指令 + 末尾一句 English」；该反模式已在 `buildObjectAdviceSystemPrompt` 修好并写进测试注释当反例）③英文页面的确定性内容仍基本是中文：化解 action/traditional/modern、`personalFit`、方位理由、物件品类与材质、`吉/凶`、`东四命/西四命`（`fengshui.group.*` 键已存在但未接线）。
 

@@ -1,4 +1,4 @@
-import type { Direction, Gua } from "./directions";
+import { DIRECTION_LABEL, type Direction, type Gua } from "./directions";
 import type { Star } from "./eight-mansions";
 
 /**
@@ -23,7 +23,7 @@ export const STAR_LABEL_EN: Record<Star, string> = {
 
 export const STAR_GLOSS_EN: Record<Star, string> = {
   生气: "vitality", 天医: "health and rest", 延年: "harmony and longevity", 伏位: "stability",
-  绝命: "total loss", 五鬼: "five ghosts", 六煞: "six killings", 祸害: "mishaps",
+  绝命: "deep depletion", 五鬼: "restlessness", 六煞: "entanglement", 祸害: "minor setbacks",
 };
 
 export const GUA_PINYIN: Record<Gua, string> = {
@@ -42,7 +42,7 @@ export const ELEMENT_EN: Record<string, string> = {
 /** 与 `ELEMENT_COLORS` 一一对应。 */
 export const COLOR_EN: Record<string, string> = {
   青: "teal", 绿: "green", 红: "red", 橙: "orange", 紫: "purple", 黄: "yellow", 褐: "brown", 米: "beige",
-  白: "white", 金: "gold", 银灰: "silver grey", 黑: "black", 藏蓝: "navy",
+  白: "white", 金: "gold", 银灰: "silver gray", 黑: "black", 藏蓝: "navy",
 };
 
 /** 与 `ELEMENT_MATERIALS` 一一对应。 */
@@ -53,3 +53,44 @@ export const MATERIAL_EN: Record<string, string> = {
   金属: "metal", 玻璃: "glass", 镜面: "mirrored surfaces",
   水景: "water features", 流线造型: "flowing shapes", 深色织物: "dark fabrics",
 };
+
+/** 风水文案的语言。与 web 的 `Locale`、llm 的 `ReadingLanguage` 同值域。 */
+export type FengshuiLanguage = "zh" | "en";
+
+/**
+ * 英文文案术语表（EP-fs-en ③，页面确定性文案与英文 prompt 共用）：
+ * - 命卦 → Life Gua；宅卦 → "<卦拼音> house"（如 Kan house）；东/西四命、东/西四宅 → East/West Group
+ * - 八星 → 拼音（Sheng Qi …），首次出现处可带 `STAR_GLOSS_EN` 释义；吉/凶 → favorable/unfavorable
+ * - 本命八方 → personal directions；房屋八方 → house directions；X 方 → "X direction"；宅 X 位 → "house X sector"
+ * - 日主 → day master；喜用/忌 → favorable/unfavorable element(s)
+ * - 「宜静宜压」→ "best kept quiet and anchored with heavy, still things"（固定译法，化解与物件规则同一说法）
+ * - 方位名：作标签时首字母大写（Southeast），在句中按英文惯例小写（to the southeast）
+ */
+
+export function directionLabel(d: Direction, lang: FengshuiLanguage): string {
+  return lang === "en" ? DIRECTION_LABEL_EN[d] : DIRECTION_LABEL[d];
+}
+
+export function starLabel(s: Star, lang: FengshuiLanguage): string {
+  return lang === "en" ? STAR_LABEL_EN[s] : s;
+}
+
+export function guaLabel(g: Gua, lang: FengshuiLanguage): string {
+  return lang === "en" ? GUA_PINYIN[g] : g;
+}
+
+export function groupLabel(g: keyof typeof GROUP_EN, lang: FengshuiLanguage): string {
+  return lang === "en" ? GROUP_EN[g] : g;
+}
+
+/** 五行中文 → 英文；查不到原样返回（不应发生，兜底不抛错）。 */
+export function elementLabel(el: string, lang: FengshuiLanguage): string {
+  return lang === "en" ? (ELEMENT_EN[el] ?? el) : el;
+}
+
+/** 英文列表（美式，带 serial comma）：a and b / a, b, and c；否定句用 "or"。文案句中用，标签行仍用逗号分隔。 */
+export function joinEn(items: string[], conj: "and" | "or" = "and"): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} ${conj} ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, ${conj} ${items[items.length - 1]}`;
+}

@@ -1,0 +1,240 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`EP-fs-en ③ 化解文案：英文 > 中文化解全文字面量快照（评审 nit：守住「中文用户逐字节不变」，快照与改动前 HEAD 对拍一致） > layer0-坎1 1`] = `
+[
+  {
+    "action": "清掉台面与地面动线上的堆积物",
+    "id": "fs-anchor-3",
+    "modern": "视觉杂乱提升认知负荷，削弱工作记忆可用容量",
+    "target": "形煞 / 屋内杂乱",
+    "traditional": "形煞 / 屋内杂乱",
+  },
+  {
+    "action": "久坐处朝向调到东南——书桌坐位面朝生气方，笔电与常用物也顺这个朝向摆",
+    "id": "fs-desk-sheng",
+    "modern": "固定一个稳定的工作朝向能减少每次落座时的环境重新定位成本",
+    "target": "东南（生气方）",
+    "traditional": "坎命生气方在东南，主振作与进取",
+  },
+  {
+    "action": "大面积的青、绿少用，尤其是卧室主色",
+    "id": "fs-color-avoid",
+    "modern": null,
+    "target": "配色减法",
+    "traditional": "命局忌木、火",
+  },
+  {
+    "action": "书桌与床头贴实墙，避免背对门与开阔通道",
+    "id": "fs-anchor-0",
+    "modern": "prospect-refuge：背实墙且前方视野开阔时，环境警觉负荷下降，专注更易维持",
+    "target": "背后有靠 / 靠山",
+    "traditional": "背后有靠 / 靠山",
+  },
+  {
+    "action": "为久坐处做出局部围合，避免置身穿堂动线中央",
+    "id": "fs-anchor-1",
+    "modern": "恢复性环境（Kaplan ART）：适度围合感有助注意力恢复",
+    "target": "藏风聚气",
+    "traditional": "藏风聚气",
+  },
+  {
+    "action": "床不正对门；镜面避开床的正面视线",
+    "id": "fs-anchor-2",
+    "modern": "半醒状态下的突发视觉刺激与夜间惊跳反应，影响睡眠连续性",
+    "target": "门冲床 / 床对镜",
+    "traditional": "门冲床 / 床对镜",
+  },
+  {
+    "action": "床头靠东一侧的实墙，头顶避开横梁与吊柜",
+    "id": "fs-bed-tianyi",
+    "modern": "床头贴实墙可降低睡眠中对背后空间的低度警觉",
+    "target": "东（天医方）",
+    "traditional": "坎命天医方在东，主安稳休养",
+  },
+  {
+    "action": "把储物柜、少用的杂物挪到西南，别把每天久待的位置放在这里",
+    "id": "fs-worst-static",
+    "modern": null,
+    "target": "西南（绝命方）",
+    "traditional": "西南为坎命的绝命方，宜静宜压",
+  },
+  {
+    "action": "寝具、窗帘、桌面小物往黄、褐、米靠，材质可选陶瓷、石材、夯土质感",
+    "id": "fs-color-favorable",
+    "modern": null,
+    "target": "常用物件配色",
+    "traditional": "命局喜用土、金、水，色与材同气相求",
+  },
+]
+`;
+
+exports[`EP-fs-en ③ 化解文案：英文 > 中文化解全文字面量快照（评审 nit：守住「中文用户逐字节不变」，快照与改动前 HEAD 对拍一致） > layer1-兑宅-相冲 1`] = `
+[
+  {
+    "action": "清掉台面与地面动线上的堆积物",
+    "id": "fs-anchor-3",
+    "modern": "视觉杂乱提升认知负荷，削弱工作记忆可用容量",
+    "target": "形煞 / 屋内杂乱",
+    "traditional": "形煞 / 屋内杂乱",
+  },
+  {
+    "action": "久坐处朝向调到东南——书桌坐位面朝生气方，笔电与常用物也顺这个朝向摆",
+    "id": "fs-desk-sheng",
+    "modern": "固定一个稳定的工作朝向能减少每次落座时的环境重新定位成本",
+    "target": "东南（生气方）",
+    "traditional": "坎命生气方在东南，主振作与进取",
+  },
+  {
+    "action": "房子整体与你不同组时，重点放在你自己的四吉方——床头与常坐位对准这几个方位即可，不必推翻整套布局",
+    "id": "fs-dw-mismatch",
+    "modern": "能改的先改：睡眠与久坐这两件事占掉一天多数时间，调它们的性价比高于重排全屋",
+    "target": "命宅不相配",
+    "traditional": "西四宅与你的命卦不同组",
+  },
+  {
+    "action": "大面积的青、绿少用，尤其是卧室主色",
+    "id": "fs-color-avoid",
+    "modern": null,
+    "target": "配色减法",
+    "traditional": "命局忌木、火",
+  },
+  {
+    "action": "书桌与床头贴实墙，避免背对门与开阔通道",
+    "id": "fs-anchor-0",
+    "modern": "prospect-refuge：背实墙且前方视野开阔时，环境警觉负荷下降，专注更易维持",
+    "target": "背后有靠 / 靠山",
+    "traditional": "背后有靠 / 靠山",
+  },
+  {
+    "action": "为久坐处做出局部围合，避免置身穿堂动线中央",
+    "id": "fs-anchor-1",
+    "modern": "恢复性环境（Kaplan ART）：适度围合感有助注意力恢复",
+    "target": "藏风聚气",
+    "traditional": "藏风聚气",
+  },
+  {
+    "action": "床不正对门；镜面避开床的正面视线",
+    "id": "fs-anchor-2",
+    "modern": "半醒状态下的突发视觉刺激与夜间惊跳反应，影响睡眠连续性",
+    "target": "门冲床 / 床对镜",
+    "traditional": "门冲床 / 床对镜",
+  },
+  {
+    "action": "床头靠东一侧的实墙，头顶避开横梁与吊柜",
+    "id": "fs-bed-tianyi",
+    "modern": "床头贴实墙可降低睡眠中对背后空间的低度警觉",
+    "target": "东（天医方）",
+    "traditional": "坎命天医方在东，主安稳休养",
+  },
+  {
+    "action": "把每天久待的活动放到西北那一块——工作、阅读、会客都算",
+    "id": "fs-dw-best",
+    "modern": "把高频活动集中到采光与动线最好的区域，减少一天里的无谓走动与环境切换",
+    "target": "西北（宅生气位）",
+    "traditional": "兑宅的生气位在西北",
+  },
+  {
+    "action": "东那一块用作储物或过道，别安排长时间停留",
+    "id": "fs-dw-worst",
+    "modern": null,
+    "target": "东（宅绝命位）",
+    "traditional": "兑宅的绝命位在东，宜静宜压",
+  },
+  {
+    "action": "把储物柜、少用的杂物挪到西南，别把每天久待的位置放在这里",
+    "id": "fs-worst-static",
+    "modern": null,
+    "target": "西南（绝命方）",
+    "traditional": "西南为坎命的绝命方，宜静宜压",
+  },
+  {
+    "action": "寝具、窗帘、桌面小物往黄、褐、米靠，材质可选陶瓷、石材、夯土质感",
+    "id": "fs-color-favorable",
+    "modern": null,
+    "target": "常用物件配色",
+    "traditional": "命局喜用土、金、水，色与材同气相求",
+  },
+]
+`;
+
+exports[`EP-fs-en ③ 化解文案：英文 > 中文化解全文字面量快照（评审 nit：守住「中文用户逐字节不变」，快照与改动前 HEAD 对拍一致） > layer1-离宅-相配 1`] = `
+[
+  {
+    "action": "清掉台面与地面动线上的堆积物",
+    "id": "fs-anchor-3",
+    "modern": "视觉杂乱提升认知负荷，削弱工作记忆可用容量",
+    "target": "形煞 / 屋内杂乱",
+    "traditional": "形煞 / 屋内杂乱",
+  },
+  {
+    "action": "久坐处朝向调到东南——书桌坐位面朝生气方，笔电与常用物也顺这个朝向摆",
+    "id": "fs-desk-sheng",
+    "modern": "固定一个稳定的工作朝向能减少每次落座时的环境重新定位成本",
+    "target": "东南（生气方）",
+    "traditional": "坎命生气方在东南，主振作与进取",
+  },
+  {
+    "action": "大面积的青、绿少用，尤其是卧室主色",
+    "id": "fs-color-avoid",
+    "modern": null,
+    "target": "配色减法",
+    "traditional": "命局忌木、火",
+  },
+  {
+    "action": "书桌与床头贴实墙，避免背对门与开阔通道",
+    "id": "fs-anchor-0",
+    "modern": "prospect-refuge：背实墙且前方视野开阔时，环境警觉负荷下降，专注更易维持",
+    "target": "背后有靠 / 靠山",
+    "traditional": "背后有靠 / 靠山",
+  },
+  {
+    "action": "为久坐处做出局部围合，避免置身穿堂动线中央",
+    "id": "fs-anchor-1",
+    "modern": "恢复性环境（Kaplan ART）：适度围合感有助注意力恢复",
+    "target": "藏风聚气",
+    "traditional": "藏风聚气",
+  },
+  {
+    "action": "床不正对门；镜面避开床的正面视线",
+    "id": "fs-anchor-2",
+    "modern": "半醒状态下的突发视觉刺激与夜间惊跳反应，影响睡眠连续性",
+    "target": "门冲床 / 床对镜",
+    "traditional": "门冲床 / 床对镜",
+  },
+  {
+    "action": "床头靠东一侧的实墙，头顶避开横梁与吊柜",
+    "id": "fs-bed-tianyi",
+    "modern": "床头贴实墙可降低睡眠中对背后空间的低度警觉",
+    "target": "东（天医方）",
+    "traditional": "坎命天医方在东，主安稳休养",
+  },
+  {
+    "action": "把每天久待的活动放到东那一块——工作、阅读、会客都算",
+    "id": "fs-dw-best",
+    "modern": "把高频活动集中到采光与动线最好的区域，减少一天里的无谓走动与环境切换",
+    "target": "东（宅生气位）",
+    "traditional": "离宅的生气位在东",
+  },
+  {
+    "action": "西北那一块用作储物或过道，别安排长时间停留",
+    "id": "fs-dw-worst",
+    "modern": null,
+    "target": "西北（宅绝命位）",
+    "traditional": "离宅的绝命位在西北，宜静宜压",
+  },
+  {
+    "action": "把储物柜、少用的杂物挪到西南，别把每天久待的位置放在这里",
+    "id": "fs-worst-static",
+    "modern": null,
+    "target": "西南（绝命方）",
+    "traditional": "西南为坎命的绝命方，宜静宜压",
+  },
+  {
+    "action": "寝具、窗帘、桌面小物往黄、褐、米靠，材质可选陶瓷、石材、夯土质感",
+    "id": "fs-color-favorable",
+    "modern": null,
+    "target": "常用物件配色",
+    "traditional": "命局喜用土、金、水，色与材同气相求",
+  },
+]
+`;

@@ -55,6 +55,16 @@ beforeEach(() => {
 });
 
 describe("EP-fs-14 居所录入", () => {
+  it("英文 locale：八个朝向按钮显示英文方位名（EP-fs-en ③）", () => {
+    render(<DwellingForm onSaved={vi.fn()} />, {
+      wrapper: ({ children }) => <I18nProvider locale="en">{children}</I18nProvider>,
+    });
+    for (const label of ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "东南" })).toBeNull();
+  });
+
   it("八个方位都是可点的按钮，不是下拉框（避免误选，且更易读）", () => {
     render(<DwellingForm onSaved={vi.fn()} />, { wrapper: Wrapper });
     for (const label of ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]) {

@@ -302,7 +302,7 @@ describe("EP-fs-en 英文主报告 user prompt", () => {
   it("八方判语用英文方位名 + 拼音星名", () => {
     // 1990 男 = 坎1：生气在东南
     expect(user).toContain("- Southeast: Sheng Qi (vitality; favorable, #1)");
-    expect(user).toContain("- Southwest: Jue Ming (total loss; unfavorable, #1)");
+    expect(user).toContain("- Southwest: Jue Ming (deep depletion; unfavorable, #1)");
   });
 
   it("命卦写拼音 + 英文组别，不出现「东四命」", () => {
@@ -317,10 +317,21 @@ describe("EP-fs-en 英文主报告 user prompt", () => {
     expect(line).toMatch(/Favorable elements: (Wood|Fire|Earth|Metal|Water)/);
   });
 
-  it("候选化解原文保留（由模型翻译），但传统象征条目明确标出", () => {
+  it("候选化解原文透传，传统象征条目明确标出", () => {
     const sym = facts.remedies.find((r) => r.evidence === "传统象征")!;
     expect(user).toContain(sym.action);
     expect(user).toMatch(/\[traditional symbolism\]/);
+  });
+
+  it("EP-fs-en ③：按英文算出的化解进 prompt 时，整份 user prompt 不含汉字、不再要求模型翻译", () => {
+    const enFacts = extractFengshuiFacts(computeFengshui({ birth, chart: computeUnifiedChart(birth), language: "en" }));
+    const u = buildFengshuiUserPrompt(enFacts, { language: "en", nickname: "Alex" });
+    expect(u).not.toMatch(/[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/);
+    expect(u).not.toMatch(/translate/i);
+    // 成本档位也是英文标签（core 的规范值是中文，不能原样漏进英文 prompt）
+    expect(u).toMatch(/- \[(no cost|rearrange|add an item|renovate)\]\[/);
+    // 化解原文与页面卡片同源：逐字出现
+    expect(u).toContain(enFacts.remedies[0]!.action);
   });
 
   it("Layer 1：房屋八方单独成段、英文标注，并提醒与本命八方是两套", () => {
@@ -337,5 +348,32 @@ describe("EP-fs-en 英文主报告 user prompt", () => {
   it("中文 user prompt 默认不变", () => {
     expect(buildFengshuiUserPrompt(facts)).toBe(buildFengshuiUserPrompt(facts, { language: "zh" }));
     expect(buildFengshuiUserPrompt(facts)).toContain("东南：生气");
+  });
+});
+
+describe("EP-fs-en ③ 物件顾问英文 user prompt", () => {
+  const enAdvice = adviseObject(
+    { verdicts: fsChart.personalDirections, affinity: fsChart.elementAffinity, dwellingSectors: directionsFor("乾") },
+    { category: "desk", material: "原木", intendedDirection: "W" },
+    "en",
+  );
+
+  it("标签与内容全英文，五行/星名/方位用英文词表", () => {
+    const u = buildObjectAdviceUserPrompt(enAdvice, { language: "en", nickname: "Alex" });
+    expect(u).not.toMatch(/[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/);
+    expect(u).toContain("Name: Alex");
+    expect(u).toContain("Object: Desk");
+    expect(u).toContain("Element: Wood");
+    expect(u).toContain("Dwelling note");
+    // 坎命：西方为祸害（凶）
+    expect(u).toContain("The user wants to put it in the west, which is the Huo Hai direction (unfavorable)");
+  });
+
+  it("英文 system prompt 不再夹带中文标签名「宅局提示」", () => {
+    expect(buildObjectAdviceSystemPrompt("en")).not.toContain("宅局提示");
+  });
+
+  it("中文 user prompt 默认不变", () => {
+    expect(buildObjectAdviceUserPrompt(objectAdvice)).toBe(buildObjectAdviceUserPrompt(objectAdvice, { language: "zh" }));
   });
 });

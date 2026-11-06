@@ -696,10 +696,10 @@ describe("最终评审 Blocking 2：「就这条问一卦」链接要带得动�
 
   it("动作文本较长时对 ask 参数做合理截断，不放任 URL 无限增长", async () => {
     const { truncateForSpiritQuery } = await import("../page");
-    const long = "久".repeat(200);
+    const long = "久".repeat(400);
     const truncated = truncateForSpiritQuery(long);
     expect(truncated.length).toBeLessThan(long.length);
-    expect(truncated.length).toBeLessThanOrEqual(81); // 80 字符上限 + 1 个省略号
+    expect(truncated.length).toBeLessThanOrEqual(241); // 240 字符上限 + 1 个省略号
     expect(truncated.endsWith("…")).toBe(true);
 
     const short = "久坐处朝向调到东南";
@@ -787,8 +787,47 @@ describe("EP-fs-07 /fengshui Layer 0 — 英文 locale", () => {
     await waitFor(() => expect(screen.getByText("Read the full reading →")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Remedies" }));
     // fs-desk-sheng（生气方书桌建议）恒为 buildPersonalRemedies 输出的第一条、effort 恒为「零成本」
-    expect(screen.getAllByText("Free").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No cost").length).toBeGreaterThan(0);
     expect(screen.queryByText("零成本")).toBeNull();
+  });
+
+  // EP-fs-en ③：页面上的确定性文案（化解、基调、四吉方、命卦、盘面读屏标签）全部英文。
+  // 叙述分节是 mock 的中文占位，所以按区域断言，不对整页做「无汉字」检查。
+  it("locale=en 时确定性区块无汉字：基调块、四吉方、命卦行、盘面读屏标签、整份化解清单", async () => {
+    const CJK = /[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/;
+    await renderPage("en");
+    await waitFor(() => expect(screen.getByText("Read the full reading →")).toBeInTheDocument());
+
+    const block = screen.getByTestId("shengqi-block");
+    expect(block.textContent).toContain("Your Sheng Qi direction · Southeast");
+    expect(block.textContent).toMatch(/your Sheng Qi direction is the southeast\./);
+    expect(block.textContent).not.toMatch(CJK);
+
+    const four = screen.getByTestId("four-auspicious").textContent!;
+    expect(four).toBe("Four favorable directions · Southeast (Sheng Qi) · East (Tian Yi) · South (Yan Nian) · North (Fu Wei)");
+
+    expect(screen.getByText("Life Gua: Kan 1 (East Group)")).toBeInTheDocument();
+    // 盘面：读屏标签英文；卦字（坎/离…）是图形，刻意保留
+    const wheel = screen.getByRole("group", { name: "Personal directions wheel" });
+    expect(screen.getByRole("button", { name: "Southeast: Sheng Qi (favorable)" })).toBeInTheDocument();
+    expect(wheel.textContent).toContain("Kan 1");
+    expect(wheel.textContent).toContain("Sheng Qi");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remedies" }));
+    const list = screen.getByText(/^Face the southeast where you sit for long stretches/).closest("ul")!;
+    expect(list.textContent).not.toMatch(CJK);
+    expect(list.textContent).toContain("Traditional basis: ");
+  });
+
+  it("locale=en 时点扇区过滤：按化解自带的 direction 字段，英文 target 照样能过滤", async () => {
+    await renderPage("en");
+    await waitFor(() => expect(screen.getByText("Read the full reading →")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Southeast: Sheng Qi (favorable)" }));
+    await waitFor(() => expect(screen.getByText("Southeast only")).toBeInTheDocument());
+    expect(screen.getByText(/^Face the southeast where you sit for long stretches/)).toBeInTheDocument();
+    // 东（天医）的床头建议不在东南过滤结果里
+    expect(screen.queryByText(/^Set the head of your bed against a solid wall on the east side/)).toBeNull();
+    expect(screen.queryByText("No remedies for this direction yet.")).toBeNull();
   });
 });
 
@@ -1367,8 +1406,7 @@ describe("Tab 行：下划线按钮", () => {
  * 剪影付费墙（创意 C）。
  *
  * 判别力说明：
- * - remedyDirection 的期望值全部是字面量（评审 C2：旧版从被测函数自身推导期望值，
- *   「先长后短」倒过来也全绿）；盘即导航的 dir/锚点断言同样写死，不碰 SUT；
+ * - 盘即导航的 dir/锚点断言写死字面量，不碰 SUT（评审 C2）；
  * - 盘即导航的过滤断言建立在「别的方位的化解不可见」上——过滤被删掉（变异）时必红；
  * - 剪影断言查「无星名/卦字文字 + 8 占位块」——把真实宅盘数据塞进去（变异）时必红；
  * - I1 的「切走再切回不重放」同时守两端：首揭中 delay 必须在（变异 C 红），
@@ -1388,18 +1426,9 @@ describe("2026-08 设计评审后续", () => {
     expect(screen.getByLabelText(sectorName).style.animationDelay).toBe("0ms");
   });
 
-  it("remedyDirection 字面量断言：先长后短（中文方位名子串陷阱，评审 C2）", async () => {
-    const { remedyDirection } = await import("../page");
-    // 长短同前缀两对：「东」⊂「东南」、「北」⊂「东北」。先短后长的实现会把
-    // 「东南（生气方）」错配成 E——这些字面量断言是变异 A 的守卫，必须变红。
-    expect(remedyDirection("东南（生气方）")).toBe("SE");
-    expect(remedyDirection("东（天医方）")).toBe("E");
-    expect(remedyDirection("东北（五鬼方）")).toBe("NE");
-    expect(remedyDirection("北（伏位方）")).toBe("N");
-    expect(remedyDirection("西南（绝命方）")).toBe("SW");
-    // 与方位无关的化解（宜用色与材/物件类）→ null，过滤时归入「不限方位」组
-    expect(remedyDirection("形煞 / 屋内杂乱")).toBeNull();
-  });
+  // EP-fs-en ③：原「remedyDirection 字面量断言」随该函数一并删除——化解自带结构化的
+  // `direction` 字段，不再从 target 文案反解方位名（英文 target 根本解析不了）。逐条方位的
+  // 字面量断言移到 core `fengshui-en-copy.test.ts`；页面过滤行为由下一条用例守着。
 
   it("盘即导航：点本命盘扇区 → 切化解 tab、按方位过滤、方位锚点显示期望标签、不限方位组保留、清除后恢复全量", async () => {
     // 评审 C2：期望值一律写死，绝不再从被测函数 remedyDirection 推导（旧实现

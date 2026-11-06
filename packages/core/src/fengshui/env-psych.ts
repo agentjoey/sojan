@@ -34,8 +34,14 @@ type EnvPsychBase = {
  * 配错（如给传统象征条目补上现代机制）会直接编译失败。
  */
 export type EnvPsychAnchor =
-  | (EnvPsychBase & { evidence: "双重支撑"; modern: string })
-  | (EnvPsychBase & { evidence: "传统象征"; modern: null });
+  | (EnvPsychBase & { evidence: "双重支撑"; modern: string; en: EnvPsychEn<string> })
+  | (EnvPsychBase & { evidence: "传统象征"; modern: null; en: EnvPsychEn<null> });
+
+/**
+ * 英文版（EP-fs-en ③）。与中文同条目并排写，而不是另起一张按下标对齐的表——
+ * 增删条目时两种语言不可能错位；`modern` 的有无同样由判别联合锁死。
+ */
+type EnvPsychEn<M extends string | null> = { traditional: string; action: string; modern: M };
 
 export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
   {
@@ -44,6 +50,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "书桌与床头贴实墙，避免背对门与开阔通道",
     effort: "挪动",
     evidence: "双重支撑",
+    en: {
+      traditional: "Support at your back (the \"backing mountain\")",
+      action: "Put your desk and headboard against a solid wall, and avoid sitting with your back to a door or an open walkway",
+      modern: "Prospect–refuge: with a solid wall behind you and an open view ahead, background vigilance tends to drop and focus is easier to sustain",
+    },
   },
   {
     traditional: "藏风聚气",
@@ -51,6 +62,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "为久坐处做出局部围合，避免置身穿堂动线中央",
     effort: "挪动",
     evidence: "双重支撑",
+    en: {
+      traditional: "Shelter from the wind, and qi gathers",
+      action: "Give the spot where you sit for long stretches a sense of partial enclosure, rather than leaving it in the middle of a through-route",
+      modern: "Restorative environments (Kaplan's Attention Restoration Theory): a moderate sense of enclosure can help attention recover",
+    },
   },
   {
     traditional: "门冲床 / 床对镜",
@@ -58,6 +74,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "床不正对门；镜面避开床的正面视线",
     effort: "挪动",
     evidence: "双重支撑",
+    en: {
+      traditional: "A door or mirror facing the bed",
+      action: "Keep the bed out of direct line with the door, and angle mirrors away from your view from the bed",
+      modern: "Sudden visual stimuli while you're half-awake can trigger a startle response at night and break up sleep",
+    },
   },
   {
     traditional: "形煞 / 屋内杂乱",
@@ -65,6 +86,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "清掉台面与地面动线上的堆积物",
     effort: "零成本",
     evidence: "双重支撑",
+    en: {
+      traditional: "Harsh forms (xing sha) and indoor clutter",
+      action: "Clear whatever has piled up on countertops and along the paths you walk",
+      modern: "Visual clutter can add to cognitive load and tax working memory",
+    },
   },
   {
     traditional: "西晒",
@@ -72,6 +98,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "西向卧室加遮光帘；床头避开西墙",
     effort: "添置",
     evidence: "双重支撑",
+    en: {
+      traditional: "Harsh western sun",
+      action: "Add blackout curtains to a west-facing bedroom, and keep the headboard off the west wall",
+      modern: "Strong late-day light can delay melatonin release and make it harder to fall asleep",
+    },
   },
   {
     traditional: "明堂开阔",
@@ -79,6 +110,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "保持入口与主要窗前的通透，勿堆放高物",
     effort: "零成本",
     evidence: "双重支撑",
+    en: {
+      traditional: "An open Ming Tang (the \"bright hall\" in front of the home)",
+      action: "Keep the entrance and the area in front of your main windows clear, without tall items stacked there",
+      modern: "Visual depth and an open outlook are associated with a calmer emotional baseline",
+    },
   },
   {
     traditional: "木气生发 / 绿植",
@@ -86,6 +122,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "在久处的房间放一两盆好养的绿植",
     effort: "添置",
     evidence: "双重支撑",
+    en: {
+      traditional: "Rising Wood qi (houseplants)",
+      action: "Keep one or two easy-care plants in the room where you spend the most time",
+      modern: "Biophilia: indoor plants and other natural elements are associated with recovery from stress",
+    },
   },
   {
     traditional: "金泄土煞（凶方置金属器物）",
@@ -93,6 +134,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "在该方位放一件你自己喜欢的金属器物，作为「这一块我已安顿好」的标记",
     effort: "添置",
     evidence: "传统象征",
+    en: {
+      traditional: "Metal to drain afflicting Earth qi (a metal object in an unfavorable direction)",
+      action: "Place a metal object you genuinely like in that direction, as a marker that says \"this corner is taken care of\"",
+      modern: null,
+    },
   },
   {
     traditional: "凶方宜静宜压",
@@ -100,6 +146,11 @@ export const ENV_PSYCH_ANCHORS: EnvPsychAnchor[] = [
     action: "把储物、少用的柜子放在凶方，把久待的活动放到吉方",
     effort: "挪动",
     evidence: "传统象征",
+    en: {
+      traditional: "Unfavorable directions are best kept quiet and anchored with heavy, still things",
+      action: "Keep storage and rarely used cabinets in your unfavorable directions, and the activities you spend long stretches on in your favorable ones",
+      modern: null,
+    },
   },
 ];
 

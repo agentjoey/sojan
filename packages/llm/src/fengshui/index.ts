@@ -132,7 +132,7 @@ export async function adviseObjectText(
 
   const raw = await chat(cfg, [
     { role: "system", content: buildObjectAdviceSystemPrompt(language) },
-    { role: "user", content: buildObjectAdviceUserPrompt(advice, { nickname: opts?.nickname }) },
+    { role: "user", content: buildObjectAdviceUserPrompt(advice, { nickname: opts?.nickname, language }) },
   ], { maxTokens: 320, temperature: 0.8 });
   return raw.trim();
 }

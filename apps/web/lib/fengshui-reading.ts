@@ -86,6 +86,8 @@ export async function generateFengshuiSections(
     cohabitants: cohabitants?.map((c) => ({
       profileId: c.profileId, name: c.name, birth: c.birth, chart: computeUnifiedChart(c.birth),
     })),
+    // 化解文字与页面卡片同语言（EP-fs-en ③）：英文叙述直接引用英文化解，不再让模型现翻。
+    language,
   });
   const r = await generateFengshuiReading(fs, { language, nickname: birth.nickname });
   // EP-fs-debt：corrections 此前到这里就丢了、连日志都没有——`degraded` 布尔量传到

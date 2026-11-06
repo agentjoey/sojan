@@ -13,9 +13,9 @@
 
 ## 🟡 最终评审遗留（2026-10-20，分支 `fix/review-findings`，计划 `docs/superpowers/plans/2026-10-20-review-fixes.md`）
 - [x] ~~**[EP-tz-edge] 新疆等边缘时区：出生时间的「记录时区」与地理时区不一致**~~ —— **2026-11-06 修复**（分支 `fix/fs-en-tz-edge`）：core `recordedTimezoneChoices`/`defaultRecordedTimezone`（Asia/Urumqi、Asia/Kashgar → 北京时间默认 / 新疆时间），起盘表单出现记录时区单选、写入 `BirthInput.timezone`、草稿保留选择；评审另查出西方盘库按坐标自查时区、根本不认 `BirthInput.timezone`，`computeWesternChart` 现先用 `convertWallTime` 换算到库所用时区。core 用例：乌鲁木齐 14:30 北京时间→午时 / 新疆时间→未时，北京 14:30 与新疆 12:30 西方盘逐项相同。
+- [ ] **[EP-i18n-en-mixed] 英文字典里仍有约 110 条「中文 (English)」混排或纯中文文案**（2026-11-07 盘点，风水命名空间已清零）：按命名空间 chart 52 / calendar 31 / spirit 9 / home 6 / reading 6 / jiao 4 / profiles 2 / nav、common、dream 各 1。其中一部分可能是刻意的双语设计（如首页卡片「命理结构 · Mingli structure」），需要 owner 先定规则：哪些保留汉字作品牌/图形元素、哪些必须纯英文；再按 EP-fs-en ③ 的做法逐区翻译（专业译法 + 独立译文评审）。
 - [ ] **[EP-tz-edge-legacy] 存量新疆档案仍按 UTC+6 算**：EP-tz-edge 之前在新疆建档的冻结命盘 `timezone` 是 `Asia/Urumqi`，若当事人的出生时间其实按北京时间记录，三盘都偏约 2 小时；目前无提示、无编辑入口，只能删档重建。可选：命盘页对 `Asia/Urumqi` 档案给一条提示 + 「按北京时间重排」入口（需走新建档案路径，命盘冻结）。
-- [ ] **[EP-root-typecheck] 顶层 `pnpm typecheck` 在 main 上失败**（2026-11-06 发现，与当日改动无关）：`tsc -p packages/llm/tsconfig.json` 编译到 core 源码时报 2 处 `string | undefined`——`packages/core/src/bazi/nayin.ts:21`、`packages/core/src/daily/season.ts:57`（llm 的 tsconfig 比 core 严）。core 自身 typecheck 通过。修法：两处加非空收窄。
-- [ ] **[EP-nav-hydration] 英文浏览器首屏导航 hydration mismatch**（2026-11-06 本地 dev 发现）：服务端按 zh 渲染 AppShell 导航（「首页」「运势」），客户端按浏览器语言切成 en，React 报 hydration failed 并整树重建。需让服务端渲染与客户端 locale 一致（cookie/Accept-Language 在服务端取），或导航文案延后到挂载后。
+- [ ] **[EP-root-typecheck] 顶层 `pnpm typecheck` 在 main 上失败**（2026-11-06 发现，与当日改动无关）：`tsc -p packages/llm/tsconfig.json` 编译到 core 源码时报 2 处 `string | undefined`——`packages/core/src/bazi/nayin.ts:21`、`packages/core/src/daily/season.ts:57``tsc -p packages/core/tsconfig.json` 同样报这 2 处（2026-11-07 复核更正：此前记成「core 自身通过」不对）。修法：两处加非空收窄。
 - [ ] **[EP-western-recompute] 存量冻结档案的西方层是按真太阳时算的**：2026-10-20 之前建档的命盘，西方盘把真太阳时当钟表时喂给了库（已修：现用 `NormalizedBirth.civil`），但冻结档案**没有重算**，目前唯一的修法是用户删档重建。考虑一次「重算西方层」迁移（只重写 `chart.western`，需临时放开 `profiles_freeze` 触发器或走专门的迁移路径），并评估已存解读里西方段是否随之失真。
 - [ ] **[EP-aux-llm-unmetered] 辅助 LLM action 不计量、入参无上限**：`app/actions.ts` 的辅助 action 只要求登录、不走 `consumeLlm`；`spiritMemoryAction` 的 history、`timelineAction` 的 chart 都不限长。方案：history 用 `SPIRIT_MAX_TURNS` / `SPIRIT_TURN_MAX_CHARS`（`lib/spirit-limits.ts`）裁剪/拒绝，chart 做结构校验或改为按 profileId 从库里取；再评估是否需要计量。
 - [ ] **[EP-llm-refund] LLM 失败/重试不退额度**：解读/解梦/掷筊/风水在 `consumeLlm` 扣费后，LLM 失败或输出不完整都不退款；风水叙事的重试/降级路径还会再扣一次。方案：失败时补偿退回一次额度，或改成「成功落库后才扣」。
@@ -40,10 +40,8 @@
 ### 风水「境」（EP-fs-*，**flag 2026-08-16 起线上已开**）
 波1 Layer 0 / 波2 Layer 1 / TG 适配均已交付并合并 main。详见 `.agent/CURRENT.md` 风水三节与 `docs/architecture.md` §7b。
 
-- [ ] **[EP-fs-en] 英文侧反幻觉补齐 —— ①② 已于 2026-11-06 修复（分支 `fix/fs-en-tz-edge`），③ 待做**：①`verifyDirectionConsistency`/`sanitizeFengshui` 加 `language`，英文路径与中文同构（词表单一事实源 core `fengshui/en.ts`，星名只认拼音、归属只认 personal/house 强标记，朝向动词/所有格后弃权）②`buildFengshuiSystemPrompt("en")` 整份英文、user prompt 确定性标签全英文；报告指纹加 `narrativeRevision`（en=`fs-en-1`）让未经校验的英文旧报告失效，中文缓存不动。**③ 仍未做**：英文页面上的确定性文案（化解 action/traditional/modern、`personalFit`、方位理由、物件品类与材质、`吉/凶`、`fengshui.group.*`）还是中文；物件顾问（`adviseObjectText`）英文仍无机械校验。以下为原始描述：
-  > 原描述：两道机械校验（`verifyDirectionConsistency` / `sanitizeFengshui`）都是中文匹配，`en` 输出**完全不被校验**，诚实标注只剩一条中文写的 prompt 规则兜底。
-  **⚠️ 性质已变**：此项原为「开 flag 前置」，但 flag 已于 2026-08-16 开启（用户知悉并接受该风险），所以现在是**线上待修**而非阻塞项。且暴露面比原描述更大——`detectLocale()`（`lib/i18n/locale.ts:9`）对任何非中文浏览器返回 `en`，那是绝大多数访客的**默认**路径，不是边缘情况。
-  含三小项：①两道校验支持英文（方位名/星名/伪科学措辞的英文形态）②`buildFengshuiSystemPrompt("en")` 改为完整英文指令（目前仍是「中文指令 + 末尾一句 English」；该反模式已在 `buildObjectAdviceSystemPrompt` 修好并写进测试注释当反例）③英文页面的确定性内容仍基本是中文：化解 action/traditional/modern、`personalFit`、方位理由、物件品类与材质、`吉/凶`、`东四命/西四命`（`fengshui.group.*` 键已存在但未接线）。
+- [x] ~~**[EP-fs-en] 英文侧反幻觉补齐**~~ —— **①② 2026-11-06、③ 2026-11-07 完成**（分支 `fix/fs-en-tz-edge`）。①`verifyDirectionConsistency`/`sanitizeFengshui` 加 `language`，英文路径与中文同构（词表单一事实源 core `fengshui/en.ts`，星名只认拼音、归属只认 personal/house 强标记）②`buildFengshuiSystemPrompt("en")` 整份英文、user prompt 确定性标签全英文 ③英文页面确定性文案由 core 直出英文：`computeFengshui({ language })` 的化解（含环境心理锚点 `en` 块）、`deriveFengshuiTagline(…, lang)`、`adviseObject(…, lang)`（品类/规则/理由/与你的关系/宅局提示）、材质与造型选项、八方盘星名与读屏标签、命卦/宅卦/组别/吉凶标签；术语表写在 `en.ts`。`Remedy` 新增结构化 `direction`，取代页面从 target 文案反解方位（英文 target 解析不了）；`fengshui.group.*` 死键删除（组别标签走 core `groupLabel`）。英文叙述的候选化解改喂英文原文、叙述修订号 en → `fs-en-2`。中文输出逐字节不变（测试锁定）。
+  **仍未做（另立）**：物件顾问说人话层（`adviseObjectText`）英文仍无机械方位对拍（中文也没有，见 `packages/llm/src/fengshui/index.ts` 注释）。
 
 - [x] ~~**[EP-fs-tg] 风水的 Telegram 适配**~~ —— **2026-08-16 交付**（pact：worker `kimi` / reviewer `claude`，两轮 changes-requested）。`api/tg/fengshui` 中介端点 + 数据层按 `hasTgSession()` 分流 + 四界面原生化 + 页内两步确认 + 居所编辑入口。解除了「TG 身份不一致」这一开 flag 阻塞项，并修掉一条 spec 未预见的：TG 的 RLS 下 `getProfile(id)` 逐条读拿 null，**合看在 TG 内一直静默失效**。
   收尾补丁（`6ff687c`）：TG 首页 `TG_ENTRIES` 加「境」入口——此前风水在 Mini App 内**入口数为零**（只加进了 `AppShell.NAV`，而 TG 不渲染 web 导航）。
@@ -56,7 +54,7 @@
   - ✅ `ObjectQuery.color` 收下但从不读取——查证是**全链路死字段**：不只是顾问逻辑没读，表单本身也从没收集/发送过这个字段，i18n 键 `fengshui.object.color` 也是零引用的死键。不是「接 ELEMENT_COLORS」而是直接删（`packages/core/src/fengshui/object-advisor.ts` 的 `ObjectQuery` 类型 + zh.ts/en.ts 两条键），zh/en 键结构一致性测试仍绿。
   - ✅ `sessionStorage` 未补 polyfill——**查证后发现不是真问题**：当前 Node 25 + vitest jsdom 组合下 `sessionStorage` 的原生 accessor 就是 jsdom 真实实现（未被 Node 的实验性 webstorage 顶掉，与 `localStorage` 的情况不同），今天新写的 `dream`/`auth/callback` 页 sessionStorage 相关测试全部无需 polyfill 直接通过。不加不必要的兜底代码，仅记录这条结论。
   - ⚠️ **重试无次数上限（每次 1600 token）——查无实据，需要 owner 澄清**：`generateFengshuiReading` 只有一次 `chat()` 调用，走的是共享 `withRetry` 客户端（已有上限，`retries ?? 2`）；页面上"重试"相关代码全是用户点击触发的手动按钮，不是自动无上限循环。没能在当前代码里找到这条描述的行为——可能是这条本身已经在某次修复里解决了，也可能你观察到的其实是"用户可以无限次手动点重试按钮、没有冷却"（跟"自动重试无上限"是两个不同量级的问题）。需要你确认具体是哪种，再决定要不要修、修什么。
-  - ⚠️ **死 i18n 键——只确认了一个，其余不可信**：机械提取 `fengshui.*` 全部键路径去比对引用的方法有大量假阳性（子命名空间的叶子键名会被误判成顶层键）。唯一独立交叉验证过的死键是 `fengshui.group.*`（`east`/`west`，东四命/西四命群组标签）——但这个键留着**不是遗漏清理**，是它明确要留给 `EP-fs-en` 去接线（那边的英文侧修复计划里第一步就是把它接上，不是删掉），所以本轮没动它。
+  - ⚠️ **死 i18n 键——只确认了一个，其余不可信**：机械提取 `fengshui.*` 全部键路径去比对引用的方法有大量假阳性（子命名空间的叶子键名会被误判成顶层键）。唯一独立交叉验证过的死键是 `fengshui.group.*`（`east`/`west`，东四命/西四命群组标签）——但这个键留着**不是遗漏清理**，是它明确要留给 `EP-fs-en` 去接线（那边的英文侧修复计划里第一步就是把它接上，不是删掉），所以本轮没动它。（2026-11-07 EP-fs-en ③ 收尾：组别标签改由 core `groupLabel` 统一产出、人与屋共用，该键最终删除。）
   - ~~`Remedy.tenancy` 端到端是死字段~~ —— **波2 已接通**：`sortRemedies(list, {tenancy})` 按租住/自有排序，`page.tsx` 真的传了 `dwelling.tenancy`。
   - ~~`TG_ENTRIES` 完全没有 flag 门控（灵）~~ —— **已修复**：`app/page.tsx` 的 TG 入口列表「灵」补上 `NEXT_PUBLIC_SPIRIT_ENABLED` 门控，与 `AppShell.NAV` 一致；补了开/关两条回归测试 + mutation 复验。
   - `/fengshui` 硬取 `dwellings[0]`，无多居所切换器——**未处理，非本轮技术债范畴，是延后的新功能**。多居所付费墙已在最终评审中撤除（为零可观察产出收费不可辩护）。日后做切换器需**同时**新建服务端写入路由——`createDwelling` 是浏览器直写 Supabase，届时任何纯客户端闸门都可绕过。
@@ -77,7 +75,7 @@
 - [x] ~~**[EP-motion-bell] 首页与主菜单风铃图标增强动态**~~ —— **2026-08-21 交付**。`BellLogo` 新增 `motion` 参数（`idle` 常驻循环 / `ring` 敲响一次即停），首页卷首与桌面主菜单 Logo 改用 `ring`（进入渲染时 + 点击各触发一次）；`CastingOverlay` 的常驻摆动语义不变（仍是 `idle`）。
 
 ## 🟡 MED
-- [ ] **[EP-i18n-hydration] en 浏览器无 cookie 首访 = 全站 hydration mismatch**（2026-08-28 打磨批真实浏览器自查揪出，**既有问题非本批引入**）：服务端 locale 只认 `x-zj-locale` header 与 `zj_locale` cookie（`lib/i18n/server.ts`，默认 zh），**不解析 `Accept-Language`**；而客户端 `detectLocale()` 对非中文浏览器一律 `en`。于是 en 用户首次访问（还没有 cookie）时 SSR 出中文、客户端 hydrate 出英文，React 报 hydration mismatch 并重生成整树（实测差异样例：SSR `aria-label="运势"` vs 客户端 `"Fortune"`）。考虑到首发海外市场、en 是多数访客的默认路径，这不是边角。修法方向：服务端加 Accept-Language 解析（与 detectLocale 同规则），或客户端首帧先按 cookie/默认渲染、挂载后再切换（I18nProvider 已有 effect 纠偏先例）。另有两条 attribute 级既有警告一并记录：`<html>` 的 `--tg-viewport-height`（TG 视口脚本）、CompassWatermark 浮点坐标 SSR/客户端序列化位数差。
+- [ ] **[EP-i18n-hydration] en 浏览器无 cookie 首访 = 全站 hydration mismatch**（2026-11-06 本地 dev 再次复现于 AppShell 导航）（2026-08-28 打磨批真实浏览器自查揪出，**既有问题非本批引入**）：服务端 locale 只认 `x-zj-locale` header 与 `zj_locale` cookie（`lib/i18n/server.ts`，默认 zh），**不解析 `Accept-Language`**；而客户端 `detectLocale()` 对非中文浏览器一律 `en`。于是 en 用户首次访问（还没有 cookie）时 SSR 出中文、客户端 hydrate 出英文，React 报 hydration mismatch 并重生成整树（实测差异样例：SSR `aria-label="运势"` vs 客户端 `"Fortune"`）。考虑到首发海外市场、en 是多数访客的默认路径，这不是边角。修法方向：服务端加 Accept-Language 解析（与 detectLocale 同规则），或客户端首帧先按 cookie/默认渲染、挂载后再切换（I18nProvider 已有 effect 纠偏先例）。另有两条 attribute 级既有警告一并记录：`<html>` 的 `--tg-viewport-height`（TG 视口脚本）、CompassWatermark 浮点坐标 SSR/客户端序列化位数差。
 
 - [ ] **[EP-uiv3-banner] 风铃图只有「谨」这一档，吉/顺/平三档待补**（UI v3 子项目 B 挂起项，2026-08-26 开；2026-08-26 owner 纠正术语并确认素材）
   **术语更正（owner 2026-08-26）**：这个组件此前被 claude 一路误称「风幡」——**不对，这是风铃的另一张图**，组件已改名 `WindBell`（原 `WindBanner`）。幡带（红色垂带）本身仍可称「幡面」，但整件东西叫风铃。

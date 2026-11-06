@@ -1,7 +1,7 @@
 import {
   FENGSHUI_GUARDRAILS, DIRECTION_LABEL, DIRECTION_LABEL_EN, STAR_LABEL_EN, STAR_GLOSS_EN,
   GUA_PINYIN, GROUP_EN, ELEMENT_EN, COLOR_EN, MATERIAL_EN, DIRECTIONS,
-  type Direction, type Gua,
+  type Direction, type Gua, type Effort,
 } from "@sojan/core";
 import type { ObjectAdvice } from "@sojan/core";
 import type { ReadingLanguage } from "../prompt";
@@ -62,17 +62,17 @@ function buildFengshuiSystemPromptEn(): string {
     `${n + 1}. Use only the star given for each direction in the facts (${stars}). Never work out a direction's star yourself and never change which star belongs to which direction.`,
     `${n + 2}. Always write star names in pinyin exactly as listed (e.g. "Sheng Qi"), optionally followed by a short gloss in parentheses. Do not replace them with English translations.`,
     `${n + 3}. Remedies marked as traditional symbolism: say only what the tradition holds and what the act can mean as a small ritual for settling yourself. Never use phrases like "studies show", "scientifically proven", "clinically", or "experiments show".`,
-    `${n + 4}. The personal directions (set by your personal gua) and the house directions (set by the house gua) are two independent sets of readings. Never mix them or derive one from the other. Whenever you mention a direction's star, say which set it belongs to, using the words "personal directions" or "house directions".`,
+    `${n + 4}. The personal directions (set by the person's Life Gua) and the house directions (set by the house gua) are two independent sets of readings. Never mix them or derive one from the other. Whenever you mention a direction's star, say which set it belongs to, using the words "personal directions" or "house directions".`,
     "",
     "Output format: exactly three H2 sections, in this order, with no other headings:",
     `## ${H.situation}`,
-    "State the personal gua, its group (East Group or West Group), and each direction's star and whether it is favorable. Describe it like terrain; do not pass judgement.",
+    "State the Life Gua, its group (East Group or West Group), and each direction's star and whether it is favorable. Describe it like terrain; do not pass judgement.",
     `## ${H.youAndSpace}`,
     "Translate that layout into everyday experience: which directions make it easier to relax over long stretches and which make it easier to feel tense, with the modern explanation where one is given (only for remedies that list a modern mechanism).",
     `## ${H.actions}`,
     "List 4–6 things to do, zero-cost ones first, each as one actionable sentence. Every remedy marked [traditional symbolism] in the candidate list must carry the inline tag \"(traditional symbolism)\" on its line — no exceptions. The post-processing step relies on this tag; it is not decoration.",
     "",
-    "The facts may be written in Chinese; translate them faithfully, but keep star names in pinyin.",
+    "If any fact is still written in Chinese, translate it faithfully, but keep star names in pinyin.",
     "Write the whole answer in English.",
     "End with one sentence saying these are suggestions for self-awareness and how you live in your space, not professional advice.",
   ].join("\n");
@@ -147,6 +147,8 @@ const dirEn = (zh: string) => {
 const mapEn = (xs: string[], table: Record<string, string>) => xs.map((x) => table[x] ?? x).join(", ");
 /** facts 里命卦是「坎1」这样的拼接串：首字卦名 + 卦数。 */
 const guaEn = (s: string) => `${GUA_PINYIN[s[0] as Gua] ?? s[0]} ${s.slice(1)}`.trim();
+const EFFORT_PROMPT_EN: Record<Effort, string> = { 零成本: "no cost", 挪动: "rearrange", 添置: "add an item", 装修: "renovate" };
+
 const groupEn = (g: string) => GROUP_EN[g as keyof typeof GROUP_EN] ?? g;
 
 function formatSectorLinesEn(sectors: FengshuiFacts["directions"]): string[] {
@@ -158,13 +160,13 @@ function formatSectorLinesEn(sectors: FengshuiFacts["directions"]): string[] {
 
 /**
  * 英文 user prompt：确定性标签（方位、星名、卦名、组别、五行、色、材）一律换成 core 英文词表，
- * 与英文对拍的词表同源；化解条目的自由文本仍是 core 产出的中文原文，交给模型忠实翻译
- * （③ 把这些文案本身做成双语是另一项工作）。
+ * 与英文对拍的词表同源。化解条目的文字来自 `computeFengshui({ language: "en" })`（EP-fs-en ③），
+ * 与页面卡片上的英文逐字相同，模型不必再翻译——叙述与卡片用词因此一致。
  */
 function buildFengshuiUserPromptEn(facts: FengshuiFacts, opts?: { nickname?: string }): string {
   const remLines = facts.remedies
     .map((r) =>
-      `- [${r.effort}][${r.evidence === "传统象征" ? "traditional symbolism" : "traditional + modern"}] ${r.action} | Tradition: ${r.traditional} | Modern mechanism: ${r.modern ?? "none (do not invent one)"}`)
+      `- [${EFFORT_PROMPT_EN[r.effort]}][${r.evidence === "传统象征" ? "traditional symbolism" : "traditional + modern"}] ${r.action} | Tradition: ${r.traditional} | Modern mechanism: ${r.modern ?? "none (do not invent one)"}`)
     .join("\n");
   const dw = facts.dwelling;
   const dwellingBlock = dw ? [
@@ -183,7 +185,7 @@ function buildFengshuiUserPromptEn(facts: FengshuiFacts, opts?: { nickname?: str
   ] : [];
   return [
     `Name: ${opts?.nickname ?? "you"}`,
-    `Personal gua: ${guaEn(facts.mingGua)} (${groupEn(facts.guaGroup)})`,
+    `Life Gua: ${guaEn(facts.mingGua)} (${groupEn(facts.guaGroup)})`,
     `Personal directions:`,
     ...formatSectorLinesEn(facts.directions),
     ...dwellingBlock,
@@ -194,7 +196,7 @@ function buildFengshuiUserPromptEn(facts: FengshuiFacts, opts?: { nickname?: str
     `Favorable directions (by element): ${facts.favorableDirections.map(dirEn).join(", ") || "none"}`,
     `Colors to favor: ${mapEn(facts.favorableColors, COLOR_EN) || "none"} | Materials to favor: ${mapEn(facts.favorableMaterials, MATERIAL_EN) || "none"} | Colors to use sparingly: ${mapEn(facts.unfavorableColors, COLOR_EN) || "none"}`,
     ``,
-    `Candidate remedies (choose only from these; you may merge similar ones; do not add new ones; the text is in Chinese — translate it):`,
+    `Candidate remedies (choose only from these; you may merge similar ones; do not add new ones):`,
     remLines,
   ].join("\n");
 }
@@ -244,7 +246,7 @@ export function buildObjectAdviceSystemPrompt(language: ReadingLanguage = "zh"):
       ...guardrails,
       `${n + 1}. Only use the directions and rules given below — do not invent or add any direction beyond the given facts.`,
       `${n + 2}. Do not assert fated outcomes (e.g. "this will bring wealth" or "this will cause illness") — describe tendencies and everyday experience only.`,
-      `${n + 3}. If a 宅局提示 (dwelling note) is given, it is a deterministic conclusion already shown to the user directly above your text. Stay consistent with it: do not contradict it, do not ignore it, and do not describe the recommended directions as good spots "in this house".`,
+      `${n + 3}. If a dwelling note is given, it is a deterministic conclusion already shown to the user directly above your text. Stay consistent with it: do not contradict it, do not ignore it, and do not describe the recommended directions as good spots "in this house".`,
       "",
       "Write the given conclusion as 2–3 natural sentences, plain, actionable, and non-deterministic.",
       "Output ONLY those 2–3 sentences — no heading, prefix, or extra explanation.",
@@ -277,7 +279,11 @@ export function buildObjectAdviceSystemPrompt(language: ReadingLanguage = "zh"):
  * `dwellingNote` 是强版唯一多出来的可观察内容。漏掉它，说人话层就会在一句「此宅与你不合」
  * 旁边浑然不觉地照夸某个方位。
  */
-export function buildObjectAdviceUserPrompt(advice: ObjectAdvice, opts?: { nickname?: string }): string {
+export function buildObjectAdviceUserPrompt(
+  advice: ObjectAdvice,
+  opts?: { nickname?: string; language?: ReadingLanguage },
+): string {
+  if (opts?.language === "en") return buildObjectAdviceUserPromptEn(advice, opts);
   return [
     `称呼：${opts?.nickname ?? "你"}`,
     `物件：${advice.categoryLabel}`,
@@ -291,6 +297,29 @@ export function buildObjectAdviceUserPrompt(advice: ObjectAdvice, opts?: { nickn
       : "",
     advice.intendedVerdict
       ? `用户想放在：${advice.intendedVerdict.direction}，该方为${advice.intendedVerdict.star}（${advice.intendedVerdict.auspicious ? "吉" : "凶"}）`
+      : "",
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * 英文版物件 user prompt（EP-fs-en ③）。`advice` 由页面按 `adviseObject(…, "en")` 产出，散文字段已是英文；
+ * 这里只把仍是规范中文值的字段（五行、星名、方位枚举）换成英文词表，标签行一律英文。
+ */
+function buildObjectAdviceUserPromptEn(advice: ObjectAdvice, opts?: { nickname?: string }): string {
+  const iv = advice.intendedVerdict;
+  return [
+    `Name: ${opts?.nickname ?? "you"}`,
+    `Object: ${advice.categoryLabel}`,
+    `Element: ${advice.elementOfObject ? (ELEMENT_EN[advice.elementOfObject] ?? advice.elementOfObject) : "not determined"}`,
+    `Recommended directions: ${advice.recommendedDirections.map((r) => `${r.label} (${r.reason})`).join("; ") || "none"}`,
+    `Directions to avoid: ${advice.avoid.map((r) => `${r.label} (${r.reason})`).join("; ") || "none"}`,
+    `Rules for this kind of piece: ${advice.categoryRules.join("; ")}`,
+    `How it relates to the person: ${advice.personalFit}`,
+    advice.dwellingNote
+      ? `Dwelling note (a deterministic conclusion already shown to the user directly above your text; stay consistent with it, do not contradict or ignore it, and do not call these directions good spots "in this house"): ${advice.dwellingNote}`
+      : "",
+    iv
+      ? `The user wants to put it in the ${DIRECTION_LABEL_EN[iv.direction].toLowerCase()}, which is the ${STAR_LABEL_EN[iv.star]} direction (${iv.auspicious ? "favorable" : "unfavorable"}) in their personal directions`
       : "",
   ].filter(Boolean).join("\n");
 }

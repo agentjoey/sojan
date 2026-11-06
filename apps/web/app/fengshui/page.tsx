@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  computeFengshui, FENGSHUI_ENGINE_VERSION, FENGSHUI_NARRATIVE_REVISION, directionsFor, DIRECTION_LABEL, DIRECTIONS, deriveFengshuiTagline,
+  computeFengshui, FENGSHUI_ENGINE_VERSION, FENGSHUI_NARRATIVE_REVISION, directionsFor, DIRECTIONS, deriveFengshuiTagline,
+  directionLabel, starLabel, guaLabel, groupLabel,
   type FengshuiChart, type DwellingInput, type CohabitantInput, type Direction,
 } from "@sojan/core";
 import { getActiveProfile, getProfile, type Profile } from "@/lib/profiles";
@@ -28,28 +29,15 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
 const SPIRIT_ENABLED = process.env.NEXT_PUBLIC_SPIRIT_ENABLED === "1";
 
 /**
- * 「就这条问一卦」链接携带的动作文本上限（最终评审 Blocking 2）。当前化解数据
- * （remedy.ts / env-psych.ts）里最长的 action 也就三四十字，80 是留了充足余量的
- * 保守上限——真正起作用的是防止未来新增更长文案时把 query string 无限拉长。
+ * 「就这条问一卦」链接携带的动作文本上限（最终评审 Blocking 2）。中文 action 最长三四十字，
+ * 英文（EP-fs-en ③）最长约 190 字符；240 让两种语言的现有文案都原样带过去，
+ * 真正起作用的是防止未来新增更长文案时把 query string 无限拉长。
  */
-const SPIRIT_QUERY_MAX_LEN = 80;
+const SPIRIT_QUERY_MAX_LEN = 240;
 
 /** 供 /spirit 端拼出「关于这条化解的提问」的原始素材；超限截断，避免 URL 无限增长。 */
 export function truncateForSpiritQuery(text: string, max = SPIRIT_QUERY_MAX_LEN): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
-}
-
-/** 方位标签 → Direction 反查（盘即导航的过滤依据）。 */
-const LABEL_TO_DIRECTION = new Map<string, Direction>(DIRECTIONS.map((d) => [DIRECTION_LABEL[d], d]));
-
-/**
- * 从化解的 `target` 字段提取方位（2026-08 创意 A「盘即导航」）。target 形如
- * 「南（生气方）」。**先长后短**：「北」是「东北」的子串，两字方位必须优先匹配
- * （方位名子串陷阱在本仓库已咬过三次）。
- * 与方位无关的化解（宜用色与材/物件类）返回 null，过滤时归入「不限方位」组。
- */
-export function remedyDirection(target: string): Direction | null {
-  return LABEL_TO_DIRECTION.get(target.slice(0, 2)) ?? LABEL_TO_DIRECTION.get(target.slice(0, 1)) ?? null;
 }
 
 /** 居所加载超时（复审必修2 次级风险）：见下方 withTimeout 的文档。 */
@@ -384,9 +372,10 @@ export default function FengshuiPage() {
         ? computeFengshui({
             birth: profile.birthInput, chart: profile.chart,
             dwelling: effectiveDwellingInput, cohabitants: effectiveCohabitantInputs,
+            language: locale,
           })
         : null,
-    [profile, effectiveDwellingInput, effectiveCohabitantInputs],
+    [profile, effectiveDwellingInput, effectiveCohabitantInputs, locale],
   );
 
   useEffect(() => {
@@ -516,7 +505,9 @@ export default function FengshuiPage() {
   const f = fs!;
   // 一句话基调（评审后续 #6）：确定性生成，只取本命八方，见 packages/core 的
   // deriveFengshuiTagline 文档注释——两套表不得互推，即使当下以居所为主视觉。
-  const tagline = deriveFengshuiTagline(f.personalDirections, f.elementAffinity, profile.chart.bazi.dayMasterElement);
+  const tagline = deriveFengshuiTagline(f.personalDirections, f.elementAffinity, profile.chart.bazi.dayMasterElement, locale);
+  const dirLabel = (d: Direction) => directionLabel(d, locale);
+  const sep = t("common.labelSeparator");
   // 会员闸门（Task 10）：合看（切视角对照）是会员功能。`f.layer === 1` 现在已经
   // **蕴含**「已确认放行」（fs 由 effectiveDwellingInput 算出，见上方注释），
   // 所以这里不必也不该再判一次 entitled——未放行时 f 根本就是 Layer 0，
@@ -551,10 +542,10 @@ export default function FengshuiPage() {
   // 盘即导航：dirFilter 生效时清单只留落在该方位的化解；「不限方位」的通用化解
   // （色/材/物件类）单列一组照列——它们与方位无关，过滤掉就是丢内容。
   const visibleRemedies = dirFilter
-    ? f.remedies.filter((r) => remedyDirection(r.target) === dirFilter)
+    ? f.remedies.filter((r) => r.direction === dirFilter)
     : f.remedies;
   const generalRemedies = dirFilter
-    ? f.remedies.filter((r) => remedyDirection(r.target) === null)
+    ? f.remedies.filter((r) => r.direction === null)
     : [];
 
   /** 化解清单（Card 列表）。 */
@@ -578,7 +569,7 @@ export default function FengshuiPage() {
       // 传统+现代）与传统/现代两行说明照旧保留——它们是产品可信度的核心，不能丢。
       <ul className="mt-3 border-y border-[var(--color-line)] [&>li+li]:border-t [&>li+li]:border-[var(--color-line)]">
         {items.map((r) => {
-          const dir = remedyDirection(r.target);
+          const dir = r.direction;
           return (
             <li key={r.id} className="py-4">
               <div className="flex items-baseline gap-3">
@@ -587,7 +578,7 @@ export default function FengshuiPage() {
                     className="font-serif text-[16px] font-semibold"
                     style={{ color: "var(--color-cinnabar)" }}
                   >
-                    {DIRECTION_LABEL[dir]}
+                    {dirLabel(dir)}
                   </span>
                 )}
                 <span
@@ -607,10 +598,10 @@ export default function FengshuiPage() {
               <p className="mt-2 text-[13px] text-ink-2">
                 {r.evidence === "传统象征" ? t("fengshui.evidenceSymbolic") : t("fengshui.evidenceBoth")}
                 {" · "}
-                {t("fengshui.traditionalLabel")}：{r.traditional}
+                {t("fengshui.traditionalLabel")}{sep}{r.traditional}
               </p>
               {r.modern && (
-                <p className="mt-1 text-[13px] text-ink-2">{t("fengshui.modernLabel")}：{r.modern}</p>
+                <p className="mt-1 text-[13px] text-ink-2">{t("fengshui.modernLabel")}{sep}{r.modern}</p>
               )}
               {SPIRIT_ENABLED && (
                 <Link
@@ -667,9 +658,9 @@ export default function FengshuiPage() {
           hasDwellingChart
             ? f.layer === 1
               ? t("fengshui.dwellingHeroSubtitle", {
-                  sitting: DIRECTION_LABEL[f.dwelling.sitting],
-                  facing: DIRECTION_LABEL[f.dwelling.facing],
-                  gua: f.dwelling.guaName,
+                  sitting: dirLabel(f.dwelling.sitting),
+                  facing: dirLabel(f.dwelling.facing),
+                  gua: guaLabel(f.dwelling.guaName, locale),
                 })
               : t("fengshui.dwellingHeroSubtitlePending")
             : t("fengshui.subtitle")
@@ -694,9 +685,17 @@ export default function FengshuiPage() {
                   {t("fengshui.dwellingTitle")}
                 </h2>
                 <div className="mt-4 flex flex-col items-center">
-                  <BaguaWheel verdicts={f.dwelling.sectors} centerLabel={`${f.dwelling.guaName}宅`} ariaLabel="房屋八方吉凶盘" />
+                  <BaguaWheel
+                    verdicts={f.dwelling.sectors}
+                    centerLabel={t("fengshui.houseGua", { gua: guaLabel(f.dwelling.guaName, locale) })}
+                    ariaLabel={t("fengshui.houseWheelAria")}
+                    locale={locale}
+                  />
                   <p className="mt-2 text-[13px] text-ink-2">
-                    {f.dwelling.name} · {f.dwelling.guaName}宅（{f.dwelling.group}）
+                    {f.dwelling.name} · {t("fengshui.houseGuaWithGroup", {
+                      gua: guaLabel(f.dwelling.guaName, locale),
+                      group: groupLabel(f.dwelling.group, locale),
+                    })}
                   </p>
                   {/* 复审必修3：同屏已并排显示「本命卦（东/西四命）」与「宅卦（东/西四命）」
                       两个标签，此前从不说这俩合不合——而 core 的 buildDwellingRemedies 早已
@@ -782,7 +781,9 @@ export default function FengshuiPage() {
           「化解」tab 里它是方位过滤的参照（点卦字筛选后不用切回盘 tab 核对）。 */}
       <p data-testid="four-auspicious" className="mt-6 text-[12px] leading-relaxed text-muted">
         {t("fengshui.fourAuspicious")} ·{" "}
-        {auspiciousDirs.map((d) => `${DIRECTION_LABEL[d]}（${activeVerdicts[d].star}）`).join(" · ")}
+        {auspiciousDirs
+          .map((d) => t("fengshui.directionWithStar", { direction: dirLabel(d), star: starLabel(activeVerdicts[d].star, locale) }))
+          .join(" · ")}
       </p>
     </>
   );
@@ -807,7 +808,7 @@ export default function FengshuiPage() {
                 后续 #4/#6），这里只外包一层强调块、一个字没动。 */}
             <Emphasis data-testid="shengqi-block">
               <h2 className="font-serif text-[15px] font-semibold text-ink">
-                {t("fengshui.bestDirection")} · <span className="text-cinnabar">{DIRECTION_LABEL[shengQiDir]}</span>
+                {t("fengshui.bestDirection")} · <span className="text-cinnabar">{dirLabel(shengQiDir)}</span>
               </h2>
               <p className="mt-2 text-[15px] leading-[1.8]" style={{ color: "var(--color-ink)" }}>{tagline}</p>
             </Emphasis>
@@ -874,13 +875,19 @@ export default function FengshuiPage() {
                   并按该方位过滤。宅盘不挂交互（化解清单的方位语义是本命卦的）。 */}
               <BaguaWheel
                 verdicts={activeVerdicts}
-                centerLabel={`${activeMingGua.guaName}${activeMingGua.gua}`}
+                centerLabel={t("fengshui.guaNumber", { gua: guaLabel(activeMingGua.guaName, locale), n: activeMingGua.gua })}
+                ariaLabel={t("fengshui.personalWheelAria")}
+                locale={locale}
                 staggerIn={staggerIn}
                 selectedDirection={dirFilter}
                 onSelectDirection={selectDirection}
               />
               <p className="mt-2 text-[13px] text-ink-2">
-                {t("fengshui.mingGua")}：{activeMingGua.guaName}{activeMingGua.gua}（{activeMingGua.group}）
+                {t("fengshui.mingGua")}{sep}{t("fengshui.guaNumberWithGroup", {
+                  gua: guaLabel(activeMingGua.guaName, locale),
+                  n: activeMingGua.gua,
+                  group: groupLabel(activeMingGua.group, locale),
+                })}
               </p>
             </div>
           </section>
@@ -905,7 +912,7 @@ export default function FengshuiPage() {
                 className="rounded-[var(--radius-chip)] px-3 py-1"
                 style={{ background: "var(--color-tint)", color: "var(--color-ink)" }}
               >
-                {t("fengshui.filterByDirection", { direction: DIRECTION_LABEL[dirFilter] })}
+                {t("fengshui.filterByDirection", { direction: dirLabel(dirFilter) })}
               </span>
               <button
                 type="button"
@@ -957,7 +964,7 @@ export default function FengshuiPage() {
             <p className="mt-1 text-[13px] text-ink-2">
               {t("fengshui.sharedGoodNote", {
                 name: activeCohabitant.name,
-                directions: activeCohabitant.sharedGood.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
+                directions: activeCohabitant.sharedGood.map(dirLabel).join(t("common.listSeparator")),
               })}
             </p>
           )}
@@ -965,7 +972,7 @@ export default function FengshuiPage() {
             <p className="mt-1 text-[13px] text-ink-2">
               {t("fengshui.conflictsNote", {
                 name: activeCohabitant.name,
-                directions: activeCohabitant.conflicts.map((d) => DIRECTION_LABEL[d]).join(t("common.listSeparator")),
+                directions: activeCohabitant.conflicts.map(dirLabel).join(t("common.listSeparator")),
               })}
             </p>
           )}

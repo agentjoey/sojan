@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DIRECTIONS, DIRECTION_LABEL, type Direction } from "@sojan/core";
+import { DIRECTIONS, directionLabel, type Direction } from "@sojan/core";
 import { createDwelling, updateDwelling, type Dwelling } from "@/lib/dwellings";
 import { listProfiles, getActiveProfileId, type Profile } from "@/lib/profiles";
 import { MAX_COHABITANTS } from "@/lib/fengshui-limits";
 import { Segmented } from "@/components/Segmented";
-import { useT } from "@/lib/i18n/I18nProvider";
+import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 import { Button } from "@/components/ui";
 
 /**
@@ -31,6 +31,7 @@ export function DwellingForm({ initial, onSaved, onAuthError }: {
   onAuthError?: (e: unknown) => boolean;
 }) {
   const t = useT();
+  const { locale } = useLocale();
   const [name, setName] = useState(initial?.name ?? "");
   const [kind, setKind] = useState<"home" | "office">(initial?.kind ?? "home");
   const [tenancy, setTenancy] = useState<"rent" | "own">(initial?.tenancy ?? "rent");
@@ -171,7 +172,7 @@ export function DwellingForm({ initial, onSaved, onAuthError }: {
                 borderColor: facing === d ? "var(--color-cinnabar)" : "var(--color-line)",
                 color: facing === d ? "var(--color-cinnabar)" : "var(--color-ink)",
               }}>
-              {DIRECTION_LABEL[d]}
+              {directionLabel(d, locale)}
             </button>
           ))}
           <button type="button"

@@ -1,4 +1,5 @@
 import { DIRECTION_LABEL } from "./directions";
+import { DIRECTION_LABEL_EN, ELEMENT_EN, type FengshuiLanguage } from "./en";
 import type { DirectionVerdict } from "./eight-mansions";
 import type { Direction } from "./directions";
 import type { ElementAffinity } from "./directions";
@@ -23,9 +24,17 @@ export function deriveFengshuiTagline(
   personalDirections: Record<Direction, DirectionVerdict>,
   affinity: Pick<ElementAffinity, "favorableElements">,
   dayMasterElement: string,
+  lang: FengshuiLanguage = "zh",
 ): string {
   const best = Object.values(personalDirections).find((v) => v.star === "生气")!;
   const favorable = affinity.favorableElements[0];
+  if (lang === "en") {
+    const where = DIRECTION_LABEL_EN[best.direction].toLowerCase();
+    const el = (e: string) => ELEMENT_EN[e] ?? e;
+    return favorable
+      ? `With a ${el(dayMasterElement)} day master, you tend to do well with ${el(favorable)} — your Sheng Qi direction is the ${where}.`
+      : `Your Sheng Qi direction is the ${where} — give it a little extra care.`;
+  }
   const bestLabel = DIRECTION_LABEL[best.direction];
   if (favorable) {
     return `${dayMasterElement}命之人，宜近${favorable}——你的生气在${bestLabel}。`;

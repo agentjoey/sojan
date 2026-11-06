@@ -34,9 +34,10 @@ export {
   DIRECTIONS, DIRECTION_LABEL, OPPOSITE, GUAS, GUA_DIRECTION, DIRECTION_GUA,
   EIGHT_MANSIONS, AUSPICIOUS_STARS, INAUSPICIOUS_STARS,
   ENV_PSYCH_ANCHORS, FENGSHUI_GUARDRAILS,
-  OBJECT_CATEGORIES, CATEGORY_LABEL,
+  OBJECT_CATEGORIES, CATEGORY_LABEL, OBJECT_CATEGORY_EN, OBJECT_MATERIAL_EN, OBJECT_SHAPE_EN,
   deriveFengshuiTagline,
   DIRECTION_LABEL_EN, STAR_LABEL_EN, STAR_GLOSS_EN, GUA_PINYIN, GROUP_EN, ELEMENT_EN, COLOR_EN, MATERIAL_EN,
+  directionLabel, starLabel, guaLabel, groupLabel, elementLabel, joinEn,
 } from "./fengshui/index";
 export type {
   FengshuiInput, FengshuiChart, DwellingView, DwellingInput, DwellingGua,
@@ -49,7 +50,8 @@ export type {
    */
   Star as FengshuiStar,
   ElementAffinity, Remedy, Effort, EnvPsychAnchor,
-  ObjectCategory, ObjectQuery, ObjectAdvice, ObjectAdviceInput,
+  ObjectCategory, ObjectQuery, ObjectAdvice, ObjectAdviceInput, ObjectMaterial, ObjectShape,
+  FengshuiLanguage,
 } from "./fengshui/index";
 
 export { normalizeBirth } from "./normalize";

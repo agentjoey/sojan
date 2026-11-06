@@ -1,6 +1,6 @@
 "use client";
 
-import { DIRECTIONS, DIRECTION_GUA, DIRECTION_LABEL, type Direction, type DirectionVerdict } from "@sojan/core";
+import { DIRECTIONS, DIRECTION_GUA, directionLabel, starLabel, type Direction, type DirectionVerdict } from "@sojan/core";
 
 /**
  * 八方位盘图（EP-fs-07）——「境」页视觉主体。
@@ -79,6 +79,11 @@ type BaguaWheelProps = {
    * 波1 的字面量不变，向后兼容所有既有调用方；仅第二个盘实例需要显式传入。
    */
   ariaLabel?: string;
+  /**
+   * EP-fs-en ③：星名小字与读屏标签的语言。卦字（坎、离等）是盘面图形，与紫微盘
+   * 一样保留汉字；文字信息（星名、方位、吉凶）随语言走。缺省 zh，既有调用方不变。
+   */
+  locale?: "zh" | "en";
   /** 盘即导航（2026-08 创意 A）：传入后卦字可点/可键盘触发，选中方位卦字变朱砂 + 短划线。 */
   onSelectDirection?: (d: Direction) => void;
   selectedDirection?: Direction | null;
@@ -101,7 +106,8 @@ export function BaguaWheel(props: BaguaWheelProps) {
   const {
     centerLabel,
     size = 320,
-    ariaLabel = "八方吉凶盘",
+    locale = "zh",
+    ariaLabel = locale === "en" ? "Directions wheel" : "八方吉凶盘",
     onSelectDirection,
     selectedDirection = null,
     staggerIn = false,
@@ -156,7 +162,10 @@ export function BaguaWheel(props: BaguaWheelProps) {
         const deg = i * 45;
         const [gx, gy] = polar(GUA_R, deg);
         const selected = selectedDirection === d;
-        const sectorAria = `${DIRECTION_LABEL[d]}：${v.star}（${v.auspicious ? "吉" : "凶"}）`;
+        const sectorAria =
+          locale === "en"
+            ? `${directionLabel(d, "en")}: ${starLabel(v.star, "en")} (${v.auspicious ? "favorable" : "unfavorable"})`
+            : `${directionLabel(d, "zh")}：${v.star}（${v.auspicious ? "吉" : "凶"}）`;
         return (
           <g
             key={d}
@@ -202,19 +211,24 @@ export function BaguaWheel(props: BaguaWheelProps) {
             {v.auspicious &&
               (() => {
                 const [sx, sy] = polar(STAR_R, deg);
+                // 拼音星名（Sheng Qi）比两个汉字宽得多：东侧三方位右对齐、西侧左对齐，
+                // 让文字朝盘心延伸，不压到外侧的卦字；正北/正南仍居中。中文保持居中不变。
+                const anchor =
+                  locale !== "en" || deg % 180 === 0 ? "middle" : deg < 180 ? "end" : "start";
                 return (
                   <text
                     x={sx}
                     y={sy}
-                    textAnchor="middle"
+                    textAnchor={anchor}
                     dominantBaseline="central"
                     style={{
-                      fontSize: 10,
-                      letterSpacing: "0.2em",
+                      fontSize: locale === "en" ? 9 : 10,
+                      // 拼音星名（Sheng Qi）比两个汉字长得多，字距收紧，免得挤到相邻方位。
+                      letterSpacing: locale === "en" ? "0.02em" : "0.2em",
                       fill: v.star === "生气" ? "var(--color-cinnabar)" : "var(--color-muted)",
                     }}
                   >
-                    {v.star}
+                    {starLabel(v.star, locale)}
                   </text>
                 );
               })()}
@@ -242,7 +256,8 @@ export function BaguaWheel(props: BaguaWheelProps) {
         x={CX}
         y={CY + 8}
         textAnchor="middle"
-        style={{ fontFamily: "var(--font-serif)", fontSize: 24, fill: "var(--color-ink)" }}
+        // 英文中心标签（「Kan 1」「Qian house」）比两个汉字宽，超过 4 字符就缩小字号，留在中心圆内；中文不受影响。
+        style={{ fontFamily: "var(--font-serif)", fontSize: locale === "en" && centerLabel.length > 4 ? 17 : 24, fill: "var(--color-ink)" }}
       >
         {centerLabel}
       </text>

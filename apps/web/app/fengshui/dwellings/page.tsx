@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { DIRECTION_LABEL } from "@sojan/core";
+import { directionLabel } from "@sojan/core";
 import { getActiveProfile, type Profile } from "@/lib/profiles";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { useSignInGate } from "@/lib/auth/useSignInGate";
-import { useT } from "@/lib/i18n/I18nProvider";
+import { useT, useLocale } from "@/lib/i18n/I18nProvider";
 import { listDwellings, deleteDwelling, type Dwelling } from "@/lib/dwellings";
 import { PageHeader } from "@/components/PageHeader";
 import { CastingOverlay } from "@/components/CastingOverlay";
@@ -41,6 +41,7 @@ const ENABLED = process.env.NEXT_PUBLIC_FENGSHUI_ENABLED === "1";
  */
 export default function DwellingsPage() {
   const t = useT();
+  const { locale } = useLocale();
   const gate = useSignInGate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [dwellings, setDwellings] = useState<Dwelling[] | null>(null);
@@ -165,7 +166,7 @@ export default function DwellingsPage() {
   function subtitleOf(d: Dwelling): string {
     return `${d.kind === "home" ? t("fengshui.dwelling.kindHome") : t("fengshui.dwelling.kindOffice")} · ${
       d.tenancy === "rent" ? t("fengshui.dwelling.tenancyRent") : t("fengshui.dwelling.tenancyOwn")
-    } · ${d.facing ? DIRECTION_LABEL[d.facing] : t("fengshui.dwelling.facingUnknown")}`;
+    } · ${d.facing ? directionLabel(d.facing, locale) : t("fengshui.dwelling.facingUnknown")}`;
   }
 
   // 编辑目标。editingId 指向的居所已被删掉（比如刚删完）时回落新增表单。

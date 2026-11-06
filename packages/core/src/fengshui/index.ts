@@ -7,6 +7,7 @@ import { directionsFor, type DirectionVerdict } from "./eight-mansions";
 import { dwellingGua, matchWithPerson, type DwellingInput, type DwellingGua } from "./dwelling";
 import { buildPersonalRemedies, buildDwellingRemedies, sortRemedies, type Remedy } from "./remedy";
 import { deriveCohabitants, type CohabitantInput, type Cohabitant } from "./cohabitants";
+import type { FengshuiLanguage } from "./en";
 
 export * from "./directions";
 export * from "./ming-gua";
@@ -27,8 +28,9 @@ export const FENGSHUI_ENGINE_VERSION = "fs-2";
  * 只有某一语言的叙述链改动到「该语言旧报告不该再被沿用」时才给它设/递增，
  * 其他语言的缓存不受牵连（重生成要花用户的 LLM 额度）。
  * - en `fs-en-1`：EP-fs-en，英文 prompt 重写 + 英文方位对拍/伪科学净化接上；此前的英文报告未经任何机械校验。
+ * - en `fs-en-2`：EP-fs-en ③，候选化解改为 core 直出的英文（此前是中文原文交模型现翻），叙述与卡片用词对齐。
  */
-export const FENGSHUI_NARRATIVE_REVISION: Partial<Record<"zh" | "en", string>> = { en: "fs-en-1" };
+export const FENGSHUI_NARRATIVE_REVISION: Partial<Record<"zh" | "en", string>> = { en: "fs-en-2" };
 
 export type FengshuiInput = {
   birth: BirthInput;
@@ -37,6 +39,8 @@ export type FengshuiInput = {
   dwelling?: DwellingInput;
   /** 同住人（EP-fs-13 合看）；仅在 Layer 1（有 dwelling）时产出结果 */
   cohabitants?: CohabitantInput[];
+  /** 化解文案的语言（EP-fs-en ③）；只影响文字，结构与排序两种语言完全一致。缺省 zh。 */
+  language?: FengshuiLanguage;
 };
 
 /** 居所视图 = 宅卦结果 + 用户填的元信息 + 与本人的配合判定 */
@@ -69,7 +73,8 @@ export function computeFengshui(input: FengshuiInput): FengshuiChart {
   const mingGua = deriveMingGua(input.birth, input.chart);
   const personalDirections = directionsFor(mingGua.guaName);
   const affinity = elementDirections(deriveUsefulElements(input.chart.bazi));
-  const personal = buildPersonalRemedies(mingGua, personalDirections, affinity);
+  const lang = input.language ?? "zh";
+  const personal = buildPersonalRemedies(mingGua, personalDirections, affinity, lang);
 
   if (!input.dwelling) {
     return {
@@ -96,6 +101,6 @@ export function computeFengshui(input: FengshuiInput): FengshuiChart {
     cohabitants: input.cohabitants?.length
       ? deriveCohabitants({ profileId: "main", name: "", birth: input.birth, chart: input.chart }, input.cohabitants)
       : [],
-    remedies: sortRemedies([...personal, ...buildDwellingRemedies(gua, match)], { tenancy: d.tenancy }),
+    remedies: sortRemedies([...personal, ...buildDwellingRemedies(gua, match, lang)], { tenancy: d.tenancy }),
   };
 }

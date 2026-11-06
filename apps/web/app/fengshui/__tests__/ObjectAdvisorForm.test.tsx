@@ -28,9 +28,10 @@ vi.mock("@sojan/core", async (importOriginal) => {
     adviseObject: (
       input: Parameters<typeof actual.adviseObject>[0],
       q: Parameters<typeof actual.adviseObject>[1],
+      lang?: Parameters<typeof actual.adviseObject>[2],
     ) => {
       adviseObjectCalls.inputs.push(input);
-      return actual.adviseObject(input, q);
+      return actual.adviseObject(input, q, lang);
     },
   };
 });
@@ -313,13 +314,37 @@ describe("EP-fs-18 物件顾问强版（宅八方）", () => {
     expect(pos & Node.DOCUMENT_POSITION_PRECEDING, "宅局提示不该被排到润色文案之后").toBeFalsy();
   });
 
-  it("英文 locale 下说明卡的小标题走 i18n（正文仍是 core 产出的中文）", async () => {
+  it("英文 locale：下拉选项、结论卡（含宅局提示正文）、发给接口的 advice 全部英文（EP-fs-en ③）", async () => {
+    const CJK = /[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/;
+    const fetchMock = vi.fn<(...args: [RequestInfo | URL, RequestInit?]) => Promise<Response>>(
+      async () => new Response("Place it against the east wall."),
+    );
+    vi.stubGlobal("fetch", fetchMock);
     render(<ObjectAdvisorForm fs={fs} dwellingSectors={clashSectors} />, {
       wrapper: (p) => <Wrapper {...p} locale="en" />,
     });
+    for (const id of ["Category", "Material", "Shape", "Planned placement"]) {
+      const sel = screen.getByLabelText(id) as HTMLSelectElement;
+      for (const o of Array.from(sel.options)) expect(o.textContent, `${id}: ${o.textContent}`).not.toMatch(CJK);
+    }
+    // value 仍是中文规范键（五行按它查），只有显示名是英文
+    expect(screen.getByRole("option", { name: "Natural wood" })).toHaveValue("原木");
+
     fireEvent.change(screen.getByLabelText("Category"), { target: { value: "desk" } });
+    fireEvent.change(screen.getByLabelText("Material"), { target: { value: "原木" } });
+    fireEvent.change(screen.getByLabelText("Planned placement"), { target: { value: "W" } });
     fireEvent.click(screen.getByText("Find a good spot"));
-    await waitFor(() => expect(screen.getByText("About this home")).toBeInTheDocument());
-    expect(screen.queryByText("关于这套房子")).toBeNull();
+    await waitFor(() => expect(screen.getByText("Place it against the east wall.")).toBeInTheDocument());
+
+    expect(screen.getByText("About this home")).toBeInTheDocument();
+    expect(screen.getByText(/^This home's favorable directions don't overlap/)).toBeInTheDocument();
+    expect(screen.getByText("Element: Wood")).toBeInTheDocument();
+    expect(screen.getByText("West — Huo Hai (unfavorable)")).toBeInTheDocument();
+    const card = screen.getByText("About this home").closest("div")!.parentElement!;
+    expect(card.textContent).not.toMatch(CJK);
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body));
+    expect(body.categoryLabel).toBe("Desk");
+    expect(body.personalFit).not.toMatch(CJK);
   });
 });

@@ -11,6 +11,8 @@ export const zh = {
     sending: "发送中…",
     signingIn: "登录中…",
     brand: "照见",
+    // 「标签：内容」的分隔符（EP-fs-en ③：英文页此前直接拼全角冒号）。
+    labelSeparator: "：",
     listSeparator: "、",
     // TodayCard（今日卡）是卷首/运势页共用组件的 UI chrome 文案（终审必修 5：
     // 此前写死在组件里，绕过了全站 i18n），放在 common 而非 home/calendar
@@ -456,7 +458,16 @@ export const zh = {
     noProfile: "还没有命盘档案，先起一个盘。",
     goCast: "去起盘",
     mingGua: "本命卦",
-    group: { east: "东四命", west: "西四命" },
+    // EP-fs-en ③：卦名/方位/星名的组合格式（中英语序与标点不同，不在组件里拼）。
+    houseGua: "{gua}宅",
+    houseGuaWithGroup: "{gua}宅（{group}）",
+    guaNumber: "{gua}{n}",
+    guaNumberWithGroup: "{gua}{n}（{group}）",
+    directionWithStar: "{direction}（{star}）",
+    favorable: "吉",
+    unfavorable: "凶",
+    personalWheelAria: "八方吉凶盘",
+    houseWheelAria: "房屋八方吉凶盘",
     bestDirection: "生气方",
     tabs: { chart: "盘", remedy: "化解", object: "添置" },
     directionsTitle: "八方吉凶",
@@ -524,6 +535,8 @@ export const zh = {
       unspecified: "不指定",
       submit: "看看放哪儿好",
       elementOf: "物件五行",
+      directionReason: "{direction}｜{reason}",
+      intendedValue: "{direction}｜{star}（{verdict}）",
       recommended: "推荐方位",
       avoid: "不宜方位",
       rules: "这类物件的讲究",

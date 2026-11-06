@@ -329,7 +329,6 @@ describe("EP-fs-en 二轮评审回归", () => {
 
   it("S-b：朝向动词后用系词/空格的真实断言照常纠正", () => {
     expect(en("Facing Southeast is your Jue Ming direction.").text).toBe("Facing Southeast is your Sheng Qi direction.");
-    expect(en("Face Southeast as your Jue Ming.").text).toBe("Face Southeast as your Sheng Qi.");
   });
 
   it("S-c：the house's 不算「别人的」所有格，房屋八方照常纠正", () => {
@@ -349,5 +348,39 @@ describe("EP-fs-en 二轮评审回归：净化", () => {
 
   it("引号开头的句子删除后同样补大写", () => {
     expect(s('- Bowl (traditional symbolism). "Studies show it works."')).toBe('- Bowl (traditional symbolism). "It works."');
+  });
+});
+
+describe("EP-fs-en 三轮评审回归", () => {
+  it("弯撇号 house’s 同样是房屋八方标记", () => {
+    const md = "The house’s Sheng Qi is in the East, while your personal Sheng Qi is in the Southeast.";
+    expect(en(md, l1)).toEqual({ text: md, corrections: [] });
+    expect(en("The house’s North is Wu Gui.", l1).text).toBe("The house’s North is Yan Nian.");
+  });
+
+  it("对照从句（unlike / aside / compared with…）里的标记不决定主句归属 → 弃权", () => {
+    for (const md of [
+      "Unlike your personal directions, here the East is Sheng Qi.",
+      "Your own directions aside, the house puts Sheng Qi in the East.",
+      "Compared with the house directions, the Southeast is Sheng Qi.",
+    ]) {
+      expect(en(md, l1)).toEqual({ text: md, corrections: [] });
+    }
+  });
+
+  it("逗号不算分句开头：列举后接破折号不误纠；as 不是胶水", () => {
+    for (const md of [
+      "Avoid the West, the Southwest — Sheng Qi lies elsewhere.",
+      "Sit facing North as Sheng Qi flows from the Southeast.",
+    ]) {
+      expect(en(md)).toEqual({ text: md, corrections: [] });
+    }
+  });
+
+  it("加粗标签「**Southeast:** Jue Ming」与标题/引用/任务列表行首都认", () => {
+    expect(en("- **Southeast:** Jue Ming — rest here.").text).toBe("- **Southeast:** Sheng Qi — rest here.");
+    expect(en("### Southeast: Jue Ming").text).toBe("### Southeast: Sheng Qi");
+    expect(en("> Southeast: Jue Ming").text).toBe("> Southeast: Sheng Qi");
+    expect(en("- [ ] Southeast: Jue Ming").text).toBe("- [ ] Southeast: Sheng Qi");
   });
 });

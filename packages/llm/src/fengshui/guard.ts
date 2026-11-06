@@ -184,7 +184,14 @@ const SENTENCE_BOUNDARY = /[；;。！？!?\n]/;
 const LIST_ROW = /^[ \t]{0,3}(?:[-*+]|\d+[.、)）]|\|)/;
 
 /** 一种语言的归属判定词表：两套标记 + 分句/句子边界。 */
-type ScopeLexicon = { personal: RegExp; dwelling: RegExp; clause: RegExp; sentence: RegExp };
+type ScopeLexicon = {
+  personal: RegExp; dwelling: RegExp; clause: RegExp; sentence: RegExp;
+  /**
+   * 对照从句（英文 unlike / aside / compared with…）：句子级判定时剔除，免得「Unlike your personal
+   * directions, here the East is Sheng Qi」把对照对象的标记当成主句归属。中文未设。
+   */
+  contrast?: RegExp;
+};
 const ZH_SCOPE: ScopeLexicon = {
   personal: PERSONAL_MARKER, dwelling: DWELLING_MARKER, clause: CLAUSE_BOUNDARY, sentence: SENTENCE_BOUNDARY,
 };
@@ -249,7 +256,12 @@ function resolveScope(
 ): DirectionScope | null {
   const byClause = scopeOfWindow(windowAround(text, start, end, lx.clause), lx);
   if (byClause) return byClause;
-  const bySentence = scopeOfWindow(windowAround(text, start, end, lx.sentence), lx);
+  let sentence = windowAround(text, start, end, lx.sentence);
+  if (lx.contrast) {
+    const contrast = lx.contrast;
+    sentence = sentence.split(lx.clause).filter((c) => !contrast.test(c)).join(" ");
+  }
+  const bySentence = scopeOfWindow(sentence, lx);
   if (bySentence) return bySentence;
   const [ls, le] = lineBounds(text, start);
   if (!LIST_ROW.test(text.slice(ls, le))) return null;
@@ -473,7 +485,7 @@ const EN_STAR_SUFFIX = "(?:[ \\t]+(?:direction|sector|position|spot|star|area|co
  * 胶水：与中文一样只放「安全」的东西——行内空白、冒号、短横/破折号、竖线、左括号，
  * 外加几个不承载语义的系词/限定词。**不含**逗号、句号、分号与换行（它们是边界）。
  */
-const EN_GLUE = "(?:[ \\t]+|:|-|—|–|→|\\||\\(|=|\\b(?:is|was|the|your|its|a|an|as)\\b)";
+const EN_GLUE = "(?:[ \\t]+|:|-|—|–|→|\\||\\(|=|\\*\\*|\\b(?:is|was|the|your|its|a|an)\\b)";
 /** 英文单词之间都隔着空白，同样一句话比中文多出好几个胶水单元，上限相应放宽。 */
 const EN_GLUE_MAX = 8;
 /** 星名在前时要求的显式方位断言（"Jue Ming lies in the Southwest" / "Sheng Qi direction is Southeast"）。 */
@@ -483,8 +495,9 @@ const EN_LOCATIVE =
 const EN_STAR_GLOSS = "(?:[ \\t]*\\([^()\\n]{1,40}\\))";
 /**
  * 分支 ① 方位名的左侧语境（评审 B1 / N3，二轮改为结构规则），在 replacer 里判：
- * - **冒号/破折号/箭头胶水只在方位名位于分句开头时才对拍**（行首、列表符号/表格竖线/`·`
- *   之后、分句标点之后，可带 the/your）。「- Southeast: Jue Ming」「Southeast — Wu Gui」是
+ * - **冒号/破折号/箭头胶水只在方位名位于分句开头时才对拍**（行首——可带列表符号、标题 `#`、
+ *   引用 `>`、任务框 `[ ]`——表格竖线/`·`/`;`/句末标点之后，可带 the/your；**逗号不算**，否则
+ *   「Avoid the West, the Southwest — Sheng Qi lies elsewhere」会被误纠）。「- Southeast: Jue Ming」「Southeast — Wu Gui」是
  *   在给这个方位标星；「Your door opens to the South — Sheng Qi, though, …」「Face North:
  *   Sheng Qi is behind you」里方位是某个动词的宾语，冒号后的星名属于别的主语 → 弃权。
  *   比列举 face/point/open/look… 动词表稳：任何动词引出的方位都同样处理。系词/空格/括号胶水
@@ -493,7 +506,8 @@ const EN_STAR_GLOSS = "(?:[ \\t]*\\([^()\\n]{1,40}\\))";
  *   但 house/home/dwelling 的所有格是房屋八方自己的断言，照常对拍。
  */
 const EN_LABEL_GLUE = /[:\-—–→]/;
-const EN_CLAUSE_START = /(?:^|[,;.!?·|])[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:(?:the|your)[ \t]+)?$/i;
+const EN_CLAUSE_START =
+  /(?:^|[;.!?·|])[ \t]*(?:(?:[-*+]|\d+[.)]|#{1,6}|>)[ \t]+)?(?:\[[ xX]\][ \t]+)?(?:(?:the|your)[ \t]+)?$/i;
 const EN_AFTER_POSSESSIVE = /(?<!\b(?:house|home|dwelling|apartment|flat))['’]s[ \t]+$/i;
 
 /**
@@ -517,9 +531,10 @@ const EN_SCOPE: ScopeLexicon = {
     "i",
   ),
   dwelling:
-    /\bhouse(?:'s)? (?:eight )?directions?\b|\bhouse (?:gua|chart|table)\b|\bdwelling\b|\b(?:this|the) house's\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) house\b|\b(?:east|west) group house\b/i,
+    /\bhouse(?:['’]s)? (?:eight )?directions?\b|\bhouse (?:gua|chart|table)\b|\bdwelling\b|\bhouse['’]s\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) house\b|\b(?:east|west) group house\b/i,
   clause: /[,;.!?\n]/,
   sentence: /[;.!?\n]/,
+  contrast: /^\s*(?:unlike|beyond|apart from|other than|instead of|rather than|compared (?:with|to)|in contrast to)\b|\baside\s*$/i,
 };
 
 function verifyDirectionConsistencyEn(

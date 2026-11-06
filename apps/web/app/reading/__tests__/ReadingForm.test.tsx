@@ -194,6 +194,14 @@ describe("ReadingForm：出生时间的记录时区（EP-tz-edge）", () => {
     expect(submittedTz()).toBe("Asia/Shanghai");
   });
 
+  it("坐标行显示实际采用的时区（随所选记录时区变化）", async () => {
+    render_();
+    await pickPlace(URUMQI);
+    expect(await screen.findByText(/Asia\/Shanghai/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /新疆时间/ }));
+    expect(await screen.findByText(/Asia\/Urumqi/)).toBeInTheDocument();
+  });
+
   it("改选新疆时间 → 提交 Asia/Urumqi", async () => {
     render_();
     await pickPlace(URUMQI);

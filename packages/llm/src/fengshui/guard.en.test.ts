@@ -225,3 +225,81 @@ describe("EP-fs-en sanitizeFengshui（英文）", () => {
     expect(sanitizeFengshui(md, facts)).toBe(md);
   });
 });
+
+describe("EP-fs-en 评审回归：误纠（blocker）", () => {
+  it("B1：朝向/坐向后的方位名不是星名的主语——「faces South — Sheng Qi, …」不改", () => {
+    for (const md of [
+      "Your front door faces South — Sheng Qi, your best direction, is in the Southeast.",
+      "Face North: Sheng Qi is behind you, in the Southeast.",
+      "Sit facing the East: Sheng Qi energy helps focus.",
+      "The house sits South: its Sheng Qi is elsewhere.",
+    ]) {
+      expect(en(md)).toEqual({ text: md, corrections: [] });
+    }
+  });
+
+  it("B1（Layer 1）：「The house faces North: Sheng Qi for you personally lies in the Southeast」零改动", () => {
+    const md = "The house faces North: Sheng Qi for you personally lies in the Southeast.";
+    expect(en(md, l1)).toEqual({ text: md, corrections: [] });
+  });
+
+  it("B2：单独的 personal 也是本命标记——同句对照两套各判各的", () => {
+    for (const md of [
+      "Your personal Sheng Qi is in the Southeast, while the house's Sheng Qi is in the East.",
+      "This house's Sheng Qi is in the East, versus your personal Sheng Qi in the Southeast.",
+    ]) {
+      expect(en(md, l1)).toEqual({ text: md, corrections: [] });
+    }
+  });
+
+  it("N3：所有格后的方位（别人的方位）不按本人表判", () => {
+    const md = "Your West Group partner's North is Sheng Qi.";
+    expect(en(md)).toEqual({ text: md, corrections: [] });
+  });
+});
+
+describe("EP-fs-en 评审回归：漏纠（should-fix）", () => {
+  it("S4：星名后带括号释义（prompt 明确允许的写法）两个方向都认，释义原样保留", () => {
+    expect(en("Jue Ming (total loss) lies in the Southeast.").text).toBe("Sheng Qi (total loss) lies in the Southeast.");
+    expect(en("- Southeast: Jue Ming (total loss)").text).toBe("- Southeast: Sheng Qi (total loss)");
+  });
+
+  it("S4：is located in / → / 多空格", () => {
+    expect(en("Jue Ming is located in the Southeast.").text).toBe("Sheng Qi is located in the Southeast.");
+    expect(en("**South** → **Jue Ming**").text).toBe("**South** → **Yan Nian**");
+    expect(en("Southeast: Jue  Ming").text).toBe("Southeast: Sheng Qi");
+  });
+});
+
+describe("EP-fs-en 评审回归：净化", () => {
+  const s = (md: string) => sanitizeFengshui(md, facts, "en");
+
+  it("S1：过去式/完成式整词吃掉，不留 n/d/ed 残片", () => {
+    for (const [inp, out] of [
+      ["- Red envelope (traditional symbolism) — research has shown it brings luck.", "- Red envelope (traditional symbolism) — it brings luck."],
+      ["- Bowl (traditional symbolism). Studies proved it works.", "- Bowl (traditional symbolism). It works."],
+      ["- Bowl (traditional symbolism). Data suggested it helps.", "- Bowl (traditional symbolism). It helps."],
+      ["- Bowl (traditional symbolism). Trials confirmed it.", "- Bowl (traditional symbolism). It."],
+      ["- Bowl (traditional symbolism). Experiments demonstrated calm.", "- Bowl (traditional symbolism). Calm."],
+    ] as const) {
+      expect(s(inp)).toBe(out);
+    }
+  });
+
+  it("S2：「has been (scientifically) proven to」改写为传统说法，不留破句", () => {
+    expect(s("- Bowl (traditional symbolism): it has been scientifically proven to calm the mind."))
+      .toBe("- Bowl (traditional symbolism): it is traditionally said to calm the mind.");
+    expect(s("- Bowl (traditional symbolism): this has been proven to calm.")).toBe("- Bowl (traditional symbolism): this is traditionally said to calm.");
+  });
+
+  it("S5：found / indicates / says", () => {
+    for (const w of ["Studies have found that", "Science says", "Evidence indicates"]) {
+      expect(s(`- Bowl (traditional symbolism). ${w} it helps.`)).toBe("- Bowl (traditional symbolism). It helps.");
+    }
+  });
+
+  it("N1：只在删除处补大写——行首删除也补，别处的 e.g. 不动", () => {
+    expect(s("- Studies show that a bowl helps (traditional symbolism), e.g. in the North."))
+      .toBe("- A bowl helps (traditional symbolism), e.g. in the North.");
+  });
+});

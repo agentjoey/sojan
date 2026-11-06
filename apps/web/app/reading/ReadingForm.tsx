@@ -155,7 +155,7 @@ export function ReadingForm() {
           <div className="flex items-start justify-between gap-3 px-3 py-2.5" style={fieldStyle}>
             <div className="text-[13px]">
               <div className="text-ink">{geo.label.split(",").slice(0, 3).join(join)}</div>
-              <div className="latin-label mt-0.5 text-[10px] text-muted">{t("reading.geoCoords", { lon: geo.lon, lat: geo.lat, timezone: geo.timezone })}</div>
+              <div className="latin-label mt-0.5 text-[10px] text-muted">{t("reading.geoCoords", { lon: geo.lon, lat: geo.lat, timezone: effectiveTz ?? geo.timezone })}</div>
             </div>
             <button type="button" onClick={() => { chooseGeo(null); setCandidates([]); }} className="shrink-0 text-[12px] text-cinnabar">{t("reading.reselect")}</button>
           </div>

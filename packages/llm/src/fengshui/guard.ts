@@ -447,8 +447,8 @@ export function sortLabelsLongestFirst<T extends { label: string }>(items: reado
  * 扫描继续前进到「west is Liu Sha」，把它当成**西方**去查表。
  */
 const enLabelSource = (label: string) => label.replace(/^(North|South)(east|west)$/, "$1[ \\t-]?$2");
-/** "Sheng Qi" → `Sheng[\s-]?Qi`：认 "Shengqi" / "Sheng-Qi" / 大小写变体。 */
-const enStarSource = (label: string) => label.replace(" ", "[ \\t-]?");
+/** "Sheng Qi" → `Sheng[\s-]*Qi`：认 "Shengqi" / "Sheng-Qi" / 多空格 / 大小写变体。 */
+const enStarSource = (label: string) => label.replace(" ", "[ \\t-]*");
 const enKey = (s: string) => s.toLowerCase().replace(/[\s-]/g, "");
 
 const EN_DIRECTION_BY_KEY = new Map<string, Direction>(
@@ -473,12 +473,23 @@ const EN_STAR_SUFFIX = "(?:[ \\t]+(?:direction|sector|position|spot|star|area|co
  * 胶水：与中文一样只放「安全」的东西——行内空白、冒号、短横/破折号、竖线、左括号，
  * 外加几个不承载语义的系词/限定词。**不含**逗号、句号、分号与换行（它们是边界）。
  */
-const EN_GLUE = "(?:[ \\t]+|:|-|—|–|\\||\\(|=|\\b(?:is|was|the|your|its|a|an|as)\\b)";
+const EN_GLUE = "(?:[ \\t]+|:|-|—|–|→|\\||\\(|=|\\b(?:is|was|the|your|its|a|an|as)\\b)";
 /** 英文单词之间都隔着空白，同样一句话比中文多出好几个胶水单元，上限相应放宽。 */
 const EN_GLUE_MAX = 8;
 /** 星名在前时要求的显式方位断言（"Jue Ming lies in the Southwest" / "Sheng Qi direction is Southeast"）。 */
 const EN_LOCATIVE =
-  "[ \\t]+(?:(?:is|lies|falls|sits)[ \\t]+(?:in|at|to)[ \\t]+|is[ \\t]+|in[ \\t]+|at[ \\t]+)(?:the[ \\t]+)?";
+  "[ \\t]+(?:is[ \\t]+located[ \\t]+(?:in|at)[ \\t]+|(?:is|lies|falls|sits)[ \\t]+(?:in|at|to)[ \\t]+|is[ \\t]+|in[ \\t]+|at[ \\t]+)(?:the[ \\t]+)?";
+/** 星名后的括号释义（prompt 允许「Sheng Qi (vitality)」），两个分支都认、改写时原样保留。 */
+const EN_STAR_GLOSS = "(?:[ \\t]*\\([^()\\n]{1,40}\\))";
+/**
+ * 分支 ① 方位名的左侧语境（评审 B1 / N3），在 replacer 里判：
+ * - 朝向/坐向动词之后的方位（「faces South — Sheng Qi, …」「Face North: Sheng Qi is behind you」）
+ *   说的是门或人朝哪边，冒号/破折号后面的星名属于别的主语 → 弃权；
+ *   但紧跟括号的同位语「face the Southeast (Sheng Qi)」仍是在说这个方位的星，照常对拍。
+ * - 所有格之后的方位（「your partner's North is Sheng Qi」）是别人的方位 → 一律弃权。
+ */
+const EN_AFTER_FACING = /\b(?:fac(?:e|es|ed|ing)|sits?|sitting|towards?)[ \t]+(?:the[ \t]+)?$/i;
+const EN_AFTER_POSSESSIVE = /['’]s[ \t]+$/;
 
 /**
  * 英文归属标记。只收**强**标记：「the house」「your home」这类词刻意不收——
@@ -489,7 +500,7 @@ const EN_LOCATIVE =
  */
 const EN_SCOPE: ScopeLexicon = {
   personal:
-    /\bpersonal (?:eight )?directions?\b|\bpersonal (?:chart|gua|table)\b|\b(?:life|ming) gua\b|\b(?:east|west) group person\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) (?:gua|person)\b|\bfor you personally\b/i,
+    /\bpersonal\b|\byour own\b|\bpersonal (?:chart|gua|table)\b|\b(?:life|ming) gua\b|\b(?:east|west) group person\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) (?:gua|person)\b|\bfor you personally\b/i,
   dwelling:
     /\bhouse(?:'s)? (?:eight )?directions?\b|\bhouse (?:gua|chart|table)\b|\bdwelling\b|\b(?:this|the) house's\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) house\b|\b(?:east|west) group house\b/i,
   clause: /[,;.!?\n]/,
@@ -517,7 +528,7 @@ function verifyDirectionConsistencyEn(
   const starFirstTail = (capture: boolean) => {
     const g = (name: string) => (capture ? `(?<${name}>` : "(?:");
     return (
-      `${g("bStarSuffix")}${EN_STAR_SUFFIX})?${g("bGlue")}${EN_LOCATIVE})` +
+      `${g("bGloss")}${EN_STAR_GLOSS})?${g("bStarSuffix")}${EN_STAR_SUFFIX})?${g("bGlue")}${EN_LOCATIVE})` +
       `${g("bDirBold")}${BOLD})?${g("bDir")}${EN_DIR_ALT})${EN_NOT_GROUP}`
     );
   };
@@ -525,7 +536,7 @@ function verifyDirectionConsistencyEn(
   const pattern = new RegExp(
     `(?<aDirBoldPre>${BOLD})?(?<aDir>${EN_DIR_ALT})${EN_NOT_GROUP}(?<aDirBoldPost>${BOLD})?(?<aDirSuffix>${EN_DIR_SUFFIX})?` +
       `(?<aGlue>(?:${EN_GLUE}){0,${EN_GLUE_MAX}})` +
-      `(?<aStarBoldPre>${BOLD})?(?<aStar>${EN_STAR_ALT})(?<aStarBoldPost>${BOLD})?` +
+      `(?<aStarBoldPre>${BOLD})?(?<aStar>${EN_STAR_ALT})(?<aStarBoldPost>${BOLD})?(?<aGloss>${EN_STAR_GLOSS})?` +
       `(?!(?:${BOLD})?${starFirstTail(false)})` +
       "|" +
       `(?<bStarBoldPre>${BOLD})?(?<bStar>${EN_STAR_ALT})(?<bStarBoldPost>${BOLD})?${starFirstTail(true)}`,
@@ -540,14 +551,19 @@ function verifyDirectionConsistencyEn(
     const writtenStar = (dirFirst ? g.aStar : g.bStar)!;
     const dir = EN_DIRECTION_BY_KEY.get(enKey(writtenDir))!;
     const star = EN_STAR_BY_KEY.get(enKey(writtenStar))!;
+    if (dirFirst) {
+      const before = markdown.slice(Math.max(0, offset - 40), offset);
+      if (EN_AFTER_POSSESSIVE.test(before)) return match;
+      if (EN_AFTER_FACING.test(before) && !(g.aGlue ?? "").trimStart().startsWith("(")) return match;
+    }
     const d = tableFor(dir, offset, offset + match.length);
     if (!d || star === d.star) return match;
     const correct = STAR_LABEL_EN[d.star];
     corrections.push({ direction: dir, label: DIRECTION_LABEL_EN[dir], wrote: writtenStar, correct });
     return dirFirst
       ? `${g.aDirBoldPre ?? ""}${writtenDir}${g.aDirBoldPost ?? ""}${g.aDirSuffix ?? ""}${g.aGlue ?? ""}` +
-          `${g.aStarBoldPre ?? ""}${correct}${g.aStarBoldPost ?? ""}`
-      : `${g.bStarBoldPre ?? ""}${correct}${g.bStarBoldPost ?? ""}${g.bStarSuffix ?? ""}` +
+          `${g.aStarBoldPre ?? ""}${correct}${g.aStarBoldPost ?? ""}${g.aGloss ?? ""}`
+      : `${g.bStarBoldPre ?? ""}${correct}${g.bStarBoldPost ?? ""}${g.bGloss ?? ""}${g.bStarSuffix ?? ""}` +
           `${g.bGlue ?? ""}${g.bDirBold ?? ""}${writtenDir}`;
   });
 
@@ -556,31 +572,44 @@ function verifyDirectionConsistencyEn(
 
 /**
  * 英文伪科学措辞：「名词 + (has/have) + 动词 (+ that)」链式组合，与中文同样是**单趟**
- * 组合正则（理由见 PSEUDO_SCIENCE_CHAIN）。
+ * 组合正则（理由见 PSEUDO_SCIENCE_CHAIN）。动词组以 `\b` 收尾——没有它，`show` 会吃掉
+ * "shown" 的前半、留下孤立的 "n"（评审 S1）。load-bearing 的是 `\b`（有它时短形匹配失败会
+ * 回溯去试长形，变异测试证实顺序无关）；长形在前只是防御性写法。
  */
+const EN_PSEUDO_VERB =
+  "(?:shown|shows|show|proven|proved|proves|prove|confirmed|confirms|confirm|demonstrated|demonstrates|demonstrate|" +
+  "suggested|suggests|suggest|found|finds|indicated|indicates|indicate|says|said)\\b";
 const EN_PSEUDO_SCIENCE_RE = new RegExp(
   [
     "\\b(?:(?:scientific|clinical|medical)[ \\t]+)?(?:studies|study|research|science|data|experiments?|trials?|evidence)" +
-      "[ \\t]+(?:(?:has|have)[ \\t]+)?(?:shows?|shown|proves?|proven|proved|confirms?|confirmed|demonstrates?|demonstrated|suggests?|suggested)" +
-      "(?:[ \\t]+that)?,?[ \\t]*",
+      `[ \\t]+(?:(?:has|have)[ \\t]+)?${EN_PSEUDO_VERB}(?:[ \\t]+that)?,?[ \\t]*`,
     "\\baccording[ \\t]+to[ \\t]+(?:studies|research|science|scientists),?[ \\t]*",
-    "\\b(?:it[ \\t]+)?has[ \\t]+been[ \\t]+(?:scientifically[ \\t]+)?proven(?:[ \\t]+that)?[ \\t]*",
+    "\\b(?:it[ \\t]+)?has[ \\t]+been[ \\t]+(?:scientifically[ \\t]+|clinically[ \\t]+)?(?:proven|shown)[ \\t]+that[ \\t]*",
   ].join("|"),
   "gi",
 );
-/** 「is scientifically proven to help」→「is traditionally said to help」：删掉会留下破句，改写成传统说法。 */
+/** 「has been (scientifically) proven to」→「is traditionally said to」：整段删掉会留下破句（评审 S2）。 */
+const EN_HAS_BEEN_PROVEN_TO_RE =
+  /\bhas[ \t]+been[ \t]+(?:scientifically[ \t]+|clinically[ \t]+)?(?:proven|shown)[ \t]+to\b/gi;
+/** 「is scientifically proven to help」→「is traditionally said to help」。 */
 const EN_PROVEN_RE = /\b(?:scientifically|clinically)[ \t]+(?:proven|shown|validated)\b/gi;
 const EN_SYMBOLIC_MARKER = /traditional symbolism|\bsymbolic\b|\britual\b/i;
+/** 删除点之前是「句首」：行首（可带列表符号）或句末标点 + 空白。 */
+const EN_SENTENCE_START = /(?:^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*|[.!?]["')\]]?[ \t]+)$/;
+/** 只在删除点补大写的内部标记；不会出现在模型输出里。 */
+const CAP = "\u0000";
 
 function sanitizeFengshuiEn(markdown: string): string {
   return markdown
     .split("\n")
     .map((line) => {
       if (!EN_SYMBOLIC_MARKER.test(line)) return line;
-      const out = line.replace(EN_PSEUDO_SCIENCE_RE, "").replace(EN_PROVEN_RE, "traditionally said");
-      if (out === line) return out;
-      // 删掉的若是句首措辞，补回下一个词的首字母大写
-      return out.replace(/([.!?][ \t]+)([a-z])/g, (_m, p: string, c: string) => p + c.toUpperCase());
+      const out = line
+        .replace(EN_HAS_BEEN_PROVEN_TO_RE, "is traditionally said to")
+        .replace(EN_PSEUDO_SCIENCE_RE, (_m: string, offset: number, whole: string) =>
+          EN_SENTENCE_START.test(whole.slice(0, offset)) ? CAP : "")
+        .replace(EN_PROVEN_RE, "traditionally said");
+      return out.replace(new RegExp(`${CAP}([a-z])`, "g"), (_m, c: string) => c.toUpperCase()).replaceAll(CAP, "");
     })
     .join("\n");
 }

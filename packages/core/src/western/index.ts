@@ -4,7 +4,7 @@ const { Origin, Horoscope } = CNH;
 import type { BirthInput } from "../types/birth-input";
 import type { WesternChart, Planet, Aspect } from "../types/chart";
 import type { NormalizedBirth } from "../normalize";
-import { normalizeBirth } from "../normalize";
+import { normalizeBirth, convertWallTime } from "../normalize";
 
 /** 心理占星只取古典十星（含三王星）；恒星/小行星(Sirius/Chiron 等)排除。 */
 const PLANETS = [
@@ -41,16 +41,22 @@ export function computeWesternChart(
   if (!n.hasTime || input.latitude == null || input.longitude == null) return null;
 
   // 真太阳时是八字/紫微概念；Origin 把输入当当地民用时（按经纬度查时区自行转 UTC）→ 必须喂钟表时间
-  const { civil } = n;
-  const origin = new Origin({
-    year: civil.year,
-    month: civil.month - 1, // 0-indexed
-    date: civil.day,
-    hour: civil.hour,
-    minute: civil.minute,
-    latitude: input.latitude,
-    longitude: input.longitude,
+  const toOrigin = (w: NormalizedBirth["civil"]) => new Origin({
+    year: w.year,
+    month: w.month - 1, // 0-indexed
+    date: w.day,
+    hour: w.hour,
+    minute: w.minute,
+    latitude: input.latitude!,
+    longitude: input.longitude!,
   });
+  let origin = toOrigin(n.civil);
+  // EP-tz-edge：Origin 的时区是它自己按坐标查的（新疆 → Asia/Urumqi），不认 input.timezone。
+  // 用户确认出生时间按别的时区记录（如北京时间）时，先换算成坐标时区的钟表时间再重建。
+  const originZone = origin.timezone?.name;
+  if (originZone && originZone !== input.timezone) {
+    origin = toOrigin(convertWallTime(n.civil, input.timezone, originZone));
+  }
   const h = new Horoscope({
     origin,
     houseSystem,

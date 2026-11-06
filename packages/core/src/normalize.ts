@@ -40,7 +40,7 @@ export type NormalizedBirth = {
 };
 
 /** 计算某 IANA 时区在给定时刻的 UTC 偏移（分钟，正=东于 UTC）。含 DST/历史规则。 */
-function tzOffsetMinutes(timeZone: string, date: Date): number {
+export function tzOffsetMinutes(timeZone: string, date: Date): number {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour12: false,
@@ -102,4 +102,24 @@ export function normalizeBirth(input: BirthInput): NormalizedBirth {
   }${hasTime ? "" : " [时辰未知]"}`;
 
   return { year, month, day, hour, minute, civil, hasTime, timeIndex, normalizedSolarTime };
+}
+
+/**
+ * 把「在 fromZone 记录的钟表时间」换算成「同一真实时刻在 toZone 的钟表时间」（EP-tz-edge）。
+ * 偏移按真实时刻取（两步迭代，同 normalizeBirth），DST 边界不差一小时。
+ */
+export function convertWallTime(
+  wall: { year: number; month: number; day: number; hour: number; minute: number },
+  fromZone: string,
+  toZone: string,
+): { year: number; month: number; day: number; hour: number; minute: number } {
+  if (fromZone === toZone) return wall;
+  const guess = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute);
+  const off1 = tzOffsetMinutes(fromZone, new Date(guess));
+  const instant = guess - tzOffsetMinutes(fromZone, new Date(guess - off1 * 60000)) * 60000;
+  const t = new Date(instant + tzOffsetMinutes(toZone, new Date(instant)) * 60000);
+  return {
+    year: t.getUTCFullYear(), month: t.getUTCMonth() + 1, day: t.getUTCDate(),
+    hour: t.getUTCHours(), minute: t.getUTCMinutes(),
+  };
 }

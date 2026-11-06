@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  BirthInputSchema, normalizeBirth, computeBaziChart,
+  BirthInputSchema, normalizeBirth, computeBaziChart, computeWesternChart,
   recordedTimezoneChoices, defaultRecordedTimezone,
 } from "../src/index";
 
@@ -55,5 +55,25 @@ describe("EP-tz-edge 记录时区确实改变排盘（乌鲁木齐 87.6°E）", 
     const xj = computeBaziChart(mk("Asia/Urumqi"));
     expect(bj.pillars.hour?.branch).toBe("午");
     expect(xj.pillars.hour?.branch).toBe("未");
+  });
+});
+
+describe("EP-tz-edge 西方盘同样按记录时区取真实时刻（评审 S3）", () => {
+  // 西方盘库 Origin 自己按经纬度查时区（新疆 → Asia/Urumqi）把钟表时间转 UTC；
+  // 记录时区若是北京时间，必须先换算成坐标时区的钟表时间再喂进去，否则上升/宫位偏 2 小时。
+  const mk = (timezone: string, time = "14:30") =>
+    BirthInputSchema.parse({
+      date: "1985-06-15", time, gender: "male",
+      timezone, longitude: 87.6, latitude: 43.8, trueSolarTime: true,
+    });
+
+  it("北京时间 14:30 与新疆时间 14:30 是不同时刻：西方盘不同", () => {
+    const bj = computeWesternChart(mk("Asia/Shanghai"))!;
+    const xj = computeWesternChart(mk("Asia/Urumqi"))!;
+    expect(bj.ascendant).not.toEqual(xj.ascendant);
+  });
+
+  it("北京时间 14:30 == 新疆时间 12:30（同一真实时刻）：西方盘逐项相同", () => {
+    expect(computeWesternChart(mk("Asia/Shanghai", "14:30"))).toEqual(computeWesternChart(mk("Asia/Urumqi", "12:30")));
   });
 });

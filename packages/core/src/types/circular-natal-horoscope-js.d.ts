@@ -11,6 +11,8 @@ declare module "circular-natal-horoscope-js" {
   }
   export class Origin {
     constructor(params: OriginParams);
+    /** 库按经纬度自行查出的 IANA 时区（moment-timezone 的 Zone） */
+    timezone?: { name: string };
   }
   interface Ecliptic {
     DecimalDegrees?: number;

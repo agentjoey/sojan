@@ -7,8 +7,9 @@
  * 乃至换日，而且八字/紫微（真太阳时）与西方盘（钟表时）两边都会偏——所以这类时区必须让
  * 用户显式确认，默认取官方时间（第一个选项）。
  *
- * 选中的时区直接写进 `BirthInput.timezone`：normalizeBirth 的 UTC 偏移（含北京时间
- * 1986–1991 的夏令时）就按它取，无需另加字段。
+ * 选中的时区直接写进 `BirthInput.timezone`，无需另加字段：normalizeBirth 的 UTC 偏移（含北京时间
+ * 1986–1991 的夏令时）按它取；西方盘库自己按坐标查时区，`computeWesternChart` 会先把钟表时间
+ * 换算到库所用的时区（`convertWallTime`）。
  */
 export type RecordedTimezoneChoice = {
   timezone: string;

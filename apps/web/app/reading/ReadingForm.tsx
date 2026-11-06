@@ -7,7 +7,7 @@ import { createProfile } from "@/lib/profiles";
 import { UnauthenticatedError } from "@/lib/errors";
 import { saveReadingDraft, takeReadingDraft } from "@/lib/reading-draft";
 import { useT } from "@/lib/i18n/I18nProvider";
-import type { BirthInput } from "@sojan/core";
+import { recordedTimezoneChoices, defaultRecordedTimezone, type BirthInput } from "@sojan/core";
 import { shichenOf } from "@/lib/shichen";
 
 // 当代东方 v3：字段值是「细线下划的纯文字」，不是方框输入——跟全站去卡片化的
@@ -37,6 +37,18 @@ export function ReadingForm() {
   const [candidates, setCandidates] = useState<GeoResult[]>([]);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geocoding, startGeocode] = useTransition();
+  // EP-tz-edge：出生时间按哪个时区记录。null = 用户没改过，取默认（新疆默认北京时间）。
+  // 只在地理时区有歧义时才有意义；换地点时必须复位（见 chooseGeo）。
+  const [recordedTz, setRecordedTz] = useState<string | null>(null);
+  const tzChoices = geo ? recordedTimezoneChoices(geo.timezone) : null;
+  const effectiveTz = geo
+    ? (recordedTz && tzChoices?.some((c) => c.timezone === recordedTz) ? recordedTz : defaultRecordedTimezone(geo.timezone))
+    : undefined;
+
+  function chooseGeo(g: GeoResult | null) {
+    setGeo(g);
+    setRecordedTz(null);
+  }
 
   // D1：登录回来后回填草稿（只回填，不自动提交）。sessionStorage 只能挂载后读，
   // 放进 useState 初值会让 SSR 首帧与水合不一致。
@@ -51,6 +63,7 @@ export function ReadingForm() {
     setTimeUnknown(d.timeUnknown);
     setGender(d.gender);
     setGeo(d.geo);
+    setRecordedTz(d.recordedTimezone ?? null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
@@ -60,7 +73,7 @@ export function ReadingForm() {
     startGeocode(async () => {
       const r = await geocodeAction(placeQuery);
       if (!r.ok) { setGeoError(r.error); return; }
-      if (r.results.length === 1) setGeo(r.results[0]!);
+      if (r.results.length === 1) chooseGeo(r.results[0]!);
       else setCandidates(r.results);
     });
   }
@@ -75,7 +88,7 @@ export function ReadingForm() {
       isLunar: formData.get("isLunar") === "on",
       latitude: geo?.lat,
       longitude: geo?.lon,
-      timezone: geo?.timezone,
+      timezone: effectiveTz,
       nickname,
     };
     startTransition(async () => {
@@ -87,7 +100,7 @@ export function ReadingForm() {
       } catch (e) {
         // D1：未登录不能建档——存草稿、去登录，登录后回到 /reading 回填。
         if (e instanceof UnauthenticatedError) {
-          saveReadingDraft({ nickname: nickname ?? "", date, isLunar, time, timeUnknown, gender, geo });
+          saveReadingDraft({ nickname: nickname ?? "", date, isLunar, time, timeUnknown, gender, geo, recordedTimezone: recordedTz });
           router.push("/account?next=/reading");
           return;
         }
@@ -144,7 +157,7 @@ export function ReadingForm() {
               <div className="text-ink">{geo.label.split(",").slice(0, 3).join(join)}</div>
               <div className="latin-label mt-0.5 text-[10px] text-muted">{t("reading.geoCoords", { lon: geo.lon, lat: geo.lat, timezone: geo.timezone })}</div>
             </div>
-            <button type="button" onClick={() => { setGeo(null); setCandidates([]); }} className="shrink-0 text-[12px] text-cinnabar">{t("reading.reselect")}</button>
+            <button type="button" onClick={() => { chooseGeo(null); setCandidates([]); }} className="shrink-0 text-[12px] text-cinnabar">{t("reading.reselect")}</button>
           </div>
         ) : (
           <>
@@ -168,7 +181,7 @@ export function ReadingForm() {
                   <li key={i}>
                     <button
                       type="button"
-                      onClick={() => { setGeo(c); setCandidates([]); }}
+                      onClick={() => { chooseGeo(c); setCandidates([]); }}
                       className="block w-full rounded-[var(--radius-button)] px-3 py-2.5 text-left text-[13px] text-ink bg-surface border border-line transition-colors hover:bg-tint"
                     >
                       {c.label.split(",").slice(0, 4).join(join)}
@@ -179,6 +192,27 @@ export function ReadingForm() {
             )}
             <p className="mt-1 text-[11px] text-muted">{t("reading.noBirthplaceHint")}</p>
           </>
+        )}
+        {tzChoices && (
+          <fieldset className="mt-3">
+            <legend className="text-[12px] text-ink-2">{t("reading.recordedTzLegend")}</legend>
+            <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1.5">
+              {tzChoices.map((c) => (
+                <label key={c.timezone} className="flex items-center gap-2 text-[13px] text-ink">
+                  <input
+                    type="radio"
+                    name="recordedTimezone"
+                    value={c.timezone}
+                    checked={effectiveTz === c.timezone}
+                    onChange={() => setRecordedTz(c.timezone)}
+                    className="accent-[var(--color-cinnabar)]"
+                  />
+                  {t(c.kind === "official" ? "reading.recordedTzOfficial" : "reading.recordedTzLocal")}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted">{t("reading.recordedTzHint")}</p>
+          </fieldset>
         )}
       </Field>
 

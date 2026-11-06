@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { UnauthenticatedError } from "@/lib/errors";
 import type { ReadingDraft } from "@/lib/reading-draft";
@@ -11,10 +11,11 @@ const m = vi.hoisted(() => ({
   computeChartAction: vi.fn(),
   saveReadingDraft: vi.fn(),
   takeReadingDraft: vi.fn(),
+  geocodeAction: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: m.push }) }));
 vi.mock("@/lib/profiles", () => ({ createProfile: m.createProfile }));
-vi.mock("@/app/actions", () => ({ computeChartAction: m.computeChartAction, geocodeAction: vi.fn() }));
+vi.mock("@/app/actions", () => ({ computeChartAction: m.computeChartAction, geocodeAction: m.geocodeAction }));
 vi.mock("@/lib/reading-draft", () => ({ saveReadingDraft: m.saveReadingDraft, takeReadingDraft: m.takeReadingDraft }));
 
 beforeEach(() => {
@@ -126,6 +127,7 @@ describe("ReadingForm：未登录起盘（D1）", () => {
       timeUnknown: false,
       gender: "male",
       geo: null,
+      recordedTimezone: null,
     });
     expect(m.push).not.toHaveBeenCalledWith("/chart");
   });
@@ -158,5 +160,90 @@ describe("ReadingForm：未登录起盘（D1）", () => {
     expect(m.takeReadingDraft).toHaveBeenCalled();
     expect(m.computeChartAction).not.toHaveBeenCalled();
     expect(m.createProfile).not.toHaveBeenCalled();
+  });
+});
+
+// EP-tz-edge：新疆坐标 tz-lookup 给 Asia/Urumqi（UTC+6），当地出生时间却多按北京时间记录。
+describe("ReadingForm：出生时间的记录时区（EP-tz-edge）", () => {
+  const URUMQI = { label: "乌鲁木齐市, 新疆, 中国", lat: 43.8, lon: 87.6, timezone: "Asia/Urumqi" };
+  const SHANGHAI = { label: "上海市, 中国", lat: 31.23, lon: 121.47, timezone: "Asia/Shanghai" };
+
+  async function pickPlace(geo: typeof URUMQI) {
+    m.geocodeAction.mockResolvedValue({ ok: true, results: [geo] });
+    fireEvent.change(screen.getByPlaceholderText(/乌鲁木齐|上海|出生地|城市/), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "查找" }));
+    await waitFor(() => expect(m.geocodeAction).toHaveBeenCalled());
+  }
+  function fillRest() {
+    fireEvent.change(document.querySelector('input[name="date"]')!, { target: { value: "1985-06-15" } });
+    fireEvent.change(document.querySelector('input[type="time"]')!, { target: { value: "14:30" } });
+    fireEvent.click(screen.getByText("乾 · 男"));
+  }
+  const submittedTz = () => (m.computeChartAction.mock.calls[0]![0] as { timezone?: string }).timezone;
+
+  it("新疆地点：出现记录时区选择，默认选中北京时间，提交的 timezone 是 Asia/Shanghai", async () => {
+    render_();
+    await pickPlace(URUMQI);
+    const beijing = await screen.findByRole("radio", { name: /北京时间/ });
+    const xinjiang = screen.getByRole("radio", { name: /新疆时间/ });
+    expect(beijing).toBeChecked();
+    expect(xinjiang).not.toBeChecked();
+    fillRest();
+    fireEvent.click(screen.getByRole("button", { name: "排我的盘" }));
+    await waitFor(() => expect(m.computeChartAction).toHaveBeenCalled());
+    expect(submittedTz()).toBe("Asia/Shanghai");
+  });
+
+  it("改选新疆时间 → 提交 Asia/Urumqi", async () => {
+    render_();
+    await pickPlace(URUMQI);
+    fireEvent.click(await screen.findByRole("radio", { name: /新疆时间/ }));
+    fillRest();
+    fireEvent.click(screen.getByRole("button", { name: "排我的盘" }));
+    await waitFor(() => expect(m.computeChartAction).toHaveBeenCalled());
+    expect(submittedTz()).toBe("Asia/Urumqi");
+  });
+
+  it("非歧义地点：不出现选择，timezone 原样用地理时区", async () => {
+    render_();
+    await pickPlace(SHANGHAI);
+    await screen.findByText("上海市、 中国");
+    expect(screen.queryByRole("radio", { name: /北京时间/ })).toBeNull();
+    fillRest();
+    fireEvent.click(screen.getByRole("button", { name: "排我的盘" }));
+    await waitFor(() => expect(m.computeChartAction).toHaveBeenCalled());
+    expect(submittedTz()).toBe("Asia/Shanghai");
+  });
+
+  it("重选地点后选择复位：之前选的新疆时间不会带到下一个新疆地点", async () => {
+    render_();
+    await pickPlace(URUMQI);
+    fireEvent.click(await screen.findByRole("radio", { name: /新疆时间/ }));
+    fireEvent.click(screen.getByRole("button", { name: "重选" }));
+    await pickPlace({ ...URUMQI, label: "喀什市, 新疆, 中国", lat: 39.47, lon: 75.99 });
+    expect(await screen.findByRole("radio", { name: /北京时间/ })).toBeChecked();
+  });
+
+  it("未登录存草稿时带上所选记录时区，回填后仍是那个选择", async () => {
+    m.createProfile.mockRejectedValue(new UnauthenticatedError());
+    render_();
+    await pickPlace(URUMQI);
+    fireEvent.click(await screen.findByRole("radio", { name: /新疆时间/ }));
+    fillRest();
+    fireEvent.click(screen.getByRole("button", { name: "排我的盘" }));
+    await waitFor(() => expect(m.saveReadingDraft).toHaveBeenCalled());
+    const saved = m.saveReadingDraft.mock.calls[0]![0] as ReadingDraft;
+    expect(saved.recordedTimezone).toBe("Asia/Urumqi");
+
+    cleanup();
+    m.takeReadingDraft.mockReturnValue(saved);
+    render_();
+    expect(await screen.findByRole("radio", { name: /新疆时间/ })).toBeChecked();
+  });
+
+  it("旧草稿没有 recordedTimezone 字段 → 新疆地点按默认北京时间", async () => {
+    m.takeReadingDraft.mockReturnValue({ ...draft, geo: URUMQI });
+    render_();
+    expect(await screen.findByRole("radio", { name: /北京时间/ })).toBeChecked();
   });
 });

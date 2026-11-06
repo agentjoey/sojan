@@ -13,6 +13,11 @@ export type ReadingDraft = {
   timeUnknown: boolean;
   gender: "male" | "female" | "";
   geo: GeoResult | null;
+  /**
+   * 出生时间的记录时区（EP-tz-edge，仅新疆等地理时区有歧义的地点才有值）。
+   * 可选：本字段之前存下的旧草稿里没有它，回填时按默认（北京时间）处理。
+   */
+  recordedTimezone?: string | null;
 };
 
 const KEY = "zhaojian.readingDraft";

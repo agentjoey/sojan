@@ -165,6 +165,10 @@ export const en: Messages = {
     search: "Search",
     searching: "Searching…",
     reselect: "Change",
+    recordedTzLegend: "Which time zone was the birth time recorded in?",
+    recordedTzOfficial: "Beijing time (UTC+8)",
+    recordedTzLocal: "Xinjiang time (UTC+6)",
+    recordedTzHint: "Birth certificates and household records usually use Beijing time — if unsure, choose Beijing time. The two differ by 2 hours, which can change the birth hour.",
     geoCoords: "Lon {lon}° · Lat {lat}° · {timezone}",
     noBirthplaceHint:
       "Without a birthplace, 真太阳时 (True Solar Time) correction and the Western chart will be omitted.",

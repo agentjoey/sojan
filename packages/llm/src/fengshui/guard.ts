@@ -482,14 +482,26 @@ const EN_LOCATIVE =
 /** 星名后的括号释义（prompt 允许「Sheng Qi (vitality)」），两个分支都认、改写时原样保留。 */
 const EN_STAR_GLOSS = "(?:[ \\t]*\\([^()\\n]{1,40}\\))";
 /**
- * 分支 ① 方位名的左侧语境（评审 B1 / N3），在 replacer 里判：
- * - 朝向/坐向动词之后的方位（「faces South — Sheng Qi, …」「Face North: Sheng Qi is behind you」）
- *   说的是门或人朝哪边，冒号/破折号后面的星名属于别的主语 → 弃权；
- *   但紧跟括号的同位语「face the Southeast (Sheng Qi)」仍是在说这个方位的星，照常对拍。
- * - 所有格之后的方位（「your partner's North is Sheng Qi」）是别人的方位 → 一律弃权。
+ * 分支 ① 方位名的左侧语境（评审 B1 / N3，二轮改为结构规则），在 replacer 里判：
+ * - **冒号/破折号/箭头胶水只在方位名位于分句开头时才对拍**（行首、列表符号/表格竖线/`·`
+ *   之后、分句标点之后，可带 the/your）。「- Southeast: Jue Ming」「Southeast — Wu Gui」是
+ *   在给这个方位标星；「Your door opens to the South — Sheng Qi, though, …」「Face North:
+ *   Sheng Qi is behind you」里方位是某个动词的宾语，冒号后的星名属于别的主语 → 弃权。
+ *   比列举 face/point/open/look… 动词表稳：任何动词引出的方位都同样处理。系词/空格/括号胶水
+ *   （「Facing Southeast is your Jue Ming direction」「face the Southeast (Sheng Qi)」）不受影响。
+ * - 所有格之后的方位（「your partner's North is Sheng Qi」）是别人的方位 → 弃权；
+ *   但 house/home/dwelling 的所有格是房屋八方自己的断言，照常对拍。
  */
-const EN_AFTER_FACING = /\b(?:fac(?:e|es|ed|ing)|sits?|sitting|towards?)[ \t]+(?:the[ \t]+)?$/i;
-const EN_AFTER_POSSESSIVE = /['’]s[ \t]+$/;
+const EN_LABEL_GLUE = /[:\-—–→]/;
+const EN_CLAUSE_START = /(?:^|[,;.!?·|])[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:(?:the|your)[ \t]+)?$/i;
+const EN_AFTER_POSSESSIVE = /(?<!\b(?:house|home|dwelling|apartment|flat))['’]s[ \t]+$/i;
+
+/**
+ * 「personal / your own」只在**紧跟**星名、方位名或 directions 时才算本命标记（二轮评审 blocker）：
+ * 单独出现时它们是日常用词（「a good spot for personal reflection」「as your own quiet corner」），
+ * 把它们当标记会让谈房屋的句子被拿本命表误纠。
+ */
+const EN_PERSONAL_LEAD = `\\b(?:personal|your[ \\t]+own)[ \\t]+(?:eight[ \\t]+)?(?:${EN_STAR_ALT}|${EN_DIR_ALT}|directions?\\b)`;
 
 /**
  * 英文归属标记。只收**强**标记：「the house」「your home」这类词刻意不收——
@@ -499,8 +511,11 @@ const EN_AFTER_POSSESSIVE = /['’]s[ \t]+$/;
  * 「personal directions」/「house directions」，弃权只落在已违规的句子上。
  */
 const EN_SCOPE: ScopeLexicon = {
-  personal:
-    /\bpersonal\b|\byour own\b|\bpersonal (?:chart|gua|table)\b|\b(?:life|ming) gua\b|\b(?:east|west) group person\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) (?:gua|person)\b|\bfor you personally\b/i,
+  personal: new RegExp(
+    `${EN_PERSONAL_LEAD}|\\bpersonal (?:chart|gua|table)\\b|\\b(?:life|ming) gua\\b|\\b(?:east|west) group person\\b|` +
+      "\\b(?:kan|kun|zhen|xun|qian|dui|gen|li) (?:gua|person)\\b|\\bfor you personally\\b",
+    "i",
+  ),
   dwelling:
     /\bhouse(?:'s)? (?:eight )?directions?\b|\bhouse (?:gua|chart|table)\b|\bdwelling\b|\b(?:this|the) house's\b|\b(?:kan|kun|zhen|xun|qian|dui|gen|li) house\b|\b(?:east|west) group house\b/i,
   clause: /[,;.!?\n]/,
@@ -552,9 +567,9 @@ function verifyDirectionConsistencyEn(
     const dir = EN_DIRECTION_BY_KEY.get(enKey(writtenDir))!;
     const star = EN_STAR_BY_KEY.get(enKey(writtenStar))!;
     if (dirFirst) {
-      const before = markdown.slice(Math.max(0, offset - 40), offset);
+      const before = markdown.slice(lineBounds(markdown, offset)[0], offset);
       if (EN_AFTER_POSSESSIVE.test(before)) return match;
-      if (EN_AFTER_FACING.test(before) && !(g.aGlue ?? "").trimStart().startsWith("(")) return match;
+      if (EN_LABEL_GLUE.test(g.aGlue ?? "") && !EN_CLAUSE_START.test(before)) return match;
     }
     const d = tableFor(dir, offset, offset + match.length);
     if (!d || star === d.star) return match;
@@ -588,14 +603,18 @@ const EN_PSEUDO_SCIENCE_RE = new RegExp(
   ].join("|"),
   "gi",
 );
-/** 「has been (scientifically) proven to」→「is traditionally said to」：整段删掉会留下破句（评审 S2）。 */
-const EN_HAS_BEEN_PROVEN_TO_RE =
-  /\bhas[ \t]+been[ \t]+(?:scientifically[ \t]+|clinically[ \t]+)?(?:proven|shown)[ \t]+to\b/gi;
+/**
+ * 「has/have been (scientifically) proven to」「is/are proven to」→「is/are traditionally said to」：
+ * 整段删掉会留下破句（评审 S2，二轮补复数与无 been 形态）。is/are 后只认 proven——
+ * 「is shown to guests」是正常英文。
+ */
+const EN_PROVEN_TO_RE =
+  /\b(?:(has|have)[ \t]+been[ \t]+(?:scientifically[ \t]+|clinically[ \t]+)?(?:proven|shown)|(is|are)[ \t]+(?:scientifically[ \t]+|clinically[ \t]+)?proven)[ \t]+to\b/gi;
 /** 「is scientifically proven to help」→「is traditionally said to help」。 */
 const EN_PROVEN_RE = /\b(?:scientifically|clinically)[ \t]+(?:proven|shown|validated)\b/gi;
 const EN_SYMBOLIC_MARKER = /traditional symbolism|\bsymbolic\b|\britual\b/i;
 /** 删除点之前是「句首」：行首（可带列表符号）或句末标点 + 空白。 */
-const EN_SENTENCE_START = /(?:^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*|[.!?]["')\]]?[ \t]+)$/;
+const EN_SENTENCE_START = /(?:^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*|[.!?]["')\]]?[ \t]+)["'“‘(]?$/;
 /** 只在删除点补大写的内部标记；不会出现在模型输出里。 */
 const CAP = "\u0000";
 
@@ -605,7 +624,10 @@ function sanitizeFengshuiEn(markdown: string): string {
     .map((line) => {
       if (!EN_SYMBOLIC_MARKER.test(line)) return line;
       const out = line
-        .replace(EN_HAS_BEEN_PROVEN_TO_RE, "is traditionally said to")
+        .replace(EN_PROVEN_TO_RE, (_m: string, perfect?: string, copula?: string) => {
+          const plural = /^(?:have|are)$/i.test(perfect ?? copula ?? "");
+          return `${plural ? "are" : "is"} traditionally said to`;
+        })
         .replace(EN_PSEUDO_SCIENCE_RE, (_m: string, offset: number, whole: string) =>
           EN_SENTENCE_START.test(whole.slice(0, offset)) ? CAP : "")
         .replace(EN_PROVEN_RE, "traditionally said");

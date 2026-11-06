@@ -303,3 +303,51 @@ describe("EP-fs-en 评审回归：净化", () => {
       .toBe("- A bowl helps (traditional symbolism), e.g. in the North.");
   });
 });
+
+describe("EP-fs-en 二轮评审回归", () => {
+  it("blocker：日常用词 personal / your own 不算本命标记（只在紧跟星名/方位名/directions 时算）", () => {
+    for (const md of [
+      "In this home, the East is Sheng Qi — a good spot for personal reflection.",
+      "Per the house directions, keep the East (Sheng Qi) as your own quiet corner.",
+    ]) {
+      expect(en(md, l1)).toEqual({ text: md, corrections: [] });
+    }
+    // 紧跟星名/方位名时仍是本命标记
+    expect(en("Your own East is Sheng Qi, while the house's Sheng Qi is in the East.", l1).text)
+      .toBe("Your own East is Tian Yi, while the house's Sheng Qi is in the East.");
+  });
+
+  it("S-a：冒号/破折号胶水只在方位名位于分句开头时对拍（任何动词引出的方位都不误纠）", () => {
+    for (const md of [
+      "Your bed points North: Sheng Qi is elsewhere.",
+      "Your door opens to the South — Sheng Qi, though, is Southeast.",
+      "The window looks out over the South: Sheng Qi energy is strongest in the Southeast.",
+    ]) {
+      expect(en(md)).toEqual({ text: md, corrections: [] });
+    }
+  });
+
+  it("S-b：朝向动词后用系词/空格的真实断言照常纠正", () => {
+    expect(en("Facing Southeast is your Jue Ming direction.").text).toBe("Facing Southeast is your Sheng Qi direction.");
+    expect(en("Face Southeast as your Jue Ming.").text).toBe("Face Southeast as your Sheng Qi.");
+  });
+
+  it("S-c：the house's 不算「别人的」所有格，房屋八方照常纠正", () => {
+    expect(en("The house's North is Wu Gui.", l1).text).toBe("The house's North is Yan Nian.");
+  });
+});
+
+describe("EP-fs-en 二轮评审回归：净化", () => {
+  const s = (md: string) => sanitizeFengshui(md, facts, "en");
+
+  it("S-d：have been proven to / are proven to 也改写成传统说法", () => {
+    expect(s("- Crystals (traditional symbolism) have been proven to attract luck."))
+      .toBe("- Crystals (traditional symbolism) are traditionally said to attract luck.");
+    expect(s("- Crystals (traditional symbolism) are proven to attract luck."))
+      .toBe("- Crystals (traditional symbolism) are traditionally said to attract luck.");
+  });
+
+  it("引号开头的句子删除后同样补大写", () => {
+    expect(s('- Bowl (traditional symbolism). "Studies show it works."')).toBe('- Bowl (traditional symbolism). "It works."');
+  });
+});
